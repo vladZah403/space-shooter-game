@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Shooter</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #000;
+            touch-action: none;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            font-size: 18px;
+            text-shadow: 0 0 10px #0f0;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #0f0;
+            display: none;
+            z-index: 20;
+        }
+
+        #gameOver h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #0f0;
+        }
+
+        #gameOver p {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        #restartBtn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #0f0;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        #restartBtn:active {
+            transform: scale(0.95);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            color: #0f0;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .control-btn:active {
+            background: rgba(0, 255, 0, 0.4);
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            color: #0f0;
+        }
+
+        #startScreen h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px #0f0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        #startBtn {
+            padding: 20px 50px;
+            font-size: 24px;
+            background: #0f0;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            box-shadow: 0 0 20px #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>🚀 SPACE SHOOTER 🚀</h1>
+        <button id="startBtn">НАЧАТЬ ИГРУ</button>
+    </div>
+
+    <div id="ui">
+        <div>Очки: <span id="score">0</span></div>
+        <div>Жизни: <span id="lives">3</span></div>
+        <div>Уровень: <span id="level">1</span></div>
+    </div>
+
+    <div id="gameOver">
+        <h1>GAME OVER</h1>
+        <p>Ваш счет: <span id="finalScore">0</span></p>
+        <p>Лучший счет: <span id="bestScore">0</span></p>
+        <button id="restartBtn">ИГРАТЬ СНОВА</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="controls">
+        <div class="control-btn" id="leftBtn">◄</div>
+        <div class="control-btn" id="shootBtn">●</div>
+        <div class="control-btn" id="rightBtn">►</div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let gameStarted = false;
+        let gameRunning = false;
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            width: 40,
+            height: 40,
+            speed: 5,
+            vx: 0
+        };
+
+        const bullets = [];
+        const enemies = [];
+        const stars = [];
+        const particles = [];
+
+        let leftPressed = false;
+        let rightPressed = false;
+        let shootPressed = false;
+        let lastShootTime = 0;
+        const shootCooldown = 250;
+
+        // Звездное поле
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2,
+                speed: Math.random() * 2 + 1
+            });
+        }
+
+        // Управление
+        document.getElementById('leftBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            leftPressed = true;
+        });
+        document.getElementById('leftBtn').addEventListener('touchend', () => leftPressed = false);
+
+        document.getElementById('rightBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            rightPressed = true;
+        });
+        document.getElementById('rightBtn').addEventListener('touchend', () => rightPressed = false);
+
+        document.getElementById('shootBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            shootPressed = true;
+        });
+        document.getElementById('shootBtn').addEventListener('touchend', () => shootPressed = false);
+
+        // Клавиатура
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = true;
+            if (e.key === 'ArrowRight') rightPressed = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                shootPressed = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = false;
+            if (e.key === 'ArrowRight') rightPressed = false;
+            if (e.key === ' ') shootPressed = false;
+        });
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            gameStarted = true;
+            gameRunning = true;
+            score = 0;
+            lives = 3;
+            level = 1;
+            bullets.length = 0;
+            enemies.length = 0;
+            particles.length = 0;
+            player.x = canvas.width / 2;
+            updateUI();
+            gameLoop();
+        }
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('gameOver').style.display = 'none';
+            startGame();
+        });
+
+        function shoot() {
+            const now = Date.now();
+            if (now - lastShootTime > shootCooldown) {
+                bullets.push({
+                    x: player.x,
+                    y: player.y,
+                    width: 4,
+                    height: 15,
+                    speed: 8
+                });
+                lastShootTime = now;
+            }
+        }
+
+        function spawnEnemy() {
+            const size = 30 + Math.random() * 20;
+            enemies.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                width: size,
+                height: size,
+                speed: 1 + level * 0.3 + Math.random() * 2,
+                health: 1 + Math.floor(level / 3)
+            });
+        }
+
+        function createExplosion(x, y) {
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 1,
+                    decay: 0.02
+                });
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('level').textContent = level;
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('bestScore', bestScore);
+
+                // Отправка данных в Telegram
+                if (tg.initDataUnsafe?.user) {
+                    tg.sendData(JSON.stringify({
+                        score: score,
+                        level: level,
+                        userId: tg.initDataUnsafe.user.id
+                    }));
+                }
+            }
+
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('bestScore').textContent = bestScore;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            // Движение игрока
+            player.vx = 0;
+            if (leftPressed) player.vx = -player.speed;
+            if (rightPressed) player.vx = player.speed;
+            player.x += player.vx;
+            player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
+
+            // Стрельба
+            if (shootPressed) shoot();
+
+            // Обновление звезд
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+
+            // Обновление пуль
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= bullets[i].speed;
+                if (bullets[i].y < 0) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Обновление врагов
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].y += enemies[i].speed;
+
+                if (enemies[i].y > canvas.height) {
+                    enemies.splice(i, 1);
+                    lives--;
+                    updateUI();
+                    if (lives <= 0) gameOver();
+                }
+            }
+
+            // Столкновения
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    if (bullets[i] && enemies[j] &&
+                        bullets[i].x > enemies[j].x - enemies[j].width / 2 &&
+                        bullets[i].x < enemies[j].x + enemies[j].width / 2 &&
+                        bullets[i].y > enemies[j].y - enemies[j].height / 2 &&
+                        bullets[i].y < enemies[j].y + enemies[j].height / 2) {
+
+                        bullets.splice(i, 1);
+                        enemies[j].health--;
+
+                        if (enemies[j].health <= 0) {
+                            createExplosion(enemies[j].x, enemies[j].y);
+                            enemies.splice(j, 1);
+                            score += 10 * level;
+                            updateUI();
+
+                            if (score > 0 && score % 200 === 0) {
+                                level++;
+                                updateUI();
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Столкновения с игроком
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (Math.abs(enemies[i].x - player.x) < (enemies[i].width + player.width) / 2 &&
+                    Math.abs(enemies[i].y - player.y) < (enemies[i].height + player.height) / 2) {
+                    createExplosion(player.x, player.y);
+                    enemies.splice(i, 1);
+                    lives--;
+                    updateUI();
+                    if (lives <= 0) gameOver();
+                }
+            }
+
+            // Обновление частиц
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+                particles[i].life -= particles[i].decay;
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Спавн врагов
+            if (Math.random() < 0.02 + level * 0.005) {
+                spawnEnemy();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Звезды
+            stars.forEach(star => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            });
+
+            // Игрок
+            ctx.fillStyle = '#0f0';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#0f0';
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y - player.height / 2);
+            ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
+            ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Пули
+            ctx.fillStyle = '#ff0';
+            bullets.forEach(bullet => {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ff0';
+                ctx.fillRect(bullet.x - bullet.width / 2, bullet.y, bullet.width, bullet.height);
+            });
+            ctx.shadowBlur = 0;
+
+            // Враги
+            enemies.forEach(enemy => {
+                ctx.fillStyle = '#f00';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#f00';
+                ctx.fillRect(
+                    enemy.x - enemy.width / 2,
+                    enemy.y - enemy.height / 2,
+                    enemy.width,
+                    enemy.height
+                );
+            });
+            ctx.shadowBlur = 0;
+
+            // Частицы
+            particles.forEach(particle => {
+                ctx.fillStyle = `rgba(255, ${Math.floor(particle.life * 255)}, 0, ${particle.life})`;
+                ctx.fillRect(particle.x, particle.y, 3, 3);
+            });
+        }
+
+        function gameLoop() {
+            if (gameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = canvas.width / 2;
+        });
+    </script>
+</body>
+</html>
