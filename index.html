@@ -1,1200 +1,1572 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Space Shooter</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-        body{overflow:hidden;background:#0a0a1a;font-family:'Segoe UI',sans-serif;touch-action:none;user-select:none}
-        #gameCanvas{display:block;touch-action:none}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Space Shooter</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --green:#00ff88;--cyan:#00d4ff;--pink:#ff0066;--gold:#ffd700;--purple:#a855f7;
+  --bg:#04040f;--card:rgba(8,18,35,.95);--border:rgba(0,255,136,.25);
+}
+body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touch-action:none;user-select:none}
+#gameCanvas{display:block;touch-action:none;position:absolute;inset:0}
 
-        /* UI */
-        #ui{position:absolute;top:10px;left:10px;right:10px;z-index:10;pointer-events:none}
-        .stat-card{background:rgba(5,15,30,.88);border:1.5px solid rgba(0,255,136,.35);border-radius:8px;padding:5px 10px;backdrop-filter:blur(8px)}
-        .stat-label{font-size:9px;color:rgba(0,255,136,.65);text-transform:uppercase;letter-spacing:.5px}
-        .stat-value{font-size:16px;font-weight:700;color:#00ff88;text-shadow:0 0 8px #00ff8888}
-        .progress{height:5px;background:rgba(0,255,136,.1);border-radius:10px;overflow:hidden}
-        .progress-bar{background:linear-gradient(90deg,#00ff88,#00d4ff);transition:width .3s}
+/* ── PAUSE OVERLAY ── */
+#pauseOverlay{position:absolute;inset:0;background:rgba(4,4,15,.85);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(16px)}
+.pause-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:32px 28px;text-align:center;min-width:240px;box-shadow:0 0 60px rgba(0,255,136,.15)}
+.pause-title{font-family:'Orbitron',monospace;font-size:28px;color:var(--green);text-shadow:0 0 20px var(--green);margin-bottom:24px;letter-spacing:4px}
+.pause-btn{display:block;width:100%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;color:#04040f;font-family:'Orbitron',monospace;font-weight:700;font-size:13px;padding:12px;border-radius:40px;cursor:pointer;letter-spacing:2px;margin-bottom:10px;transition:all .2s}
+.pause-btn:active{transform:scale(.95)}
+.pause-btn.secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:12px}
 
-        /* Combo */
-        #comboDisplay{position:absolute;top:80px;right:15px;text-align:right;pointer-events:none;z-index:10;transition:all .3s}
-        .combo-text{font-size:13px;color:rgba(255,200,0,.8);font-weight:700}
-        .combo-value{font-size:28px;font-weight:900;color:#ffd700;text-shadow:0 0 15px #ffd70088;line-height:1}
-        .combo-hidden{opacity:0}
+/* ── UI TOP ── */
+#ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;padding:10px}
+.stats-row{display:flex;gap:6px;align-items:stretch}
+.stat-pill{background:rgba(8,18,35,.88);border:1px solid var(--border);border-radius:10px;padding:5px 10px;backdrop-filter:blur(10px);flex:1;position:relative;overflow:hidden}
+.stat-pill::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,.05),transparent);pointer-events:none}
+.stat-lbl{font-size:8px;color:rgba(0,255,136,.5);text-transform:uppercase;letter-spacing:1px;font-family:'Orbitron',monospace}
+.stat-val{font-size:17px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 8px rgba(0,255,136,.5)}
+.stat-val.lives{color:#ff6b88;text-shadow:0 0 8px rgba(255,107,136,.5)}
+.stat-val.level-val{color:var(--cyan);text-shadow:0 0 8px rgba(0,212,255,.5)}
 
-        /* Уведомления */
-        #notifications{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;text-align:center}
-        .notif{font-size:22px;font-weight:900;color:#00ff88;text-shadow:0 0 20px #00ff88;animation:notifAnim .8s forwards;white-space:nowrap}
-        .notif.boss{font-size:30px;color:#ff0066;text-shadow:0 0 30px #ff0066}
-        .notif.achieve{font-size:18px;color:#ffd700;text-shadow:0 0 15px #ffd700}
-        @keyframes notifAnim{0%{opacity:1;transform:scale(.5)}40%{opacity:1;transform:scale(1.1)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:translateY(-40px) scale(.8)}}
+/* Level progress */
+#levelBar{height:3px;background:rgba(0,212,255,.1);border-radius:2px;overflow:hidden;margin-top:6px}
+#levelFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;transition:width .4s ease;box-shadow:0 0 6px var(--cyan)}
 
-        /* Powerup indicator */
-        #powerupBar{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
-        .powerup-icon{background:rgba(5,15,30,.85);border:1.5px solid;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
-        .powerup-icon.shield{border-color:#00d4ff;color:#00d4ff}
-        .powerup-icon.speed{border-color:#ffd700;color:#ffd700}
-        .powerup-icon.bomb{border-color:#ff6b00;color:#ff6b00}
+/* XP bar */
+#xpRow{display:flex;align-items:center;gap:8px;margin-top:5px;padding:4px 8px;background:rgba(255,215,0,.06);border-radius:8px;border:1px solid rgba(255,215,0,.1)}
+.xp-lbl{font-size:9px;color:rgba(255,215,0,.6);font-family:'Orbitron',monospace;white-space:nowrap}
+.xp-track{flex:1;height:3px;background:rgba(255,215,0,.1);border-radius:2px;overflow:hidden}
+.xp-fill-bar{height:100%;background:linear-gradient(90deg,var(--gold),#ff9900);border-radius:2px;transition:width .4s}
+.xp-lvl{font-size:10px;color:var(--gold);font-family:'Orbitron',monospace;white-space:nowrap}
 
-        /* Авто-стрельба */
-        #autoShootIndicator{position:absolute;bottom:20px;right:15px;background:rgba(5,15,30,.85);border:1.5px solid rgba(0,255,136,.4);border-radius:20px;padding:7px 14px;color:#00ff88;font-size:11px;display:flex;align-items:center;gap:5px;backdrop-filter:blur(8px);cursor:pointer;z-index:10;transition:all .25s}
-        #autoShootIndicator.active{background:rgba(0,255,136,.18);border-color:#00ff88}
-        #autoShootIndicator:active{transform:scale(.93)}
+/* ── PAUSE BTN ── */
+#pauseBtn{position:absolute;top:10px;right:10px;z-index:15;pointer-events:all;width:38px;height:38px;background:rgba(8,18,35,.88);border:1px solid var(--border);border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(10px)}
+#pauseBtn:active{transform:scale(.9);border-color:var(--green)}
+#pauseBtn svg{width:16px;height:16px;fill:var(--green)}
 
-        /* XP Bar */
-        #xpBar{position:absolute;top:78px;left:10px;right:10px;z-index:10;pointer-events:none}
-        .xp-row{display:flex;align-items:center;gap:8px}
-        .xp-label{font-size:9px;color:rgba(255,215,0,.7);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-        .xp-track{flex:1;height:4px;background:rgba(255,215,0,.1);border-radius:10px;overflow:hidden}
-        .xp-fill{height:100%;background:linear-gradient(90deg,#ffd700,#ff9900);border-radius:10px;transition:width .4s}
-        .ship-lvl{font-size:11px;font-weight:700;color:#ffd700;white-space:nowrap}
+/* ── COMBO ── */
+#comboDisplay{position:absolute;top:105px;right:10px;text-align:right;pointer-events:none;z-index:10;transition:opacity .3s,transform .3s}
+.combo-word{font-size:9px;color:rgba(255,215,0,.7);font-family:'Orbitron',monospace;letter-spacing:2px}
+.combo-num{font-size:32px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 20px rgba(255,215,0,.6);line-height:1;animation:comboPulse .3s ease}
+@keyframes comboPulse{0%{transform:scale(1.3)}100%{transform:scale(1)}}
+.combo-hidden{opacity:0;transform:translateX(20px)}
 
-        /* Upgrade screen */
-        #upgradeScreen{position:absolute;inset:0;background:rgba(10,10,26,.96);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(12px);padding:15px;overflow-y:auto}
-        .upgrade-card{background:rgba(13,27,42,.98);border:1.5px solid rgba(255,215,0,.35);border-radius:16px;padding:18px 14px;max-width:400px;width:100%;box-shadow:0 10px 50px rgba(255,215,0,.2);max-height:92vh;overflow-y:auto}
-        .upgrade-title{font-size:26px;font-weight:800;background:linear-gradient(135deg,#ffd700,#ff9900);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:4px}
-        .upgrade-coins{text-align:center;font-size:14px;color:#ffd700;margin-bottom:16px}
-        .upgrade-item{background:rgba(13,27,42,.7);border:1.5px solid rgba(255,215,0,.2);border-radius:12px;padding:13px;margin-bottom:10px;display:flex;align-items:center;gap:12px;transition:all .25s}
-        .upgrade-item.maxed{border-color:rgba(0,255,136,.4)}
-        .upgrade-icon{font-size:26px;flex-shrink:0}
-        .upgrade-name{font-size:14px;font-weight:700;color:#ffd700;margin-bottom:2px}
-        .upgrade-desc{font-size:11px;color:rgba(255,255,255,.6);margin-bottom:5px}
-        .upgrade-stars{display:flex;gap:3px;margin-bottom:6px}
-        .star{width:12px;height:12px;border-radius:2px;background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.3)}
-        .star.filled{background:#ffd700;border-color:#ffd700}
-        .btn-upgrade{background:linear-gradient(135deg,#ffd700,#ff9900);border:none;color:#0a0a1a;font-weight:700;font-size:12px;padding:7px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .25s}
-        .btn-upgrade:active{transform:scale(.93)}
-        .btn-upgrade:disabled{background:rgba(255,255,255,.1);color:rgba(255,255,255,.3);cursor:not-allowed}
-        .btn-upgrade.maxed{background:linear-gradient(135deg,#00ff88,#00d4ff);color:#0a0a1a}
+/* ── NOTIFICATIONS ── */
+#notifications{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;text-align:center}
+.notif{font-size:20px;font-weight:700;font-family:'Orbitron',monospace;color:var(--green);text-shadow:0 0 15px var(--green);animation:notifAnim .9s forwards;white-space:nowrap}
+.notif.boss{font-size:28px;color:var(--pink);text-shadow:0 0 30px var(--pink)}
+.notif.gold{color:var(--gold);text-shadow:0 0 15px var(--gold);font-size:16px}
+.notif.levelup{font-size:26px;color:var(--cyan);text-shadow:0 0 25px var(--cyan)}
+@keyframes notifAnim{0%{opacity:0;transform:scale(.4) translateY(0)}20%{opacity:1;transform:scale(1.1) translateY(0)}60%{opacity:1;transform:scale(1) translateY(-10px)}100%{opacity:0;transform:scale(.8) translateY(-45px)}}
 
-        /* Leaderboard screen */
-        #leaderboardScreen{position:absolute;inset:0;background:rgba(10,10,26,.96);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(12px);padding:15px}
-        .lb-card{background:rgba(13,27,42,.98);border:1.5px solid rgba(0,212,255,.35);border-radius:16px;padding:18px 14px;max-width:400px;width:100%;box-shadow:0 10px 50px rgba(0,212,255,.2);max-height:92vh;overflow-y:auto}
-        .lb-title{font-size:24px;font-weight:800;background:linear-gradient(135deg,#00d4ff,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:16px}
-        .lb-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:7px;background:rgba(13,27,42,.6);border:1px solid rgba(0,212,255,.15);transition:all .2s}
-        .lb-row.mine{border-color:rgba(0,255,136,.5);background:rgba(0,255,136,.08)}
-        .lb-rank{font-size:18px;font-weight:900;min-width:30px;text-align:center}
-        .lb-name{flex:1;font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .lb-score{font-size:14px;font-weight:700;color:#00d4ff}
-        .lb-loading{text-align:center;color:rgba(0,212,255,.6);font-size:13px;padding:20px}
+/* ── POWERUP BAR ── */
+#powerupBar{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
+.pu-chip{background:rgba(8,18,35,.88);border:1.5px solid;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;font-family:'Orbitron',monospace;display:flex;align-items:center;gap:5px}
+.pu-chip.shield{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.3)}
+.pu-chip.speed{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(255,215,0,.3)}
 
-        /* Boss HP */
-        #bossBar{position:absolute;bottom:60px;left:10px;right:10px;z-index:10;display:none;pointer-events:none}
-        .boss-bar-label{font-size:11px;color:#ff0066;text-align:center;margin-bottom:3px;text-shadow:0 0 10px #ff0066;letter-spacing:1px;font-weight:700}
-        .boss-bar-bg{height:10px;background:rgba(255,0,102,.15);border-radius:8px;border:1px solid rgba(255,0,102,.4);overflow:hidden}
-        .boss-bar-fill{height:100%;background:linear-gradient(90deg,#ff0066,#ff6b00);border-radius:8px;transition:width .3s;box-shadow:0 0 10px #ff006688}
+/* ── BOSS BAR ── */
+#bossBar{position:absolute;bottom:72px;left:10px;right:10px;z-index:10;display:none;pointer-events:none}
+.boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink)}
+.boss-track{height:8px;background:rgba(255,0,102,.1);border-radius:6px;border:1px solid rgba(255,0,102,.3);overflow:hidden}
+#bossFill{height:100%;background:linear-gradient(90deg,var(--pink),#ff6b00);border-radius:6px;transition:width .3s;box-shadow:0 0 8px rgba(255,0,102,.6)}
 
-        /* Достижения */
-        #achieveToast{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(5,15,30,.95);border:1.5px solid #ffd700;border-radius:12px;padding:10px 18px;display:none;z-index:25;text-align:center;box-shadow:0 0 20px rgba(255,215,0,.4);backdrop-filter:blur(8px)}
-        .achieve-title{font-size:10px;color:rgba(255,215,0,.7);letter-spacing:2px;margin-bottom:2px}
-        .achieve-name{font-size:14px;font-weight:700;color:#ffd700}
+/* ── AUTO / WEAPON BAR ── */
+#bottomBar{position:absolute;bottom:12px;left:10px;right:10px;display:flex;align-items:center;justify-content:space-between;z-index:10;pointer-events:all}
+.weapon-btn{width:50px;height:50px;background:rgba(8,18,35,.88);border:2px solid rgba(0,255,136,.2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;gap:1px;backdrop-filter:blur(8px)}
+.weapon-btn.active{border-color:var(--green);background:rgba(0,255,136,.12);box-shadow:0 0 16px rgba(0,255,136,.3)}
+.weapon-btn:active{transform:scale(.88)}
+.weapon-emoji{font-size:18px;line-height:1}
+.weapon-lbl{font-size:7px;color:rgba(0,255,136,.6);font-family:'Orbitron',monospace;font-weight:700}
+.weapon-btn.active .weapon-lbl{color:var(--green)}
+.weapons-group{display:flex;gap:6px}
+#autoBtn{background:rgba(8,18,35,.88);border:1.5px solid rgba(0,255,136,.3);border-radius:20px;padding:8px 14px;color:rgba(0,255,136,.6);font-size:10px;font-family:'Orbitron',monospace;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px;backdrop-filter:blur(8px)}
+#autoBtn.active{background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(0,255,136,.25)}
+#autoBtn:active{transform:scale(.93)}
 
-        /* Экраны */
-        #gameOver,#difficultyScreen,#customizeScreen{position:absolute;inset:0;background:rgba(10,10,26,.95);display:flex;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(12px);overflow-y:auto;padding:15px}
-        .game-card{background:linear-gradient(135deg,rgba(13,27,42,.98),rgba(26,10,46,.98));border:1.5px solid rgba(0,255,136,.3);border-radius:16px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 50px rgba(0,255,136,.25);max-height:92vh;overflow-y:auto}
-        .game-title{font-size:30px;font-weight:800;background:linear-gradient(135deg,#00ff88,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;line-height:1.15;margin-bottom:4px;animation:pulse 2s infinite}
-        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
-        .game-subtitle{color:rgba(0,255,136,.6);text-align:center;font-size:10px;letter-spacing:2px;margin-bottom:18px}
-        .difficulty-card{background:rgba(13,27,42,.6);border:1.5px solid rgba(0,255,136,.2);border-radius:12px;padding:11px 13px;margin-bottom:9px;cursor:pointer;transition:all .25s}
-        .difficulty-card:active{transform:scale(.97);border-color:#00ff88}
-        .difficulty-card.selected{border-color:#00ff88;background:rgba(0,255,136,.13)}
-        .difficulty-icon{font-size:26px;margin-right:11px;flex-shrink:0}
-        .difficulty-name{font-size:17px;font-weight:700;color:#00ff88;margin-bottom:2px}
-        .difficulty-description{font-size:11px;color:rgba(255,255,255,.65)}
-        .btn-game{background:linear-gradient(135deg,#00ff88,#00d4ff);border:none;color:#0a0a1a;font-weight:700;font-size:15px;padding:12px 28px;border-radius:50px;cursor:pointer;text-transform:uppercase;letter-spacing:1.5px;box-shadow:0 4px 18px rgba(0,255,136,.4);transition:all .25s}
-        .btn-game:active{transform:scale(.95)}
-        .btn-secondary-game{background:rgba(13,27,42,.8);border:1.5px solid rgba(0,255,136,.45);color:#00ff88;font-size:13px;padding:10px 24px}
-        .score-row{background:rgba(13,27,42,.8);border:1.5px solid rgba(0,255,136,.2);border-radius:10px;padding:11px 13px;margin-bottom:8px}
-        .score-label{font-size:12px;color:rgba(0,255,136,.7)}
-        .score-value{font-size:24px;font-weight:700;color:#00ff88;text-shadow:0 0 10px #00ff8866}
-        .achieve-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-        .achieve-badge{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.4);border-radius:20px;padding:3px 10px;font-size:11px;color:#ffd700}
-        .achieve-badge.locked{opacity:.35;border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.3)}
+/* ── ACHIEVEMENT TOAST ── */
+#achieveToast{position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(8,18,35,.96);border:1.5px solid var(--gold);border-radius:14px;padding:10px 20px;display:none;z-index:25;text-align:center;box-shadow:0 0 30px rgba(255,215,0,.3);backdrop-filter:blur(10px);animation:slideDown .4s ease}
+@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.ach-lbl{font-size:8px;color:rgba(255,215,0,.6);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:2px}
+.ach-name{font-size:14px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace}
 
-        /* Кастомизация */
-        .customize-section{margin-bottom:18px}
-        .customize-label{color:#00ff88;font-size:13px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:7px}
-        .color-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-        .color-option{aspect-ratio:1;border-radius:11px;border:2.5px solid rgba(0,255,136,.2);cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center}
-        .color-option i{color:#fff;font-size:22px;opacity:0;transition:opacity .25s;text-shadow:0 1px 4px #0008}
-        .color-option.selected{border-color:#00ff88;box-shadow:0 0 16px rgba(0,255,136,.5);transform:scale(1.06)}
-        .color-option.selected i{opacity:1}
-        .color-option:active{transform:scale(.93)}
-        .ship-shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-        .ship-shape-option{background:rgba(13,27,42,.6);border:1.5px solid rgba(0,255,136,.2);border-radius:10px;padding:10px 6px;cursor:pointer;transition:all .25s;text-align:center}
-        .ship-shape-option:active{transform:scale(.94)}
-        .ship-shape-option.selected{border-color:#00ff88;background:rgba(0,255,136,.14)}
-        .ship-shape-name{color:#00ff88;font-size:12px;font-weight:700;margin-bottom:2px}
-        .ship-shape-desc{color:rgba(255,255,255,.55);font-size:10px}
-        .shoot-style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-        .shoot-style-option{background:rgba(13,27,42,.6);border:1.5px solid rgba(0,255,136,.2);border-radius:10px;padding:11px 6px;cursor:pointer;transition:all .25s;text-align:center}
-        .shoot-style-option:active{transform:scale(.94)}
-        .shoot-style-option.selected{border-color:#00ff88;background:rgba(0,255,136,.14)}
-        .shoot-style-name{color:#00ff88;font-size:12px;font-weight:700;margin-bottom:2px}
-        .shoot-style-desc{color:rgba(255,255,255,.55);font-size:10px}
-        .touchHint{position:absolute;bottom:95px;left:50%;transform:translateX(-50%);color:rgba(0,255,136,.5);font-size:12px;text-align:center;pointer-events:none;z-index:5;animation:fadeHint 3s ease forwards}
-        @keyframes fadeHint{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+/* ══════════════════════════════════
+   SCREENS
+══════════════════════════════════ */
+.screen{position:absolute;inset:0;background:rgba(4,4,15,.97);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(16px);padding:12px;overflow-y:auto}
+.screen.active{display:flex}
 
-        @media(max-height:680px){.game-card{padding:14px 13px}.game-title{font-size:26px}.difficulty-card{padding:9px 11px;margin-bottom:7px}.difficulty-name{font-size:15px}.btn-game{font-size:13px;padding:10px 22px}}
-    </style>
+/* Common card */
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 60px rgba(0,255,136,.12);max-height:94vh;overflow-y:auto}
+
+/* Screen titles */
+.screen-title{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;text-align:center;margin-bottom:2px;line-height:1.1}
+.screen-title.green{background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.screen-title.gold{background:linear-gradient(135deg,var(--gold),#ff9900);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.screen-title.purple{background:linear-gradient(135deg,var(--purple),#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.screen-title.cyan{background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.screen-sub{text-align:center;font-size:9px;color:rgba(0,255,136,.4);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:18px}
+
+/* Buttons */
+.btn{border:none;cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;letter-spacing:1.5px;border-radius:40px;transition:all .2s;display:block;width:100%;text-align:center}
+.btn:active{transform:scale(.95)}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--cyan));color:#04040f;font-size:14px;padding:13px;box-shadow:0 4px 20px rgba(0,255,136,.35)}
+.btn-primary:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.25);cursor:not-allowed;box-shadow:none}
+.btn-secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:11px;padding:10px}
+.btn-gold{border-color:rgba(255,215,0,.4);color:var(--gold)}
+.btn-cyan{border-color:rgba(0,212,255,.4);color:var(--cyan)}
+.btn-purple{border-color:rgba(168,85,247,.4);color:var(--purple)}
+.btn-red{border-color:rgba(255,0,102,.4);color:var(--pink)}
+
+/* ── DIFFICULTY SCREEN ── */
+.diff-item{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px}
+.diff-item:active{transform:scale(.97)}
+.diff-item.selected{border-color:var(--green);background:rgba(0,255,136,.1);box-shadow:0 0 20px rgba(0,255,136,.15)}
+.diff-icon{font-size:28px;flex-shrink:0}
+.diff-name{font-size:16px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;margin-bottom:2px}
+.diff-desc{font-size:11px;color:rgba(255,255,255,.55)}
+.diff-badge{font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid;margin-left:6px;font-family:'Orbitron',monospace;vertical-align:middle}
+.diff-badge.nm{color:var(--pink);border-color:var(--pink)}
+
+.check-row{display:flex;align-items:center;gap:8px;padding:8px 4px;cursor:pointer;margin:8px 0}
+.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
+.check-row label{color:var(--green);font-size:12px;font-family:'Rajdhani',sans-serif;cursor:pointer}
+
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.menu-grid .btn{font-size:10px;padding:10px 6px}
+
+/* ── GAME OVER SCREEN ── */
+.score-block{background:rgba(8,18,35,.7);border:1px solid rgba(0,255,136,.15);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.score-lbl{font-size:10px;color:rgba(0,255,136,.55);font-family:'Orbitron',monospace;letter-spacing:1px}
+.score-val{font-size:26px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;text-shadow:0 0 12px rgba(0,255,136,.4)}
+.score-val.record{color:var(--gold);text-shadow:0 0 12px rgba(255,215,0,.4)}
+.new-record{display:inline-block;font-size:9px;color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:1px 8px;font-family:'Orbitron',monospace;margin-left:6px;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.3}}
+.ach-badges{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}
+.ach-badge{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid;font-family:'Rajdhani',sans-serif;font-weight:700}
+.ach-badge.unlocked{color:var(--gold);border-color:rgba(255,215,0,.5);background:rgba(255,215,0,.08)}
+.ach-badge.locked{color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.1)}
+.coins-earned{text-align:center;color:var(--gold);font-size:13px;font-family:'Orbitron',monospace;padding:8px;background:rgba(255,215,0,.06);border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,215,0,.15)}
+
+/* ── UPGRADE SCREEN ── */
+.coins-banner{text-align:center;color:var(--gold);font-size:16px;font-family:'Orbitron',monospace;margin-bottom:14px;padding:8px;background:rgba(255,215,0,.07);border-radius:10px;border:1px solid rgba(255,215,0,.2)}
+.upg-item{background:rgba(8,18,35,.6);border:1.5px solid rgba(255,215,0,.15);border-radius:14px;padding:13px;margin-bottom:9px;display:flex;align-items:center;gap:10px;transition:all .2s}
+.upg-item.maxed{border-color:rgba(0,255,136,.3)}
+.upg-icon{font-size:26px;flex-shrink:0}
+.upg-name{font-size:13px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace;margin-bottom:1px}
+.upg-desc{font-size:10px;color:rgba(255,255,255,.5);margin-bottom:5px}
+.upg-stars{display:flex;gap:3px;margin-bottom:0}
+.star{width:11px;height:11px;border-radius:2px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25)}
+.star.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 4px rgba(255,215,0,.5)}
+.upg-btn{background:linear-gradient(135deg,var(--gold),#ff9900);border:none;color:#04040f;font-weight:700;font-size:11px;font-family:'Orbitron',monospace;padding:7px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s}
+.upg-btn:active{transform:scale(.93)}
+.upg-btn:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.25);cursor:not-allowed}
+.upg-btn.maxed{background:linear-gradient(135deg,var(--green),var(--cyan));color:#04040f}
+
+/* ── LEADERBOARD ── */
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:6px;background:rgba(8,18,35,.5);border:1px solid rgba(0,212,255,.12);transition:all .2s}
+.lb-row.me{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07)}
+.lb-rank{font-size:18px;font-family:'Orbitron',monospace;font-weight:900;min-width:30px;text-align:center}
+.lb-info{flex:1;overflow:hidden}
+.lb-name{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-sub{font-size:10px;color:rgba(255,255,255,.35)}
+.lb-score{font-size:15px;font-weight:700;color:var(--cyan);font-family:'Orbitron',monospace}
+.lb-loading{text-align:center;color:rgba(0,212,255,.5);font-size:12px;padding:20px;font-family:'Orbitron',monospace;letter-spacing:1px}
+
+/* ── CUSTOMIZE SCREEN ── */
+.cust-section{margin-bottom:16px}
+.cust-lbl{color:var(--green);font-size:12px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:1px}
+.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.color-opt{aspect-ratio:1;border-radius:10px;border:2px solid rgba(0,255,136,.15);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative}
+.color-opt i{position:absolute;color:#fff;font-size:14px;opacity:0;transition:opacity .2s;text-shadow:0 1px 4px #0008}
+.color-opt.sel{border-color:var(--green);box-shadow:0 0 14px rgba(0,255,136,.4);transform:scale(1.08)}
+.color-opt.sel i{opacity:1}
+.color-opt:active{transform:scale(.92)}
+.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.shape-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
+.shape-opt:active{transform:scale(.94)}
+.shape-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+.shape-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+.shape-desc{color:rgba(255,255,255,.45);font-size:9px}
+.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.style-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
+.style-opt:active{transform:scale(.94)}
+.style-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+.style-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+.style-desc{color:rgba(255,255,255,.45);font-size:9px}
+.toggle-row{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer}
+.toggle-row input{width:16px;height:16px;accent-color:var(--green)}
+.toggle-row label{color:var(--green);font-size:12px;cursor:pointer}
+
+/* ── SKIN SCREEN ── */
+.skin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.skin-item{background:rgba(8,18,35,.6);border:2px solid rgba(168,85,247,.15);border-radius:14px;padding:14px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+.skin-item.ok{border-color:rgba(168,85,247,.4)}
+.skin-item.active{border-color:var(--purple);background:rgba(168,85,247,.12);box-shadow:0 0 18px rgba(168,85,247,.25)}
+.skin-item.locked{opacity:.45;cursor:not-allowed}
+.skin-icon{font-size:36px;margin-bottom:5px;display:block}
+.skin-name{font-size:12px;font-weight:700;color:var(--purple);font-family:'Orbitron',monospace;margin-bottom:3px}
+.skin-req{font-size:9px;color:rgba(255,255,255,.4)}
+.skin-unlocked{font-size:9px;color:var(--green)}
+.skin-active-badge{position:absolute;top:6px;right:6px;font-size:9px;background:rgba(0,255,136,.15);border:1px solid var(--green);border-radius:8px;padding:1px 6px;color:var(--green);font-family:'Orbitron',monospace}
+
+/* ── TOUCH HINT ── */
+.touch-hint{position:absolute;bottom:82px;left:50%;transform:translateX(-50%);color:rgba(0,255,136,.4);font-size:11px;font-family:'Orbitron',monospace;text-align:center;pointer-events:none;z-index:5;animation:fadeOut 4s ease forwards;letter-spacing:1px;white-space:nowrap}
+@keyframes fadeOut{0%,60%{opacity:1}100%{opacity:0}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
+
+/* ── FLEX UTILS ── */
+.flex{display:flex}.gap2{gap:8px}.mt1{margin-top:8px}.mt2{margin-top:12px}.mt3{margin-top:16px}.w100{width:100%}.grow{flex:1}
+</style>
 </head>
 <body>
 
-<!-- XP Bar -->
-<div id="xpBar">
-    <div class="xp-row">
-        <div class="xp-label">🚀 Корабль</div>
-        <div class="xp-track"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
-        <div class="ship-lvl">Ур.<span id="shipLvl">1</span></div>
-    </div>
+<!-- ═══ CANVAS ═══ -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ═══ PAUSE OVERLAY ═══ -->
+<div id="pauseOverlay">
+  <div class="pause-card">
+    <div class="pause-title">ПАУЗА</div>
+    <button class="pause-btn" id="resumeBtn">▶ ПРОДОЛЖИТЬ</button>
+    <button class="pause-btn secondary" id="pauseRestartBtn">↺ ЗАНОВО</button>
+    <button class="pause-btn secondary" id="pauseMenuBtn">☰ МЕНЮ</button>
+  </div>
 </div>
 
-<!-- DIFFICULTY -->
-<div id="difficultyScreen">
-    <div class="game-card">
-        <h1 class="game-title">🚀 SPACE<br>SHOOTER</h1>
-        <p class="game-subtitle">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
-        <div class="difficulty-card" data-difficulty="easy"><div class="d-flex align-items-center"><div class="difficulty-icon">😊</div><div><div class="difficulty-name">Легко</div><div class="difficulty-description">Медленные враги • 5 жизней • Больше бонусов</div></div></div></div>
-        <div class="difficulty-card" data-difficulty="normal"><div class="d-flex align-items-center"><div class="difficulty-icon">😎</div><div><div class="difficulty-name">Нормально</div><div class="difficulty-description">Сбалансированная игра • 3 жизни</div></div></div></div>
-        <div class="difficulty-card" data-difficulty="hard"><div class="d-flex align-items-center"><div class="difficulty-icon">😤</div><div><div class="difficulty-name">Сложно</div><div class="difficulty-description">Быстрые враги • Боссы сильнее • 2 жизни</div></div></div></div>
-        <div class="difficulty-card" data-difficulty="nightmare"><div class="d-flex align-items-center"><div class="difficulty-icon">💀</div><div><div class="difficulty-name">Кошмар</div><div class="difficulty-description">Экстремально • 1 жизнь • Без бонусов</div></div></div></div>
-        <div class="form-check mt-3 mb-3" style="text-align:left">
-            <input class="form-check-input" type="checkbox" id="autoShootToggle" checked>
-            <label class="form-check-label" for="autoShootToggle" style="color:#00ff88;font-size:13px"><i class="bi bi-lightning-fill"></i> Автоматическая стрельба</label>
-        </div>
-        <button class="btn btn-game w-100 mb-2" id="startBtn" disabled>НАЧАТЬ ИГРУ</button>
-        <div class="d-flex gap-2">
-            <button class="btn btn-game btn-secondary-game flex-fill" id="customizeBtn"><i class="bi bi-palette-fill"></i> СТИЛЬ</button>
-            <button class="btn btn-game btn-secondary-game flex-fill" id="upgradeBtn" style="border-color:rgba(255,215,0,.45);color:#ffd700">⚡ ПРОКАЧКА</button>
-            <button class="btn btn-game btn-secondary-game flex-fill" id="leaderboardBtn" style="border-color:rgba(0,212,255,.45);color:#00d4ff">🏆 ТОП</button>
-        </div>
-    </div>
-</div>
-
-<!-- CUSTOMIZE -->
-<div id="customizeScreen" style="display:none">
-    <div class="game-card">
-        <h1 class="game-title" style="font-size:26px">🎨 КАСТОМИЗАЦИЯ</h1>
-        <p class="game-subtitle">НАСТРОЙТЕ КОРАБЛЬ</p>
-        <div class="customize-section">
-            <div class="customize-label"><i class="bi bi-rocket-fill"></i> Форма корабля</div>
-            <div class="ship-shape-grid">
-                <div class="ship-shape-option selected" data-ship-shape="fighter"><div class="ship-shape-name">⚔️ Боец</div><div class="ship-shape-desc">Классика</div></div>
-                <div class="ship-shape-option" data-ship-shape="arrow"><div class="ship-shape-name">🏹 Стрела</div><div class="ship-shape-desc">Острый</div></div>
-                <div class="ship-shape-option" data-ship-shape="diamond"><div class="ship-shape-name">💎 Кристалл</div><div class="ship-shape-desc">Широкий</div></div>
-            </div>
-        </div>
-        <div class="customize-section">
-            <div class="customize-label"><i class="bi bi-brush-fill"></i> Цвет корабля</div>
-            <div class="color-grid">
-                <div class="color-option" data-ship-color="green" style="background:linear-gradient(135deg,#00ff88,#00d4ff)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-ship-color="blue" style="background:linear-gradient(135deg,#00d4ff,#0080ff)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-ship-color="purple" style="background:linear-gradient(135deg,#a855f7,#ec4899)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-ship-color="orange" style="background:linear-gradient(135deg,#ff6b00,#ff9900)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-ship-color="red" style="background:linear-gradient(135deg,#ff0066,#ff3366)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-ship-color="yellow" style="background:linear-gradient(135deg,#ffd700,#ffed4e)"><i class="bi bi-check-lg"></i></div>
-            </div>
-        </div>
-        <div class="customize-section">
-            <div class="customize-label"><i class="bi bi-circle-fill"></i> Цвет пуль</div>
-            <div class="color-grid">
-                <div class="color-option" data-bullet-color="yellow" style="background:linear-gradient(135deg,#ffff00,#ff9900)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-bullet-color="cyan" style="background:linear-gradient(135deg,#00ffff,#00d4ff)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-bullet-color="pink" style="background:linear-gradient(135deg,#ff69b4,#ff1493)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-bullet-color="green" style="background:linear-gradient(135deg,#00ff88,#00ff00)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-bullet-color="white" style="background:linear-gradient(135deg,#ffffff,#cccccc)"><i class="bi bi-check-lg"></i></div>
-                <div class="color-option" data-bullet-color="purple" style="background:linear-gradient(135deg,#a855f7,#8b5cf6)"><i class="bi bi-check-lg"></i></div>
-            </div>
-        </div>
-        <div class="customize-section">
-            <div class="customize-label"><i class="bi bi-stars"></i> Стиль стрельбы</div>
-            <div class="shoot-style-grid">
-                <div class="shoot-style-option selected" data-shoot-style="single"><div class="shoot-style-name">Одиночная</div><div class="shoot-style-desc">1 пуля</div></div>
-                <div class="shoot-style-option" data-shoot-style="double"><div class="shoot-style-name">Двойная</div><div class="shoot-style-desc">2 пули</div></div>
-                <div class="shoot-style-option" data-shoot-style="triple"><div class="shoot-style-name">Тройная</div><div class="shoot-style-desc">3 пули</div></div>
-            </div>
-        </div>
-        <div class="customize-section">
-            <div class="form-check mb-2" style="text-align:left"><input class="form-check-input" type="checkbox" id="particlesToggle" checked><label class="form-check-label" for="particlesToggle" style="color:#00ff88;font-size:12px"><i class="bi bi-star-fill"></i> Эффекты частиц</label></div>
-            <div class="form-check" style="text-align:left"><input class="form-check-input" type="checkbox" id="glowToggle" checked><label class="form-check-label" for="glowToggle" style="color:#00ff88;font-size:12px"><i class="bi bi-brightness-high-fill"></i> Эффекты свечения</label></div>
-        </div>
-        <div class="d-grid gap-2 mt-2">
-            <button class="btn btn-game" id="saveCustomizationBtn"><i class="bi bi-check2-circle"></i> СОХРАНИТЬ</button>
-            <button class="btn btn-game btn-secondary-game" id="backToMenuBtn"><i class="bi bi-arrow-left"></i> НАЗАД</button>
-        </div>
-    </div>
-</div>
-
-<!-- GAME UI -->
+<!-- ═══ HUD ═══ -->
 <div id="ui">
-    <div class="row g-2">
-        <div class="col-4"><div class="stat-card"><div class="stat-label">Очки</div><div class="stat-value" id="score">0</div></div></div>
-        <div class="col-4"><div class="stat-card"><div class="stat-label">❤️ Жизни</div><div class="stat-value" id="lives">3</div></div></div>
-        <div class="col-4"><div class="stat-card"><div class="stat-label">Уровень</div><div class="stat-value" id="level">1</div></div></div>
-    </div>
-    <div class="mt-2"><div class="progress"><div class="progress-bar" id="levelProgress" style="width:0%"></div></div></div>
+  <div class="stats-row">
+    <div class="stat-pill"><div class="stat-lbl">Очки</div><div class="stat-val" id="scoreVal">0</div></div>
+    <div class="stat-pill"><div class="stat-lbl">❤️ Жизни</div><div class="stat-val lives" id="livesVal">3</div></div>
+    <div class="stat-pill"><div class="stat-lbl">Уровень</div><div class="stat-val level-val" id="levelVal">1</div></div>
+  </div>
+  <div id="levelBar"><div id="levelFill" style="width:0%"></div></div>
+  <div id="xpRow">
+    <div class="xp-lbl">🚀 UR.</div>
+    <div class="xp-track"><div class="xp-fill-bar" id="xpFill" style="width:0%"></div></div>
+    <div class="xp-lvl">Ур.<span id="shipLvlVal">1</span></div>
+  </div>
 </div>
 
+<!-- Pause button -->
+<button id="pauseBtn" aria-label="Пауза">
+  <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+</button>
+
+<!-- Combo -->
 <div id="comboDisplay" class="combo-hidden">
-    <div class="combo-text">КОМБО</div>
-    <div class="combo-value" id="comboValue">x2</div>
+  <div class="combo-word">COMBO</div>
+  <div class="combo-num" id="comboVal">x2</div>
 </div>
 
 <div id="notifications"></div>
 <div id="powerupBar"></div>
-<div id="bossBar"><div class="boss-bar-label">👾 БОСС</div><div class="boss-bar-bg"><div class="boss-bar-fill" id="bossFill" style="width:100%"></div></div></div>
 
-<div id="autoShootIndicator" class="active"><i class="bi bi-lightning-fill"></i><span id="autoShootText">АВТО</span></div>
-<div id="achieveToast"><div class="achieve-title">🏆 ДОСТИЖЕНИЕ</div><div class="achieve-name" id="achieveName"></div></div>
+<!-- Boss bar -->
+<div id="bossBar">
+  <div class="boss-lbl">👾 BOSS</div>
+  <div class="boss-track"><div id="bossFill" style="width:100%"></div></div>
+</div>
+
+<!-- Bottom bar: weapons + auto -->
+<div id="bottomBar">
+  <div class="weapons-group">
+    <div class="weapon-btn active" data-weapon="laser"><div class="weapon-emoji">🔵</div><div class="weapon-lbl">LASER</div></div>
+    <div class="weapon-btn" data-weapon="rocket"><div class="weapon-emoji">🚀</div><div class="weapon-lbl">ROCKET</div></div>
+    <div class="weapon-btn" data-weapon="shotgun"><div class="weapon-emoji">💥</div><div class="weapon-lbl">SHOT</div></div>
+  </div>
+  <button id="autoBtn" class="active">⚡ АВТО</button>
+</div>
+
+<!-- Achievement toast -->
+<div id="achieveToast">
+  <div class="ach-lbl">🏆 ДОСТИЖЕНИЕ</div>
+  <div class="ach-name" id="achieveName"></div>
+</div>
+
+<!-- ═══════════════════════
+     SCREENS
+═══════════════════════ -->
+
+<!-- DIFFICULTY / MAIN MENU -->
+<div id="difficultyScreen" class="screen active">
+  <div class="card">
+    <h1 class="screen-title green">🚀 SPACE<br>SHOOTER</h1>
+    <p class="screen-sub">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
+    <div class="diff-item" data-diff="easy"><div class="diff-icon">😊</div><div><div class="diff-name">ЛЕГКО</div><div class="diff-desc">5 жизней • Медленные враги • Больше бонусов</div></div></div>
+    <div class="diff-item" data-diff="normal"><div class="diff-icon">😎</div><div><div class="diff-name">НОРМАЛЬНО</div><div class="diff-desc">3 жизни • Сбалансированная игра</div></div></div>
+    <div class="diff-item" data-diff="hard"><div class="diff-icon">😤</div><div><div class="diff-name">СЛОЖНО</div><div class="diff-desc">2 жизни • Быстрые враги • Сильные боссы</div></div></div>
+    <div class="diff-item" data-diff="nightmare"><div class="diff-icon">💀</div><div><div class="diff-name">КОШМАР <span class="diff-badge nm">ХАРДКОР</span></div><div class="diff-desc">1 жизнь • Без бонусов • Экстремально</div></div></div>
+    <div class="check-row">
+      <input type="checkbox" id="autoChk" checked>
+      <label for="autoChk">⚡ Автоматическая стрельба</label>
+    </div>
+    <button class="btn btn-primary" id="startBtn" disabled>▶ НАЧАТЬ ИГРУ</button>
+    <div class="menu-grid mt2">
+      <button class="btn btn-secondary" id="customBtn">🎨 СТИЛЬ</button>
+      <button class="btn btn-secondary btn-gold" id="upgradeBtn">⚡ ПРОКАЧКА</button>
+      <button class="btn btn-secondary btn-cyan" id="lbBtn">🏆 РЕЙТИНГ</button>
+      <button class="btn btn-secondary btn-purple" id="skinBtn">👾 СКИНЫ</button>
+    </div>
+  </div>
+</div>
 
 <!-- GAME OVER -->
-<div id="gameOver" style="display:none">
-    <div class="game-card text-center">
-        <h1 class="game-title mb-3">GAME OVER</h1>
-        <div class="score-row mb-2"><div class="score-label">Ваш счет</div><div class="score-value" id="finalScore">0</div></div>
-        <div class="score-row mb-2"><div class="score-label">Уровень</div><div class="score-value" id="finalLevel">1</div></div>
-        <div class="score-row mb-2"><div class="score-label">Макс. комбо</div><div class="score-value" id="finalCombo">x1</div></div>
-        <div class="score-row mb-3"><div class="score-label"><i class="bi bi-trophy-fill text-warning"></i> Рекорд</div><div class="score-value" id="bestScore">0</div></div>
-        <div id="achieveList" class="achieve-row mb-3"></div>
-        <div class="d-grid gap-2">
-            <button class="btn btn-game" id="restartBtn"><i class="bi bi-arrow-clockwise"></i> СНОВА</button>
-            <button class="btn btn-game btn-secondary-game" id="changeDifficultyBtn"><i class="bi bi-gear-fill"></i> СЛОЖНОСТЬ</button>
-        </div>
+<div id="gameOverScreen" class="screen">
+  <div class="card">
+    <h1 class="screen-title green" style="font-size:34px;margin-bottom:4px">GAME OVER</h1>
+    <p class="screen-sub">РЕЗУЛЬТАТ</p>
+    <div class="score-block"><div class="score-lbl">ВАШ СЧЁТ</div><div class="score-val" id="goScore">0</div></div>
+    <div class="flex gap2">
+      <div class="score-block grow"><div class="score-lbl">УРОВЕНЬ</div><div class="score-val" id="goLevel" style="font-size:20px">1</div></div>
+      <div class="score-block grow"><div class="score-lbl">МАКС КОМБО</div><div class="score-val" id="goCombo" style="font-size:20px">x1</div></div>
     </div>
+    <div class="score-block"><div class="score-lbl">🏆 РЕКОРД</div><div class="score-val record" id="goBest">0</div></div>
+    <div class="coins-earned" id="goCoins">💰 Монет: 0</div>
+    <div class="ach-badges" id="goAch"></div>
+    <div class="flex gap2 mt2">
+      <button class="btn btn-primary grow" id="restartBtn">↺ СНОВА</button>
+      <button class="btn btn-secondary grow" id="menuBtn">☰ МЕНЮ</button>
+    </div>
+  </div>
 </div>
 
-<!-- UPGRADE SCREEN -->
-<div id="upgradeScreen">
-    <div class="upgrade-card">
-        <div class="upgrade-title">⚡ ПРОКАЧКА</div>
-        <div class="upgrade-coins">💰 Монеты: <span id="coinsDisplay">0</span></div>
-
-        <div class="upgrade-item" id="upg-damage">
-            <div class="upgrade-icon">🔫</div>
-            <div class="flex-grow-1">
-                <div class="upgrade-name">Урон</div>
-                <div class="upgrade-desc">Больше урона по врагам</div>
-                <div class="upgrade-stars" id="stars-damage"></div>
-            </div>
-            <button class="btn-upgrade" id="btn-damage">⬆️ <span id="cost-damage">100</span>💰</button>
-        </div>
-
-        <div class="upgrade-item" id="upg-speed">
-            <div class="upgrade-icon">💨</div>
-            <div class="flex-grow-1">
-                <div class="upgrade-name">Скорость пуль</div>
-                <div class="upgrade-desc">Пули летят быстрее</div>
-                <div class="upgrade-stars" id="stars-speed"></div>
-            </div>
-            <button class="btn-upgrade" id="btn-speed">⬆️ <span id="cost-speed">80</span>💰</button>
-        </div>
-
-        <div class="upgrade-item" id="upg-firerate">
-            <div class="upgrade-icon">⚡</div>
-            <div class="flex-grow-1">
-                <div class="upgrade-name">Скорострельность</div>
-                <div class="upgrade-desc">Быстрее стрельба</div>
-                <div class="upgrade-stars" id="stars-firerate"></div>
-            </div>
-            <button class="btn-upgrade" id="btn-firerate">⬆️ <span id="cost-firerate">120</span>💰</button>
-        </div>
-
-        <div class="upgrade-item" id="upg-shield">
-            <div class="upgrade-icon">🛡️</div>
-            <div class="flex-grow-1">
-                <div class="upgrade-name">Стартовый щит</div>
-                <div class="upgrade-desc">Начинать игру со щитом</div>
-                <div class="upgrade-stars" id="stars-shield"></div>
-            </div>
-            <button class="btn-upgrade" id="btn-shield">⬆️ <span id="cost-shield">200</span>💰</button>
-        </div>
-
-        <div class="upgrade-item" id="upg-magnet">
-            <div class="upgrade-icon">🧲</div>
-            <div class="flex-grow-1">
-                <div class="upgrade-name">Магнит бонусов</div>
-                <div class="upgrade-desc">Бонусы сами летят к вам</div>
-                <div class="upgrade-stars" id="stars-magnet"></div>
-            </div>
-            <button class="btn-upgrade" id="btn-magnet">⬆️ <span id="cost-magnet">150</span>💰</button>
-        </div>
-
-        <button class="btn btn-game btn-secondary-game w-100 mt-3" id="backFromUpgrade"><i class="bi bi-arrow-left"></i> НАЗАД</button>
-    </div>
+<!-- UPGRADE -->
+<div id="upgradeScreen" class="screen">
+  <div class="card">
+    <h1 class="screen-title gold">⚡ ПРОКАЧКА</h1>
+    <p class="screen-sub">УЛУЧШИ КОРАБЛЬ</p>
+    <div class="coins-banner">💰 Монеты: <span id="coinsVal">0</span></div>
+    <div id="upgList"></div>
+    <button class="btn btn-secondary btn-gold w100 mt2" id="backFromUpgrade">← НАЗАД</button>
+  </div>
 </div>
 
-<!-- LEADERBOARD SCREEN -->
-<div id="leaderboardScreen">
-    <div class="lb-card">
-        <div class="lb-title">🏆 МИРОВОЙ РЕЙТИНГ</div>
-        <div id="lbContent"><div class="lb-loading">⏳ Загрузка...</div></div>
-        <button class="btn btn-game btn-secondary-game w-100 mt-3" id="backFromLb" style="border-color:rgba(0,212,255,.45);color:#00d4ff"><i class="bi bi-arrow-left"></i> НАЗАД</button>
-    </div>
+<!-- LEADERBOARD -->
+<div id="lbScreen" class="screen">
+  <div class="card">
+    <h1 class="screen-title cyan">🏆 РЕЙТИНГ</h1>
+    <p class="screen-sub">МИРОВЫЕ РЕКОРДЫ</p>
+    <div id="lbContent"><div class="lb-loading">⏳ ЗАГРУЗКА...</div></div>
+    <button class="btn btn-secondary btn-cyan w100 mt2" id="backFromLb">← НАЗАД</button>
+  </div>
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<!-- CUSTOMIZE -->
+<div id="customScreen" class="screen">
+  <div class="card">
+    <h1 class="screen-title green" style="font-size:22px">🎨 КАСТОМИЗАЦИЯ</h1>
+    <p class="screen-sub">НАСТРОЙ КОРАБЛЬ</p>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="cust-section">
+      <div class="cust-lbl">🚀 Форма корабля</div>
+      <div class="shape-grid">
+        <div class="shape-opt sel" data-ship-shape="fighter"><div class="shape-name">⚔️ БОЕЦ</div><div class="shape-desc">Классика</div></div>
+        <div class="shape-opt" data-ship-shape="arrow"><div class="shape-name">🏹 СТРЕЛА</div><div class="shape-desc">Острый</div></div>
+        <div class="shape-opt" data-ship-shape="diamond"><div class="shape-name">💎 КРИСТАЛЛ</div><div class="shape-desc">Широкий</div></div>
+      </div>
+    </div>
+
+    <div class="cust-section">
+      <div class="cust-lbl">🎨 Цвет корабля</div>
+      <div class="color-grid">
+        <div class="color-opt" data-ship-color="green" style="background:linear-gradient(135deg,#00ff88,#00d4ff)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="blue" style="background:linear-gradient(135deg,#00d4ff,#0080ff)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="purple" style="background:linear-gradient(135deg,#a855f7,#ec4899)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="orange" style="background:linear-gradient(135deg,#ff6b00,#ff9900)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="red" style="background:linear-gradient(135deg,#ff0066,#ff3366)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="yellow" style="background:linear-gradient(135deg,#ffd700,#ffed4e)"><i>✓</i></div>
+      </div>
+    </div>
+
+    <div class="cust-section">
+      <div class="cust-lbl">🔵 Цвет пуль</div>
+      <div class="color-grid">
+        <div class="color-opt" data-bullet-color="yellow" style="background:linear-gradient(135deg,#ffff00,#ff9900)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="cyan" style="background:linear-gradient(135deg,#00ffff,#00d4ff)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="pink" style="background:linear-gradient(135deg,#ff69b4,#ff1493)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="green" style="background:linear-gradient(135deg,#00ff88,#00ff00)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="white" style="background:linear-gradient(135deg,#ffffff,#cccccc)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="purple" style="background:linear-gradient(135deg,#a855f7,#8b5cf6)"><i>✓</i></div>
+      </div>
+    </div>
+
+    <div class="cust-section">
+      <div class="cust-lbl">⚡ Стиль стрельбы</div>
+      <div class="style-grid">
+        <div class="style-opt sel" data-shoot-style="single"><div class="style-name">ОДИНОЧНАЯ</div><div class="style-desc">1 пуля</div></div>
+        <div class="style-opt" data-shoot-style="double"><div class="style-name">ДВОЙНАЯ</div><div class="style-desc">2 пули</div></div>
+        <div class="style-opt" data-shoot-style="triple"><div class="style-name">ТРОЙНАЯ</div><div class="style-desc">3 пули</div></div>
+      </div>
+    </div>
+
+    <div class="cust-section">
+      <div class="toggle-row"><input type="checkbox" id="particlesChk" checked><label for="particlesChk">✨ Эффекты частиц</label></div>
+      <div class="toggle-row"><input type="checkbox" id="glowChk" checked><label for="glowChk">💡 Эффекты свечения</label></div>
+    </div>
+
+    <div class="flex gap2 mt1">
+      <button class="btn btn-primary grow" id="saveCustomBtn">✓ СОХРАНИТЬ</button>
+      <button class="btn btn-secondary grow" id="backFromCustom">← НАЗАД</button>
+    </div>
+  </div>
+</div>
+
+<!-- SKIN SCREEN -->
+<div id="skinScreen" class="screen">
+  <div class="card">
+    <h1 class="screen-title purple">👾 СКИНЫ</h1>
+    <p class="screen-sub">ОБЛИК КОРАБЛЯ</p>
+    <div class="skin-grid" id="skinGrid"></div>
+    <button class="btn btn-secondary btn-purple w100" id="backFromSkin">← НАЗАД</button>
+  </div>
+</div>
+
 <script>
+// ════════════════════════════════════════════════════
+// TELEGRAM
+// ════════════════════════════════════════════════════
 const tg = window.Telegram?.WebApp;
-if(tg){tg.expand();tg.enableClosingConfirmation();}
+if(tg){ tg.expand(); tg.enableClosingConfirmation(); }
 
+// ════════════════════════════════════════════════════
+// CANVAS
+// ════════════════════════════════════════════════════
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ═══ ПРОКАЧКА ═══
-const UPGRADES = {
-    damage:   { max:5, baseCost:100, costMult:1.6, label:'Урон' },
-    speed:    { max:5, baseCost:80,  costMult:1.5, label:'Скорость пуль' },
-    firerate: { max:5, baseCost:120, costMult:1.7, label:'Скорострельность' },
-    shield:   { max:3, baseCost:200, costMult:2.0, label:'Стартовый щит' },
-    magnet:   { max:3, baseCost:150, costMult:1.8, label:'Магнит' }
+// ════════════════════════════════════════════════════
+// AUDIO (Web Audio API — без файлов)
+// ════════════════════════════════════════════════════
+const AC = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getAC(){ if(!audioCtx) audioCtx = new AC(); return audioCtx; }
+
+function playSound(type){
+  try{
+    const ac = getAC();
+    const g = ac.createGain();
+    g.connect(ac.destination);
+    const o = ac.createOscillator();
+    o.connect(g);
+    if(type==='shoot'){
+      o.type='square'; o.frequency.setValueAtTime(880,ac.currentTime); o.frequency.exponentialRampToValueAtTime(220,ac.currentTime+.08);
+      g.gain.setValueAtTime(.06,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.1);
+      o.start(); o.stop(ac.currentTime+.1);
+    }else if(type==='explode'){
+      const buf = ac.createBuffer(1,ac.sampleRate*.15,ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*8);
+      const src = ac.createBufferSource(); src.buffer=buf; src.connect(g);
+      g.gain.setValueAtTime(.18,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.15);
+      src.start(); return;
+    }else if(type==='hit'){
+      o.type='sawtooth'; o.frequency.setValueAtTime(220,ac.currentTime); o.frequency.exponentialRampToValueAtTime(80,ac.currentTime+.08);
+      g.gain.setValueAtTime(.1,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.1);
+      o.start(); o.stop(ac.currentTime+.1);
+    }else if(type==='powerup'){
+      o.type='sine'; o.frequency.setValueAtTime(440,ac.currentTime); o.frequency.exponentialRampToValueAtTime(880,ac.currentTime+.12);
+      g.gain.setValueAtTime(.12,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.15);
+      o.start(); o.stop(ac.currentTime+.15);
+    }else if(type==='boss'){
+      o.type='sawtooth'; o.frequency.setValueAtTime(110,ac.currentTime); o.frequency.exponentialRampToValueAtTime(55,ac.currentTime+.3);
+      g.gain.setValueAtTime(.2,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.35);
+      o.start(); o.stop(ac.currentTime+.35);
+    }else if(type==='levelup'){
+      const freqs=[523,659,784,1047];
+      freqs.forEach((f,i)=>{
+        const oo=ac.createOscillator(), gg=ac.createGain();
+        oo.connect(gg); gg.connect(ac.destination);
+        oo.type='sine'; oo.frequency.value=f;
+        gg.gain.setValueAtTime(0,ac.currentTime+i*.08);
+        gg.gain.linearRampToValueAtTime(.12,ac.currentTime+i*.08+.04);
+        gg.gain.exponentialRampToValueAtTime(.001,ac.currentTime+i*.08+.15);
+        oo.start(ac.currentTime+i*.08); oo.stop(ac.currentTime+i*.08+.15);
+      });
+      return;
+    }
+  }catch(e){}
+}
+
+// ════════════════════════════════════════════════════
+// PERSISTENT DATA
+// ════════════════════════════════════════════════════
+const LS = {
+  get:(k,def='')=>{ try{ const v=localStorage.getItem(k); return v===null?def:v; }catch(e){return def;} },
+  set:(k,v)=>{ try{ localStorage.setItem(k,String(v)); }catch(e){} },
+  getJ:(k,def)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){return def;} },
+  setJ:(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
 
-let upgrades = JSON.parse(localStorage.getItem('upgrades') || '{"damage":0,"speed":0,"firerate":0,"shield":0,"magnet":0}');
-let coins    = +localStorage.getItem('coins') || 0;
-let shipXP   = +localStorage.getItem('shipXP') || 0;
-let shipLvl  = +localStorage.getItem('shipLvl') || 1;
+// ════════════════════════════════════════════════════
+// UPGRADES SYSTEM
+// ════════════════════════════════════════════════════
+const UPGRADES = {
+  damage:   {max:5, base:100, mult:1.6, label:'Урон',          desc:'Больше урона по врагам',    icon:'🔫'},
+  speed:    {max:5, base:80,  mult:1.5, label:'Скорость пуль', desc:'Пули летят быстрее',         icon:'💨'},
+  firerate: {max:5, base:120, mult:1.7, label:'Скорострельность', desc:'Быстрее стрельба',        icon:'⚡'},
+  shield:   {max:3, base:200, mult:2.0, label:'Стартовый щит', desc:'Начинать игру со щитом',    icon:'🛡️'},
+  magnet:   {max:3, base:150, mult:1.8, label:'Магнит',        desc:'Бонусы летят к вам',         icon:'🧲'}
+};
 
-function saveUpgrades(){
-    localStorage.setItem('upgrades', JSON.stringify(upgrades));
-    localStorage.setItem('coins', coins);
-    localStorage.setItem('shipXP', shipXP);
-    localStorage.setItem('shipLvl', shipLvl);
+let upgrades = LS.getJ('upgrades', {damage:0,speed:0,firerate:0,shield:0,magnet:0});
+let coins    = +LS.get('coins', 0);
+let shipXP   = +LS.get('shipXP', 0);
+let shipLvl  = +LS.get('shipLvl', 1);
+
+function savePersistent(){
+  LS.setJ('upgrades', upgrades);
+  LS.set('coins', coins);
+  LS.set('shipXP', shipXP);
+  LS.set('shipLvl', shipLvl);
 }
 
-function upgradeCost(key){
-    const u = UPGRADES[key];
-    return Math.floor(u.baseCost * Math.pow(u.costMult, upgrades[key]));
+function upgCost(k){ return Math.floor(UPGRADES[k].base * Math.pow(UPGRADES[k].mult, upgrades[k])); }
+
+let cachedBonus = null;
+function getBonus(){
+  if(!cachedBonus) cachedBonus = {
+    bulletSpeedMult: 1 + upgrades.speed    * 0.15,
+    damageMult:      1 + upgrades.damage   * 0.25,
+    firerateMult:    1 - upgrades.firerate * 0.08,
+    hasStartShield:  upgrades.shield > 0,
+    magnetRadius:    upgrades.magnet * 60
+  };
+  return cachedBonus;
 }
+function invalidateBonus(){ cachedBonus = null; }
 
-function renderUpgradeScreen(){
-    document.getElementById('coinsDisplay').textContent = coins;
-    Object.keys(UPGRADES).forEach(key => {
-        const lvl = upgrades[key];
-        const max = UPGRADES[key].max;
-        const cost = upgradeCost(key);
-        const maxed = lvl >= max;
-
-        // Stars
-        const stars = document.getElementById('stars-'+key);
-        stars.innerHTML = '';
-        for(let i=0;i<max;i++){
-            const s=document.createElement('div');
-            s.className='star'+(i<lvl?' filled':'');
-            stars.appendChild(s);
-        }
-
-        // Button
-        const btn = document.getElementById('btn-'+key);
-        const costEl = document.getElementById('cost-'+key);
-        if(maxed){
-            btn.textContent='✅ МАКС';
-            btn.className='btn-upgrade maxed';
-            btn.disabled=true;
-            document.getElementById('upg-'+key).classList.add('maxed');
-        } else {
-            btn.className='btn-upgrade';
-            btn.disabled = coins < cost;
-            if(costEl) costEl.textContent = cost;
-        }
-    });
-}
-
-Object.keys(UPGRADES).forEach(key => {
-    document.getElementById('btn-'+key)?.addEventListener('click', () => {
-        const cost = upgradeCost(key);
-        if(coins < cost || upgrades[key] >= UPGRADES[key].max) return;
-        coins -= cost;
-        upgrades[key]++;
-        saveUpgrades();
-        renderUpgradeScreen();
-        renderXPBar();
-    });
-});
-
-// Функция получения бонусов от прокачки
-function getUpgradeBonus(){
-    return {
-        bulletSpeedMult:  1 + upgrades.speed    * 0.15,
-        damageMult:       1 + upgrades.damage   * 0.25,
-        firerateMult:     1 - upgrades.firerate * 0.08,  // уменьшает cooldown
-        hasStartShield:   upgrades.shield > 0,
-        magnetRadius:     upgrades.magnet * 60
-    };
-}
-
-// XP и уровень корабля
-function addShipXP(amount){
-    shipXP += amount;
-    const needed = shipLvl * 500;
-    if(shipXP >= needed){
-        shipXP -= needed;
-        shipLvl++;
-        coins += 100;  // бонус за уровень
-        saveUpgrades();
-        notify('⭐ КОРАБЛЬ УР.'+shipLvl+'! +100💰');
-    }
-    saveUpgrades();
-    renderXPBar();
+function addShipXP(amt){
+  shipXP += amt;
+  const needed = shipLvl * 500;
+  if(shipXP >= needed){
+    shipXP -= needed; shipLvl++;
+    coins += 100;
+    savePersistent();
+    notify('⭐ КОРАБЛЬ УР.'+shipLvl+'! +100💰', 'gold');
+  }
+  savePersistent();
+  renderXPBar();
 }
 
 function renderXPBar(){
-    const needed = shipLvl * 500;
-    const pct = Math.min(100, shipXP / needed * 100);
-    document.getElementById('xpFill').style.width = pct + '%';
-    document.getElementById('shipLvl').textContent = shipLvl;
+  const pct = Math.min(100, shipXP / (shipLvl * 500) * 100);
+  document.getElementById('xpFill').style.width = pct + '%';
+  document.getElementById('shipLvlVal').textContent = shipLvl;
 }
-
 renderXPBar();
 
-// ═══ ЛИДЕРБОРД ═══
+function renderUpgradeScreen(){
+  document.getElementById('coinsVal').textContent = coins;
+  const list = document.getElementById('upgList');
+  list.innerHTML = '';
+  Object.keys(UPGRADES).forEach(k => {
+    const u = UPGRADES[k], lvl = upgrades[k], maxed = lvl >= u.max, cost = upgCost(k);
+    const div = document.createElement('div');
+    div.className = 'upg-item' + (maxed?' maxed':'');
+    const stars = Array.from({length:u.max},(_,i)=>`<div class="star${i<lvl?' on':''}"></div>`).join('');
+    div.innerHTML = `
+      <div class="upg-icon">${u.icon}</div>
+      <div class="grow">
+        <div class="upg-name">${u.label}</div>
+        <div class="upg-desc">${u.desc}</div>
+        <div class="upg-stars">${stars}</div>
+      </div>
+      <button class="upg-btn${maxed?' maxed':''}" data-upg="${k}" ${(maxed||coins<cost)?'disabled':''}>
+        ${maxed ? '✅ МАКС' : `⬆️ ${cost}💰`}
+      </button>`;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('[data-upg]').forEach(btn => {
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.upg;
+      const cost = upgCost(k);
+      if(coins < cost || upgrades[k] >= UPGRADES[k].max) return;
+      coins -= cost; upgrades[k]++;
+      invalidateBonus();
+      savePersistent();
+      renderUpgradeScreen();
+      renderXPBar();
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════
+// LEADERBOARD
+// ════════════════════════════════════════════════════
+let bestScore = +LS.get('bestScore', 0);
+
 async function loadLeaderboard(){
-    const content = document.getElementById('lbContent');
-    content.innerHTML = '<div class="lb-loading">⏳ Загрузка...</div>';
-
-    try {
-        // Локальная таблица (без сервера работает из localStorage)
-        let entries = JSON.parse(localStorage.getItem('leaderboard') || '[]');
-
-        // Добавляем текущего пользователя если есть рекорд
-        const myName = tg?.initDataUnsafe?.user?.first_name || 'Вы';
-        const myId   = tg?.initDataUnsafe?.user?.id || 0;
-        if(bestScore > 0){
-            entries = entries.filter(e => e.id !== myId);
-            entries.push({id: myId, name: myName, score: bestScore, lvl: shipLvl});
-            entries.sort((a,b) => b.score - a.score);
-            entries = entries.slice(0, 20);
-            localStorage.setItem('leaderboard', JSON.stringify(entries));
-        }
-
-        renderLeaderboard(entries, myId);
-    } catch(e){
-        content.innerHTML = '<div class="lb-loading">❌ Ошибка загрузки</div>';
-    }
-}
-
-function renderLeaderboard(entries, myId){
-    const content = document.getElementById('lbContent');
-    if(!entries.length){
-        content.innerHTML = '<div class="lb-loading">Пока нет записей. Сыграйте первым! 🚀</div>';
-        return;
-    }
-    const medals = ['🥇','🥈','🥉'];
-    content.innerHTML = entries.map((e,i) => `
-        <div class="lb-row ${e.id===myId?'mine':''}">
-            <div class="lb-rank">${medals[i]||'#'+(i+1)}</div>
-            <div>
-                <div class="lb-name">${e.name}${e.id===myId?' 👈':''}</div>
-                <div style="font-size:10px;color:rgba(255,255,255,.4)">Корабль ур.${e.lvl||1}</div>
-            </div>
-            <div class="lb-score">${e.score.toLocaleString()}</div>
+  const content = document.getElementById('lbContent');
+  content.innerHTML = '<div class="lb-loading">⏳ ЗАГРУЗКА...</div>';
+  const myName = tg?.initDataUnsafe?.user?.first_name || 'Игрок';
+  const myId   = tg?.initDataUnsafe?.user?.id || 0;
+  let entries = LS.getJ('leaderboard', []);
+  if(bestScore > 0){
+    entries = entries.filter(e => e.id !== myId);
+    entries.push({id:myId, name:myName, score:bestScore, lvl:shipLvl});
+    entries.sort((a,b)=>b.score-a.score);
+    entries = entries.slice(0,20);
+    LS.setJ('leaderboard', entries);
+  }
+  const medals = ['🥇','🥈','🥉'];
+  content.innerHTML = entries.length
+    ? entries.map((e,i)=>`
+      <div class="lb-row ${e.id===myId?'me':''}">
+        <div class="lb-rank">${medals[i]||'#'+(i+1)}</div>
+        <div class="lb-info">
+          <div class="lb-name">${e.name}${e.id===myId?' 👈':''}</div>
+          <div class="lb-sub">Корабль ур.${e.lvl||1}</div>
         </div>
-    `).join('');
+        <div class="lb-score">${e.score.toLocaleString()}</div>
+      </div>`).join('')
+    : '<div class="lb-loading">Пока нет записей. Сыграйте первым! 🚀</div>';
 }
 
-// Кнопки навигации
-document.getElementById('upgradeBtn').addEventListener('click', () => {
-    hide('difficultyScreen');
-    renderUpgradeScreen();
-    document.getElementById('upgradeScreen').style.display='flex';
-});
-document.getElementById('backFromUpgrade').addEventListener('click', () => {
-    document.getElementById('upgradeScreen').style.display='none';
-    show('difficultyScreen');
-});
-document.getElementById('leaderboardBtn').addEventListener('click', () => {
-    hide('difficultyScreen');
-    document.getElementById('leaderboardScreen').style.display='flex';
-    loadLeaderboard();
-});
-document.getElementById('backFromLb').addEventListener('click', () => {
-    document.getElementById('leaderboardScreen').style.display='none';
-    show('difficultyScreen');
-});
-
-// ═══ КОНФИГИ ═══
-const DIFF = {
-    easy:      {lives:5, spd:.7,  spawn:.013, scoreMult:1,   bossHpMult:.7,  powerupRate:.006},
-    normal:    {lives:3, spd:1,   spawn:.018, scoreMult:1.5, bossHpMult:1,   powerupRate:.004},
-    hard:      {lives:2, spd:1.5, spawn:.027, scoreMult:2,   bossHpMult:1.4, powerupRate:.002},
-    nightmare: {lives:1, spd:2,   spawn:.038, scoreMult:3,   bossHpMult:2,   powerupRate:0}
-};
-const COLORS = {
-    ship:{green:{a:'#00ff88',b:'#00d4ff'},blue:{a:'#00d4ff',b:'#0080ff'},purple:{a:'#a855f7',b:'#ec4899'},orange:{a:'#ff6b00',b:'#ff9900'},red:{a:'#ff0066',b:'#ff3366'},yellow:{a:'#ffd700',b:'#ffed4e'}},
-    bullet:{yellow:{a:'#ffff00',b:'#ff9900'},cyan:{a:'#00ffff',b:'#00d4ff'},pink:{a:'#ff69b4',b:'#ff1493'},green:{a:'#00ff88',b:'#00ff00'},white:{a:'#ffffff',b:'#cccccc'},purple:{a:'#a855f7',b:'#8b5cf6'}}
-};
+// ════════════════════════════════════════════════════
+// SKINS
+// ════════════════════════════════════════════════════
+let unlockedAch = LS.getJ('achievements', []);
 const ACHIEVEMENTS = [
-    {id:'first_kill',  name:'Первая кровь 🔫',   desc:'Уничтожь первого врага'},
-    {id:'combo5',      name:'Комбо мастер ⚡',   desc:'Получи комбо x5'},
-    {id:'combo10',     name:'Легенда комбо 🌟',  desc:'Получи комбо x10'},
-    {id:'boss1',       name:'Убийца боссов 💀',  desc:'Убей первого босса'},
-    {id:'score1000',   name:'Тысячник 🎯',       desc:'Набери 1000 очков'},
-    {id:'score5000',   name:'Пять тысяч 🏆',     desc:'Набери 5000 очков'},
-    {id:'shield',      name:'Неуязвимый 🛡️',    desc:'Подбери щит'},
-    {id:'survive5',    name:'Выживший 💪',       desc:'Проживи 5 уровней'},
+  {id:'first_kill', name:'Первая кровь 🔫'},
+  {id:'combo5',     name:'Комбо мастер ⚡'},
+  {id:'combo10',    name:'Легенда комбо 🌟'},
+  {id:'boss1',      name:'Убийца боссов 💀'},
+  {id:'score1000',  name:'Тысячник 🎯'},
+  {id:'score5000',  name:'Пять тысяч 🏆'},
+  {id:'shield',     name:'Неуязвимый 🛡️'},
+  {id:'survive5',   name:'Выживший 💪'},
 ];
 
-// ═══ СОСТОЯНИЕ ═══
-let difficulty=null, gameRunning=false;
-let score=0,lives=0,level=1,levelProgress=0;
-let bestScore=+localStorage.getItem('bestScore')||0;
-let autoShoot=localStorage.getItem('autoShoot')!=='false';
+const SKINS = [
+  {id:'default', name:'СТАНДАРТ',  emoji:'🚀', req:'Начальный',     cond:()=>true},
+  {id:'fire',    name:'ОГНЕННЫЙ',  emoji:'🔥', req:'50 убийств',    cond:()=>+LS.get('totalKills',0)>=50},
+  {id:'ice',     name:'ЛЕДЯНОЙ',   emoji:'❄️', req:'Корабль ур.10', cond:()=>shipLvl>=10},
+  {id:'ghost',   name:'ПРИЗРАК',   emoji:'👻', req:'3 босса',       cond:()=>+LS.get('totalBosses',0)>=3},
+  {id:'gold',    name:'ЗОЛОТОЙ',   emoji:'⭐', req:'1000+ монет',   cond:()=>coins>=1000},
+  {id:'dragon',  name:'ДРАКОН',    emoji:'🐉', req:'Комбо x15',     cond:()=>+LS.get('maxComboEver',0)>=15},
+  {id:'alien',   name:'ПРИШЕЛЕЦ',  emoji:'👾', req:'5 боссов',      cond:()=>+LS.get('totalBosses',0)>=5},
+  {id:'rainbow', name:'РАДУГА',    emoji:'🌈', req:'Все достижения', cond:()=>unlockedAch.length>=ACHIEVEMENTS.length},
+];
+const SKIN_COLORS = {
+  default:{a:'#00ff88',b:'#00d4ff',trail:'#00ff8866',glow:'#00ff88'},
+  fire:   {a:'#ff6b00',b:'#ff0000',trail:'#ff6b0066',glow:'#ff6b00'},
+  ice:    {a:'#00d4ff',b:'#a0f0ff',trail:'#00d4ff66',glow:'#00d4ff'},
+  ghost:  {a:'#ccccff',b:'#8888ff',trail:'#ccccff44',glow:'#ccccff'},
+  gold:   {a:'#ffd700',b:'#ff9900',trail:'#ffd70066',glow:'#ffd700'},
+  dragon: {a:'#a855f7',b:'#ec4899',trail:'#a855f766',glow:'#a855f7'},
+  alien:  {a:'#00ff00',b:'#44ff44',trail:'#00ff0066',glow:'#00ff00'},
+  rainbow:{a:'#ff0088',b:'#00ffff',trail:'#ff008866',glow:'#ff88ff'},
+};
+let activeSkin = LS.get('activeSkin','default');
+
+function renderSkinScreen(){
+  const grid = document.getElementById('skinGrid');
+  grid.innerHTML = '';
+  SKINS.forEach(skin => {
+    const ok = skin.cond(), isActive = activeSkin === skin.id;
+    const div = document.createElement('div');
+    div.className = `skin-item ${ok?'ok':''} ${isActive?'active':''} ${!ok?'locked':''}`;
+    div.innerHTML = `
+      ${isActive ? '<div class="skin-active-badge">✓ АКТИВЕН</div>' : ''}
+      <div class="skin-icon">${skin.emoji}</div>
+      <div class="skin-name">${skin.name}</div>
+      <div class="${ok?'skin-unlocked':'skin-req'}">${ok?'✅ Разблокирован':skin.req}</div>`;
+    if(ok) div.addEventListener('click',()=>{ activeSkin=skin.id; LS.set('activeSkin',activeSkin); renderSkinScreen(); });
+    grid.appendChild(div);
+  });
+}
+
+// ════════════════════════════════════════════════════
+// CUSTOMIZATION
+// ════════════════════════════════════════════════════
+const SHIP_COLORS = {
+  green:{a:'#00ff88',b:'#00d4ff'}, blue:{a:'#00d4ff',b:'#0080ff'}, purple:{a:'#a855f7',b:'#ec4899'},
+  orange:{a:'#ff6b00',b:'#ff9900'}, red:{a:'#ff0066',b:'#ff3366'}, yellow:{a:'#ffd700',b:'#ffed4e'}
+};
+const BULLET_COLORS = {
+  yellow:{a:'#ffff00',b:'#ff9900'}, cyan:{a:'#00ffff',b:'#00d4ff'}, pink:{a:'#ff69b4',b:'#ff1493'},
+  green:{a:'#00ff88',b:'#00ff00'}, white:{a:'#ffffff',b:'#cccccc'}, purple:{a:'#a855f7',b:'#8b5cf6'}
+};
+
+let custom = {
+  shipShape:   LS.get('shipShape',  'fighter'),
+  shipColor:   LS.get('shipColor',  'green'),
+  bulletColor: LS.get('bulletColor','yellow'),
+  shootStyle:  LS.get('shootStyle', 'single'),
+  particles:   LS.get('particles',  'true') !== 'false',
+  glow:        LS.get('glow',       'true') !== 'false',
+};
+
+function loadCustomUI(){
+  document.querySelectorAll('[data-ship-shape]').forEach(e=>e.classList.toggle('sel',e.dataset.shipShape===custom.shipShape));
+  document.querySelectorAll('[data-ship-color]').forEach(e=>e.classList.toggle('sel',e.dataset.shipColor===custom.shipColor));
+  document.querySelectorAll('[data-bullet-color]').forEach(e=>e.classList.toggle('sel',e.dataset.bulletColor===custom.bulletColor));
+  document.querySelectorAll('[data-shoot-style]').forEach(e=>e.classList.toggle('sel',e.dataset.shootStyle===custom.shootStyle));
+  document.getElementById('particlesChk').checked = custom.particles;
+  document.getElementById('glowChk').checked = custom.glow;
+}
+function saveCustom(){
+  custom.particles = document.getElementById('particlesChk').checked;
+  custom.glow      = document.getElementById('glowChk').checked;
+  LS.set('shipShape',   custom.shipShape);
+  LS.set('shipColor',   custom.shipColor);
+  LS.set('bulletColor', custom.bulletColor);
+  LS.set('shootStyle',  custom.shootStyle);
+  LS.set('particles',   custom.particles);
+  LS.set('glow',        custom.glow);
+}
+
+// Selection listeners for customize screen
+[['data-ship-shape','shipShape'],['data-ship-color','shipColor'],['data-bullet-color','bulletColor'],['data-shoot-style','shootStyle']].forEach(([attr,key])=>{
+  document.querySelectorAll(`[${attr}]`).forEach(el=>{
+    el.addEventListener('click',function(){
+      document.querySelectorAll(`[${attr}]`).forEach(e=>e.classList.remove('sel'));
+      this.classList.add('sel');
+      custom[key] = this.getAttribute(attr);
+    });
+  });
+});
+
+// ════════════════════════════════════════════════════
+// DIFFICULTY CONFIG
+// ════════════════════════════════════════════════════
+const DIFF = {
+  easy:      {lives:5, spd:.7,  spawn:.013, scoreMult:1,   bossHpMult:.7,  powerupRate:.007},
+  normal:    {lives:3, spd:1,   spawn:.018, scoreMult:1.5, bossHpMult:1,   powerupRate:.004},
+  hard:      {lives:2, spd:1.5, spawn:.026, scoreMult:2,   bossHpMult:1.4, powerupRate:.002},
+  nightmare: {lives:1, spd:2,   spawn:.034, scoreMult:3,   bossHpMult:2,   powerupRate:0}
+};
+
+// ════════════════════════════════════════════════════
+// SCREEN MANAGER
+// ════════════════════════════════════════════════════
+const SCREENS = ['difficultyScreen','gameOverScreen','upgradeScreen','lbScreen','customScreen','skinScreen'];
+function showScreen(id){ SCREENS.forEach(s=>{ const el=document.getElementById(s); if(el) el.style.display = s===id ? 'flex' : 'none'; }); }
+function hideAllScreens(){ SCREENS.forEach(s=>{ const el=document.getElementById(s); if(el) el.style.display='none'; }); }
+showScreen('difficultyScreen');
+
+// ════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════
+let difficulty = null;
+let autoShoot  = LS.get('autoShoot','true') !== 'false';
+
+document.querySelectorAll('[data-diff]').forEach(c=>{
+  c.addEventListener('click',function(){
+    document.querySelectorAll('[data-diff]').forEach(x=>x.classList.remove('selected'));
+    this.classList.add('selected');
+    difficulty = this.dataset.diff;
+    document.getElementById('startBtn').disabled = false;
+  });
+});
+
+document.getElementById('startBtn').addEventListener('click',()=>{ if(difficulty){ hideAllScreens(); startGame(); } });
+document.getElementById('restartBtn').addEventListener('click',()=>{ hideAllScreens(); startGame(); });
+document.getElementById('menuBtn').addEventListener('click',()=>{ showScreen('difficultyScreen'); });
+
+document.getElementById('upgradeBtn').addEventListener('click',()=>{ renderUpgradeScreen(); showScreen('upgradeScreen'); });
+document.getElementById('backFromUpgrade').addEventListener('click',()=>{ showScreen('difficultyScreen'); });
+
+document.getElementById('lbBtn').addEventListener('click',()=>{ showScreen('lbScreen'); loadLeaderboard(); });
+document.getElementById('backFromLb').addEventListener('click',()=>{ showScreen('difficultyScreen'); });
+
+document.getElementById('customBtn').addEventListener('click',()=>{ loadCustomUI(); showScreen('customScreen'); });
+document.getElementById('saveCustomBtn').addEventListener('click',()=>{ saveCustom(); showScreen('difficultyScreen'); });
+document.getElementById('backFromCustom').addEventListener('click',()=>{ showScreen('difficultyScreen'); });
+
+document.getElementById('skinBtn').addEventListener('click',()=>{ renderSkinScreen(); showScreen('skinScreen'); });
+document.getElementById('backFromSkin').addEventListener('click',()=>{ showScreen('difficultyScreen'); });
+
+// Auto shoot
+function syncAutoUI(){
+  document.getElementById('autoBtn').classList.toggle('active', autoShoot);
+  document.getElementById('autoBtn').textContent = autoShoot ? '⚡ АВТО' : '✋ РУЧН.';
+  document.getElementById('autoChk').checked = autoShoot;
+}
+syncAutoUI();
+document.getElementById('autoBtn').addEventListener('click',()=>{ autoShoot=!autoShoot; LS.set('autoShoot',autoShoot); syncAutoUI(); });
+document.getElementById('autoChk').addEventListener('change',function(){ autoShoot=this.checked; LS.set('autoShoot',autoShoot); syncAutoUI(); });
+
+// Weapon selector
+let currentWeapon = 'laser';
+document.querySelectorAll('[data-weapon]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    currentWeapon = btn.dataset.weapon;
+    document.querySelectorAll('[data-weapon]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// Pause
+let gamePaused = false;
+document.getElementById('pauseBtn').addEventListener('click',()=>{
+  if(!gameRunning) return;
+  gamePaused = true;
+  document.getElementById('pauseOverlay').style.display = 'flex';
+});
+document.getElementById('resumeBtn').addEventListener('click',()=>{
+  gamePaused = false;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+});
+document.getElementById('pauseRestartBtn').addEventListener('click',()=>{
+  gamePaused = false;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  hideAllScreens(); startGame();
+});
+document.getElementById('pauseMenuBtn').addEventListener('click',()=>{
+  gamePaused = false; gameRunning = false;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  showScreen('difficultyScreen');
+});
+
+// ════════════════════════════════════════════════════
+// BACKGROUND ELEMENTS
+// ════════════════════════════════════════════════════
+const stars=[], nebulas=[], planets=[], asteroids=[];
+
+for(let i=0;i<130;i++) stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:Math.random()*2+.5,sp:Math.random()*1.8+.3,o:Math.random()*.55+.35});
+for(let i=0;i<5;i++) nebulas.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:60+Math.random()*120,hue:Math.random()*360,o:.04+Math.random()*.06,sp:.15+Math.random()*.2});
+for(let i=0;i<3;i++) planets.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:30+Math.random()*60,hue:Math.random()*360,sp:.05+Math.random()*.1,o:.12+Math.random()*.1,rings:Math.random()>.5,ringAngle:Math.random()*Math.PI});
+for(let i=0;i<8;i++) asteroids.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:5+Math.random()*15,sp:.2+Math.random()*.6,angle:Math.random()*Math.PI*2,rot:(Math.random()-.5)*.02,pts:Array.from({length:7},(_,j)=>({a:j/7*Math.PI*2,r:.7+Math.random()*.6}))});
+
+// ════════════════════════════════════════════════════
+// GAME STATE
+// ════════════════════════════════════════════════════
+let gameRunning=false;
+let score=0, lives=0, level=1, levelProgress=0;
 let combo=1, maxCombo=1, comboTimer=0;
 let bossActive=false, bossEnemy=null;
 let killedEnemies=0, bossesKilled=0;
-let sessionAchievements=[];
-let unlockedAchievements=JSON.parse(localStorage.getItem('achievements')||'[]');
-let activePowerups={shield:0,speed:0,bomb:0};
+let sessionAch=[];
+let activePowerups={shield:0, speed:0};
+let shakeAmount=0, shakeX=0, shakeY=0;
+let lastTime=0;
 
-let custom={
-    shipShape:   localStorage.getItem('shipShape')   ||'fighter',
-    shipColor:   localStorage.getItem('shipColor')   ||'green',
-    bulletColor: localStorage.getItem('bulletColor') ||'yellow',
-    shootStyle:  localStorage.getItem('shootStyle')  ||'single',
-    particles:   localStorage.getItem('particles')   !=='false',
-    glow:        localStorage.getItem('glow')        !=='false'
-};
+const player = {x:canvas.width/2, y:canvas.height-110, targetX:canvas.width/2, w:44, h:44};
+const playerTrail = [];
 
-// ═══ ИГРОВЫЕ ОБЪЕКТЫ ═══
-const player={x:canvas.width/2,y:canvas.height-110,targetX:canvas.width/2,w:44,h:44};
-const bullets=[],enemies=[],stars=[],particles=[],powerups=[],nebulas=[];
+// Object pools — pre-allocated for performance
+const bullets=[], enemies=[], particles=[], powerups=[];
+const MAX_PARTICLES = 300;
 
-let lastShot=0;
-const SHOOT_CD=190;
+let lastShot = 0;
 
-// ═══ ЗВЁЗДЫ И ТУМАННОСТИ ═══
-for(let i=0;i<130;i++) stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:Math.random()*2+.5,sp:Math.random()*1.8+.3,o:Math.random()*.55+.35});
-for(let i=0;i<5;i++) nebulas.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:60+Math.random()*120,hue:Math.random()*360,o:.04+Math.random()*.06,sp:.15+Math.random()*.2});
-
-// ═══ УПРАВЛЕНИЕ ═══
-let touching=false;
-canvas.addEventListener('touchstart',e=>{e.preventDefault();if(!gameRunning)return;touching=true;player.targetX=e.touches[0].clientX;},{passive:false});
-canvas.addEventListener('touchmove',e=>{e.preventDefault();if(!gameRunning)return;player.targetX=e.touches[0].clientX;},{passive:false});
-canvas.addEventListener('touchend',e=>{e.preventDefault();touching=false;},{passive:false});
-const keys={};
-document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' ')e.preventDefault();});
-document.addEventListener('keyup',e=>{keys[e.key]=false;});
-
-// ═══ АВТО-СТРЕЛЬБА ═══
-function syncAutoUI(){
-    document.getElementById('autoShootText').textContent=autoShoot?'АВТО':'РУЧН.';
-    document.getElementById('autoShootIndicator').classList.toggle('active',autoShoot);
+// ════════════════════════════════════════════════════
+// NOTIFICATION QUEUE (rate-limited to avoid DOM spam)
+// ════════════════════════════════════════════════════
+let notifQueue = [], notifBusy = false;
+function notify(text, cls=''){
+  notifQueue.push({text,cls});
+  if(!notifBusy) flushNotif();
 }
-syncAutoUI();
-document.getElementById('autoShootToggle').checked=autoShoot;
-document.getElementById('autoShootIndicator').addEventListener('click',()=>{autoShoot=!autoShoot;localStorage.setItem('autoShoot',autoShoot);syncAutoUI();});
-document.getElementById('autoShootToggle').addEventListener('change',function(){autoShoot=this.checked;localStorage.setItem('autoShoot',autoShoot);syncAutoUI();});
-
-// ═══ ЭКРАНЫ ═══
-function show(id){document.getElementById(id).style.display='flex';}
-function hide(id){document.getElementById(id).style.display='none';}
-
-document.querySelectorAll('.difficulty-card').forEach(c=>{
-    c.addEventListener('click',function(){
-        document.querySelectorAll('.difficulty-card').forEach(x=>x.classList.remove('selected'));
-        this.classList.add('selected');difficulty=this.dataset.difficulty;
-        document.getElementById('startBtn').disabled=false;
-    });
-});
-document.getElementById('startBtn').addEventListener('click',()=>{if(difficulty){hide('difficultyScreen');startGame();}});
-document.getElementById('restartBtn').addEventListener('click',()=>{hide('gameOver');startGame();});
-document.getElementById('changeDifficultyBtn').addEventListener('click',()=>{hide('gameOver');show('difficultyScreen');difficulty=null;document.getElementById('startBtn').disabled=true;document.querySelectorAll('.difficulty-card').forEach(c=>c.classList.remove('selected'));});
-document.getElementById('customizeBtn').addEventListener('click',()=>{hide('difficultyScreen');show('customizeScreen');loadCustomUI();});
-document.getElementById('backToMenuBtn').addEventListener('click',()=>{hide('customizeScreen');show('difficultyScreen');});
-document.getElementById('saveCustomizationBtn').addEventListener('click',()=>{saveCustom();hide('customizeScreen');show('difficultyScreen');});
-
-// Кастомизация
-['data-ship-shape','data-ship-color','data-bullet-color','data-shoot-style'].forEach(attr=>{
-    const key=attr.replace('data-','').replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
-    document.querySelectorAll(`[${attr}]`).forEach(el=>{
-        el.addEventListener('click',function(){
-            document.querySelectorAll(`[${attr}]`).forEach(e=>e.classList.remove('selected'));
-            this.classList.add('selected');custom[key]=this.getAttribute(attr);
-        });
-    });
-});
-function loadCustomUI(){
-    document.querySelectorAll('[data-ship-shape]').forEach(e=>e.classList.toggle('selected',e.dataset.shipShape===custom.shipShape));
-    document.querySelectorAll('[data-ship-color]').forEach(e=>e.classList.toggle('selected',e.dataset.shipColor===custom.shipColor));
-    document.querySelectorAll('[data-bullet-color]').forEach(e=>e.classList.toggle('selected',e.dataset.bulletColor===custom.bulletColor));
-    document.querySelectorAll('[data-shoot-style]').forEach(e=>e.classList.toggle('selected',e.dataset.shootStyle===custom.shootStyle));
-    document.getElementById('particlesToggle').checked=custom.particles;
-    document.getElementById('glowToggle').checked=custom.glow;
-}
-function saveCustom(){
-    custom.particles=document.getElementById('particlesToggle').checked;
-    custom.glow=document.getElementById('glowToggle').checked;
-    Object.entries(custom).forEach(([k,v])=>localStorage.setItem(k,v));
+function flushNotif(){
+  if(!notifQueue.length){ notifBusy=false; return; }
+  notifBusy = true;
+  const {text,cls} = notifQueue.shift();
+  const container = document.getElementById('notifications');
+  // Limit DOM children
+  while(container.childElementCount > 4) container.removeChild(container.firstChild);
+  const el = document.createElement('div');
+  el.className = 'notif ' + cls;
+  el.textContent = text;
+  container.appendChild(el);
+  setTimeout(()=>{ el.remove(); flushNotif(); }, 750);
 }
 
-// ═══ СТАРТ ═══
-function startGame(){
-    const cfg=DIFF[difficulty];
-    const bonus=getUpgradeBonus();
-    score=0;lives=cfg.lives;level=1;levelProgress=0;
-    combo=1;maxCombo=1;comboTimer=0;
-    killedEnemies=0;bossesKilled=0;
-    bossActive=false;bossEnemy=null;
-    sessionAchievements=[];
-    activePowerups={shield: bonus.hasStartShield?9999:0, speed:0, bomb:0};
-    bullets.length=0;enemies.length=0;particles.length=0;powerups.length=0;
-    player.x=player.targetX=canvas.width/2;
-    gameRunning=true;
-    updateUI();
-    renderXPBar();
-    hide('bossBar');
-
-    // Подсказка
-    const old=document.querySelector('.touchHint');if(old)old.remove();
-    const hint=document.createElement('div');
-    hint.className='touchHint';hint.textContent='☝️ Ведите пальцем для управления';
-    document.body.appendChild(hint);setTimeout(()=>hint.remove(),3500);
-
-    requestAnimationFrame(loop);
+// ════════════════════════════════════════════════════
+// ACHIEVEMENTS
+// ════════════════════════════════════════════════════
+function checkAch(id){
+  if(unlockedAch.includes(id) || sessionAch.includes(id)) return;
+  const a = ACHIEVEMENTS.find(x=>x.id===id);
+  if(!a) return;
+  sessionAch.push(id); unlockedAch.push(id);
+  LS.setJ('achievements', unlockedAch);
+  const toast = document.getElementById('achieveToast');
+  document.getElementById('achieveName').textContent = a.name;
+  toast.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>toast.style.display='none', 2500);
 }
 
-// ═══ СТРЕЛЬБА ═══
-function shoot(){
-    const bonus=getUpgradeBonus();
-    const now=Date.now();
-    const cd=(activePowerups.speed>0?SHOOT_CD*.55:SHOOT_CD)*bonus.firerateMult;
-    if(now-lastShot<cd)return;
-    lastShot=now;
-    const spd=12*bonus.bulletSpeedMult*(activePowerups.speed>0?1.3:1);
-    const base={y:player.y,w:activePowerups.speed>0?7:5,h:18,sp:spd,dmg:bonus.damageMult};
-    const style=custom.shootStyle;
-    if(style==='single'){bullets.push({...base,x:player.x});}
-    else if(style==='double'){bullets.push({...base,x:player.x-11});bullets.push({...base,x:player.x+11});}
-    else{bullets.push({...base,x:player.x-16});bullets.push({...base,x:player.x});bullets.push({...base,x:player.x+16});}
-}
+// ════════════════════════════════════════════════════
+// SHAKE
+// ════════════════════════════════════════════════════
+function triggerShake(s=8){ shakeAmount=s; }
 
-// ═══ ВЗРЫВ ═══
+// ════════════════════════════════════════════════════
+// EXPLOSION
+// ════════════════════════════════════════════════════
 function explode(x,y,color,count=28){
-    if(!custom.particles)return;
-    for(let i=0;i<count;i++) particles.push({x,y,vx:(Math.random()-.5)*11,vy:(Math.random()-.5)*11,life:1,decay:.014+Math.random()*.01,color,size:2+Math.random()*3});
-    // Волна
-    particles.push({x,y,vx:0,vy:0,life:1,decay:.04,color,wave:true,r:0,maxR:60+count});
+  if(!custom.particles) return;
+  const cap = Math.min(count, MAX_PARTICLES - particles.length);
+  for(let i=0;i<cap;i++) particles.push({x,y,vx:(Math.random()-.5)*11,vy:(Math.random()-.5)*11,life:1,decay:.014+Math.random()*.01,color,size:2+Math.random()*3,wave:false,bossShot:false});
+  if(particles.length < MAX_PARTICLES)
+    particles.push({x,y,vx:0,vy:0,life:1,decay:.04,color,wave:true,r:0,maxR:60+count,bossShot:false});
 }
 
-// ═══ НОТИФИКАЦИИ ═══
-function notify(text,cls=''){
-    const el=document.createElement('div');
-    el.className='notif '+(cls||'');el.textContent=text;
-    document.getElementById('notifications').appendChild(el);
-    setTimeout(()=>el.remove(),900);
-}
-
-// ═══ ДОСТИЖЕНИЯ ═══
-function checkAchievement(id){
-    if(unlockedAchievements.includes(id)||sessionAchievements.includes(id))return;
-    const a=ACHIEVEMENTS.find(x=>x.id===id);if(!a)return;
-    sessionAchievements.push(id);
-    unlockedAchievements.push(id);
-    localStorage.setItem('achievements',JSON.stringify(unlockedAchievements));
-    const toast=document.getElementById('achieveToast');
-    document.getElementById('achieveName').textContent=a.name;
-    toast.style.display='block';
-    setTimeout(()=>toast.style.display='none',2500);
-}
-
-// ═══ БОНУСЫ (POWERUPS) ═══
+// ════════════════════════════════════════════════════
+// POWERUPS
+// ════════════════════════════════════════════════════
 function spawnPowerup(x,y){
-    const types=['shield','speed','bomb'];
-    const type=types[Math.floor(Math.random()*types.length)];
-    const icons={shield:'🛡️',speed:'⚡',bomb:'💣'};
-    powerups.push({x,y,type,icon:icons[type],r:14,sp:.8,life:1,decay:.003,angle:0});
+  const types=['shield','speed','bomb'];
+  const type=types[Math.floor(Math.random()*types.length)];
+  const icons={shield:'🛡️',speed:'⚡',bomb:'💣'};
+  powerups.push({x,y,type,icon:icons[type],r:14,sp:.8,life:1,decay:.003,angle:0});
 }
 function applyPowerup(type){
-    if(type==='shield'){
-        activePowerups.shield=8000;
-        notify('🛡️ ЩИТ!','');
-        checkAchievement('shield');
-    }else if(type==='speed'){
-        activePowerups.speed=6000;
-        notify('⚡ УСКОРЕНИЕ!','');
-    }else if(type==='bomb'){
-        // Уничтожает всех врагов
-        enemies.forEach(e=>explode(e.x,e.y,'#ff6b00',20));
-        const killed=enemies.length;
-        enemies.length=0;
-        if(bossActive&&bossEnemy){
-            bossEnemy.hp=Math.floor(bossEnemy.hp*.5);
-        }
-        score+=killed*20;updateUI();
-        notify('💣 БОМБА! +'+killed*20,'');
-    }
-    updatePowerupBar();
+  playSound('powerup');
+  if(type==='shield'){
+    activePowerups.shield=8000;
+    notify('🛡️ ЩИТ!');
+    checkAch('shield');
+  }else if(type==='speed'){
+    activePowerups.speed=6000;
+    notify('⚡ УСКОРЕНИЕ!');
+  }else if(type==='bomb'){
+    const n=enemies.length;
+    enemies.forEach(e=>explode(e.x,e.y,'#ff6b00',20));
+    enemies.length=0;
+    if(bossActive&&bossEnemy) bossEnemy.hp=Math.floor(bossEnemy.hp*.5);
+    score+=n*20; updateHUD();
+    notify('💣 БОМБА! +'+n*20,'gold');
+    triggerShake(14);
+    playSound('explode');
+  }
+  updatePowerupBar();
 }
 function updatePowerupBar(){
-    const bar=document.getElementById('powerupBar');
-    bar.innerHTML='';
-    if(activePowerups.shield>0){const d=document.createElement('div');d.className='powerup-icon shield';d.innerHTML='🛡️ <span>'+Math.ceil(activePowerups.shield/1000)+'s</span>';bar.appendChild(d);}
-    if(activePowerups.speed>0){const d=document.createElement('div');d.className='powerup-icon speed';d.innerHTML='⚡ <span>'+Math.ceil(activePowerups.speed/1000)+'s</span>';bar.appendChild(d);}
+  const bar=document.getElementById('powerupBar');
+  bar.innerHTML='';
+  if(activePowerups.shield>0){ const d=document.createElement('div'); d.className='pu-chip shield'; d.innerHTML='🛡️ '+Math.ceil(activePowerups.shield/1000)+'s'; bar.appendChild(d); }
+  if(activePowerups.speed>0){  const d=document.createElement('div'); d.className='pu-chip speed';  d.innerHTML='⚡ '+Math.ceil(activePowerups.speed/1000)+'s';  bar.appendChild(d); }
 }
 
-// ═══ БОСС ═══
+// ════════════════════════════════════════════════════
+// WEAPONS
+// ════════════════════════════════════════════════════
+const WEAPONS = {
+  laser:   {baseCd:160, label:'ЛАЗЕР',  color:'#00d4ff'},
+  rocket:  {baseCd:600, label:'РАКЕТА', color:'#ff6b00'},
+  shotgun: {baseCd:800, label:'ДРОБЬ',  color:'#ffd700'},
+};
+
+function shoot(){
+  const bonus = getBonus();
+  const now = Date.now();
+  const wpn = WEAPONS[currentWeapon];
+  const cd = (activePowerups.speed>0 ? wpn.baseCd*.6 : wpn.baseCd) * bonus.firerateMult;
+  if(now - lastShot < cd) return;
+  lastShot = now;
+  playSound('shoot');
+
+  const spd = 13 * bonus.bulletSpeedMult * (activePowerups.speed>0?1.3:1);
+  const dmg = bonus.damageMult;
+  const style = custom.shootStyle;
+
+  if(currentWeapon==='laser'){
+    const base={y:player.y,w:5,h:22,sp:spd,dmg,type:'laser'};
+    if(style==='single') bullets.push({...base,x:player.x});
+    else if(style==='double'){ bullets.push({...base,x:player.x-11}); bullets.push({...base,x:player.x+11}); }
+    else { bullets.push({...base,x:player.x-16}); bullets.push({...base,x:player.x}); bullets.push({...base,x:player.x+16}); }
+  }else if(currentWeapon==='rocket'){
+    bullets.push({x:player.x,y:player.y,w:10,h:18,sp:7*bonus.bulletSpeedMult,dmg:dmg*3,type:'rocket',angle:0,homing:true});
+  }else if(currentWeapon==='shotgun'){
+    const s=10*bonus.bulletSpeedMult;
+    for(let a=-3;a<=3;a++) bullets.push({x:player.x,y:player.y,w:6,h:14,sp:s,dmg,type:'shotgun',vx:a*1.8,pierce:true,pierced:new Set()});
+  }
+}
+
+// ════════════════════════════════════════════════════
+// BOSS
+// ════════════════════════════════════════════════════
 function spawnBoss(){
-    bossActive=true;
-    const cfg=DIFF[difficulty];
-    const hp=Math.floor((30+level*15)*cfg.bossHpMult);
-    bossEnemy={
-        x:canvas.width/2, y:-80,
-        w:80,h:60,
-        hw:55,hh:45,
-        sp:1+level*.1,
-        hp,maxHp:hp,
-        dir:1,
-        phase:0,
-        shootTimer:0,
-        isBoss:true
-    };
-    enemies.push(bossEnemy);
-    document.getElementById('bossBar').style.display='block';
-    notify('👾 БОСС!','boss');
+  bossActive=true;
+  const cfg=DIFF[difficulty];
+  // Better HP scaling: capped growth
+  const hp = Math.floor((30 + level*10 + Math.sqrt(level)*20) * cfg.bossHpMult);
+  bossEnemy={x:canvas.width/2,y:-80,w:80,h:60,hw:55,hh:45,sp:1+level*.08,hp,maxHp:hp,dir:1,shootTimer:0,isBoss:true};
+  enemies.push(bossEnemy);
+  document.getElementById('bossBar').style.display='block';
+  notify('👾 BOSS!','boss');
+  playSound('boss');
+  triggerShake(12);
 }
 
-// ═══ СПАВН ВРАГОВ ═══
+// ════════════════════════════════════════════════════
+// ENEMY SPAWNING
+// ════════════════════════════════════════════════════
 function spawnEnemy(){
-    const cfg=DIFF[difficulty];
-    const rand=Math.random();
-    let type='normal';
-    if(rand<.15+level*.02)type='fast';
-    else if(rand<.25+level*.01&&level>=3)type='tank';
-    else if(rand<.3&&level>=5)type='zigzag';
+  const cfg=DIFF[difficulty];
+  const rand=Math.random();
+  let type='normal';
+  if(rand<.15+level*.02) type='fast';
+  else if(rand<.25+level*.01&&level>=3) type='tank';
+  else if(rand<.32&&level>=5) type='zigzag';
 
-    const hw=type==='tank'?22:type==='fast'?12:16+Math.random()*10;
-    const hh=hw*(.8+Math.random()*.4);
-    const hp=type==='tank'?3+Math.floor(level/2):1+Math.floor(level/4);
-    const spd=type==='fast'?2.5:type==='tank'?.6:1;
+  const hw=type==='tank'?22:type==='fast'?12:14+Math.random()*8;
+  const hh=hw*(.8+Math.random()*.4);
+  const hp=type==='tank'?3+Math.floor(level/2):1+Math.floor(level/4);
+  const spd=type==='fast'?2.5:type==='tank'?.6:1;
 
-    enemies.push({
-        x:hw+Math.random()*(canvas.width-hw*2),
-        y:-hh*2, hw, hh,
-        sp:(spd+level*.22+Math.random()*1.2)*cfg.spd,
-        hp, maxHp:hp,
-        type,
-        zigAngle:0,
-        isBoss:false
-    });
+  enemies.push({x:hw+Math.random()*(canvas.width-hw*2),y:-hh*2,hw,hh,sp:(spd+level*.18+Math.random()*.9)*cfg.spd,hp,maxHp:hp,type,zigAngle:0,isBoss:false});
 }
 
-// ═══ КОМБО ═══
+// ════════════════════════════════════════════════════
+// COMBO
+// ════════════════════════════════════════════════════
 function addCombo(){
-    combo=Math.min(combo+1,20);
-    if(combo>maxCombo)maxCombo=combo;
-    comboTimer=2500;
-    const el=document.getElementById('comboDisplay');
-    document.getElementById('comboValue').textContent='x'+combo;
-    el.classList.toggle('combo-hidden',combo<2);
-    if(combo>=5)checkAchievement('combo5');
-    if(combo>=10)checkAchievement('combo10');
+  combo = Math.min(combo+1,20);
+  if(combo>maxCombo) maxCombo=combo;
+  comboTimer = 2500;
+  const el = document.getElementById('comboDisplay');
+  document.getElementById('comboVal').textContent = 'x'+combo;
+  el.classList.toggle('combo-hidden', combo<2);
+  if(combo>=5) checkAch('combo5');
+  if(combo>=10) checkAch('combo10');
+  // Save max combo for dragon skin
+  const prev = +LS.get('maxComboEver',0);
+  if(combo > prev) LS.set('maxComboEver', combo);
 }
 
-// ═══ UPDATE ═══
-let lastTime=0;
+// ════════════════════════════════════════════════════
+// UPDATE
+// ════════════════════════════════════════════════════
+let touching=false;
+canvas.addEventListener('touchstart',e=>{e.preventDefault();if(!gameRunning)return;touching=true;player.targetX=e.touches[0].clientX;},{passive:false});
+canvas.addEventListener('touchmove', e=>{e.preventDefault();if(!gameRunning)return;player.targetX=e.touches[0].clientX;},{passive:false});
+canvas.addEventListener('touchend',  e=>{e.preventDefault();touching=false;},{passive:false});
+const keys={};
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' ')e.preventDefault();if(e.key==='Escape'&&gameRunning){ if(!gamePaused){gamePaused=true;document.getElementById('pauseOverlay').style.display='flex';}else{document.getElementById('resumeBtn').click();} }});
+document.addEventListener('keyup',  e=>keys[e.key]=false);
+
 function update(dt){
-    const cfg=DIFF[difficulty];
-    const spd=activePowerups.speed>0?9:6;
+  const cfg = DIFF[difficulty];
+  const bonus = getBonus();
+  const moveSpd = activePowerups.speed>0 ? 9 : 6;
 
-    // Игрок
-    if(touching){const dx=player.targetX-player.x;player.x+=dx*.2;}
-    if(keys['ArrowLeft'])player.x-=spd;
-    if(keys['ArrowRight'])player.x+=spd;
-    if(keys[' ']&&!autoShoot)shoot();
-    player.x=Math.max(player.w/2,Math.min(canvas.width-player.w/2,player.x));
+  // Player movement
+  if(touching){ const dx=player.targetX-player.x; player.x+=dx*.2; }
+  if(keys['ArrowLeft']||keys['a']||keys['A']) player.x -= moveSpd;
+  if(keys['ArrowRight']||keys['d']||keys['D']) player.x += moveSpd;
+  if(keys[' ']&&!autoShoot) shoot();
+  player.x = Math.max(player.w/2, Math.min(canvas.width-player.w/2, player.x));
+  if(autoShoot) shoot();
 
-    if(autoShoot)shoot();
+  // Player trail
+  playerTrail.push({x:player.x, y:player.y+player.h/2, life:1});
+  if(playerTrail.length>18) playerTrail.shift();
+  playerTrail.forEach(t=>t.life-=.06);
 
-    // Powerup таймеры
-    if(activePowerups.shield>0){activePowerups.shield-=dt;if(activePowerups.shield<0)activePowerups.shield=0;updatePowerupBar();}
-    if(activePowerups.speed>0){activePowerups.speed-=dt;if(activePowerups.speed<0)activePowerups.speed=0;updatePowerupBar();}
+  // Screen shake decay
+  if(shakeAmount>0){
+    shakeAmount*=.72; shakeX=(Math.random()-.5)*shakeAmount; shakeY=(Math.random()-.5)*shakeAmount;
+    if(shakeAmount<.5){shakeAmount=0;shakeX=0;shakeY=0;}
+  }
 
-    // Комбо таймер
-    if(comboTimer>0){comboTimer-=dt;}
-    else if(combo>1){combo=1;document.getElementById('comboDisplay').classList.add('combo-hidden');}
+  // Powerup timers
+  if(activePowerups.shield>0){ activePowerups.shield-=dt; if(activePowerups.shield<0)activePowerups.shield=0; updatePowerupBar(); }
+  if(activePowerups.speed>0){  activePowerups.speed-=dt;  if(activePowerups.speed<0) activePowerups.speed=0;  updatePowerupBar(); }
 
-    // Звёзды
-    stars.forEach(s=>{s.y+=s.sp;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}});
-    nebulas.forEach(n=>{n.y+=n.sp;if(n.y>canvas.height+n.r){n.y=-n.r;n.x=Math.random()*canvas.width;}});
+  // Combo timer
+  if(comboTimer>0) comboTimer-=dt;
+  else if(combo>1){ combo=1; document.getElementById('comboDisplay').classList.add('combo-hidden'); }
 
-    // Пули
-    for(let i=bullets.length-1;i>=0;i--){
-        bullets[i].y-=bullets[i].sp;
-        if(bullets[i].y<-20)bullets.splice(i,1);
+  // Background scroll
+  stars.forEach(s=>{s.y+=s.sp;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}});
+  nebulas.forEach(n=>{n.y+=n.sp;if(n.y>canvas.height+n.r){n.y=-n.r;n.x=Math.random()*canvas.width;}});
+  planets.forEach(p=>{p.y+=p.sp;if(p.y>canvas.height+p.r+50){p.y=-p.r-50;p.x=Math.random()*canvas.width;}});
+  asteroids.forEach(a=>{a.y+=a.sp;a.angle+=a.rot;if(a.y>canvas.height+30){a.y=-30;a.x=Math.random()*canvas.width;}});
+
+  // Bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.y-=b.sp;
+    if(b.vx) b.x+=b.vx;
+    if(b.type==='rocket'&&b.homing&&enemies.length>0){
+      // Find nearest enemy
+      let nearest=null, nearDist=Infinity;
+      enemies.forEach(e=>{ const d=Math.hypot(e.x-b.x,e.y-b.y); if(d<nearDist){nearDist=d;nearest=e;} });
+      if(nearest){
+        const dx=nearest.x-b.x, dy=nearest.y-b.y, dist=Math.max(nearDist,.1);
+        b.x+=dx/dist*2.5; b.y+=dy/dist*2.5-b.sp;
+        b.angle=Math.atan2(dx,-(dy-b.sp*dist))*0.5;
+      }
     }
+    if(b.y<-50||b.x<-30||b.x>canvas.width+30||b.y>canvas.height+30) bullets.splice(i,1);
+  }
 
-    // Powerup объекты
-    const bonus=getUpgradeBonus();
-    for(let i=powerups.length-1;i>=0;i--){
-        const p=powerups[i];
-        // Магнит: притягиваем к игроку
-        if(bonus.magnetRadius>0){
-            const dx=player.x-p.x, dy=player.y-p.y;
-            const dist=Math.sqrt(dx*dx+dy*dy);
-            if(dist<bonus.magnetRadius){
-                p.x+=dx/dist*4;
-                p.y+=dy/dist*4;
-            }
-        }
-        p.y+=p.sp;p.angle+=.05;p.life-=p.decay;
-        if(p.y>canvas.height+20||p.life<=0){powerups.splice(i,1);continue;}
-        // Подбор
-        if(Math.abs(p.x-player.x)<(p.r+player.w/2)&&Math.abs(p.y-player.y)<(p.r+player.h/2)){
-            applyPowerup(p.type);
-            powerups.splice(i,1);
-        }
+  // Powerup objects
+  for(let i=powerups.length-1;i>=0;i--){
+    const p=powerups[i];
+    if(bonus.magnetRadius>0){
+      const dx=player.x-p.x, dy=player.y-p.y, dist=Math.hypot(dx,dy);
+      if(dist<bonus.magnetRadius){ p.x+=dx/dist*4.5; p.y+=dy/dist*4.5; }
     }
-
-    // Враги
-    for(let i=enemies.length-1;i>=0;i--){
-        const e=enemies[i];
-        if(e.isBoss){
-            // Босс движется по синусоиде
-            e.x+=e.sp*e.dir;
-            if(e.x>canvas.width-e.hw||e.x<e.hw)e.dir*=-1;
-            if(e.y<120)e.y+=1.5;
-            e.shootTimer-=dt;
-            if(e.shootTimer<=0){
-                e.shootTimer=1800-level*80;
-                // Выстрелы вниз
-                for(let a=-1;a<=1;a++){
-                    particles.push({x:e.x+a*20,y:e.y+e.hh,vx:a*.5,vy:3,life:1,decay:.008,color:'#ff0066',isBossShot:true,size:8});
-                }
-            }
-            // Обновить boss bar
-            document.getElementById('bossFill').style.width=(e.hp/e.maxHp*100)+'%';
-        }else{
-            e.y+=e.sp;
-            if(e.type==='zigzag'){e.zigAngle+=.08;e.x+=Math.sin(e.zigAngle)*3;}
-        }
-        if(e.y>canvas.height+30){
-            if(!e.isBoss)lives--;
-            else{bossActive=false;bossEnemy=null;hide('bossBar');}
-            enemies.splice(i,1);
-            updateUI();if(lives<=0)endGame();
-        }
+    p.y+=p.sp; p.angle+=.05; p.life-=p.decay;
+    if(p.y>canvas.height+20||p.life<=0){ powerups.splice(i,1); continue; }
+    if(Math.abs(p.x-player.x)<(p.r+player.w/2)&&Math.abs(p.y-player.y)<(p.r+player.h/2)){
+      applyPowerup(p.type); powerups.splice(i,1);
     }
+  }
 
-    // Коллизии пули ↔ враги
-    for(let i=bullets.length-1;i>=0;i--){
-        for(let j=enemies.length-1;j>=0;j--){
-            const b=bullets[i],e=enemies[j];
-            if(!b||!e)continue;
-            if(b.x>e.x-e.hw&&b.x<e.x+e.hw&&b.y>e.y-e.hh&&b.y<e.y+e.hh){
-                bullets.splice(i,1);
-                e.hp--;
-                if(e.hp<=0){
-                    if(e.isBoss){
-                        explode(e.x,e.y,'#ff0066',60);
-                        bossActive=false;bossEnemy=null;hide('bossBar');
-                        bossesKilled++;score+=500*level;
-                        notify('👾 БОСС УБИТ! +'+500*level,'boss');
-                        checkAchievement('boss1');
-                    }else{
-                        const color=e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':'#ff6b00';
-                        explode(e.x,e.y,color);
-                    }
-                    enemies.splice(j,1);
-                    killedEnemies++;
-                    if(killedEnemies===1)checkAchievement('first_kill');
-                    addCombo();
-                    const pts=Math.floor((e.isBoss?500:10)*level*cfg.scoreMult*combo);
-                    score+=pts;levelProgress+=pts;
-
-                    // Монеты и XP
-                    const earnedCoins=Math.floor((e.isBoss?15:1)*level*(combo>5?2:1));
-                    const earnedXP=Math.floor((e.isBoss?100:10)*level);
-                    coins+=earnedCoins;
-                    addShipXP(earnedXP);
-                    saveUpgrades();
-
-                    // Шанс дропнуть бонус
-                    if(Math.random()<cfg.powerupRate&&!e.isBoss)spawnPowerup(e.x,e.y);
-
-                    // Всплывающие очки
-                    notify('+'+pts+(combo>2?' x'+combo:''));
-                    if(score>=1000)checkAchievement('score1000');
-                    if(score>=5000)checkAchievement('score5000');
-                    if(level>=5)checkAchievement('survive5');
-                    updateUI();
-                    // Прогресс уровня
-                    const threshold=200*(level*.6+.6);
-                    if(levelProgress>=threshold){
-                        level++;levelProgress=0;
-                        notify('⬆️ УРОВЕНЬ '+level);
-                        // Спавн босса каждые 5 уровней
-                        if(level%5===0&&!bossActive)spawnBoss();
-                    }
-                }
-                break;
-            }
+  // Enemies
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    if(e.isBoss){
+      e.x+=e.sp*e.dir;
+      if(e.x>canvas.width-e.hw||e.x<e.hw) e.dir*=-1;
+      if(e.y<120) e.y+=1.5;
+      e.shootTimer-=dt;
+      if(e.shootTimer<=0){
+        e.shootTimer = Math.max(800, 1800-level*80);
+        for(let a=-1;a<=1;a++){
+          particles.push({x:e.x+a*20,y:e.y+e.hh,vx:a*.6,vy:3+level*.05,life:1,decay:.007,color:'#ff0066',bossShot:true,wave:false,size:8});
         }
-    }
-
-    // Выстрелы босса ↔ игрок
-    for(let i=particles.length-1;i>=0;i--){
-        const p=particles[i];
-        if(!p.isBossShot)continue;
-        if(Math.abs(p.x-player.x)<player.w/2&&Math.abs(p.y-player.y)<player.h/2){
-            particles.splice(i,1);
-            if(activePowerups.shield>0){activePowerups.shield=0;notify('🛡️ ЩИТ СЛОМАН');}
-            else{lives--;updateUI();if(lives<=0)endGame();}
-        }
-    }
-
-    // Коллизии враги ↔ игрок
-    for(let i=enemies.length-1;i>=0;i--){
-        const e=enemies[i];
-        if(Math.abs(e.x-player.x)<(e.hw+player.w/2)&&Math.abs(e.y-player.y)<(e.hh+player.h/2)){
-            if(activePowerups.shield>0){
-                explode(e.x,e.y,'#00d4ff',20);
-                enemies.splice(i,1);
-                activePowerups.shield=0;
-                notify('🛡️ ЩИТ СЛОМАН');
-            }else{
-                explode(player.x,player.y,COLORS.ship[custom.shipColor].a);
-                if(!e.isBoss)enemies.splice(i,1);
-                lives--;updateUI();if(lives<=0)endGame();
-            }
-        }
-    }
-
-    // Частицы
-    for(let i=particles.length-1;i>=0;i--){
-        const p=particles[i];
-        if(!p.isBossShot){p.x+=p.vx;p.y+=p.vy;}
-        else{p.x+=p.vx;p.y+=p.vy;}
-        p.life-=p.decay;
-        if(p.wave&&p.r!==undefined)p.r=p.maxR*(1-p.life);
-        if(p.life<=0)particles.splice(i,1);
-    }
-
-    // Спавн врагов
-    if(!bossActive&&Math.random()<cfg.spawn+level*.003)spawnEnemy();
-}
-
-// ═══ DRAW ═══
-function draw(){
-    // Фон
-    const bg=ctx.createLinearGradient(0,0,0,canvas.height);
-    bg.addColorStop(0,'#060612');bg.addColorStop(.5,'#12062a');bg.addColorStop(1,'#060612');
-    ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    // Туманности
-    nebulas.forEach(n=>{
-        const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
-        g.addColorStop(0,`hsla(${n.hue},80%,60%,${n.o})`);
-        g.addColorStop(1,'transparent');
-        ctx.fillStyle=g;ctx.fillRect(n.x-n.r,n.y-n.r,n.r*2,n.r*2);
-    });
-
-    // Звёзды с мерцанием
-    const t=Date.now()/1000;
-    stars.forEach(s=>{
-        const flicker=.7+.3*Math.sin(t*s.sp*3+s.x);
-        ctx.fillStyle=`rgba(255,255,255,${s.o*flicker})`;
-        ctx.fillRect(s.x,s.y,s.s,s.s);
-    });
-
-    // Powerup объекты
-    powerups.forEach(p=>{
-        ctx.save();
-        ctx.globalAlpha=p.life;
-        ctx.translate(p.x,p.y);
-        ctx.rotate(p.angle);
-        // Свечение
-        const col=p.type==='shield'?'#00d4ff':p.type==='speed'?'#ffd700':'#ff6b00';
-        ctx.shadowBlur=20;ctx.shadowColor=col;
-        ctx.fillStyle=col+'33';
-        ctx.beginPath();ctx.arc(0,0,p.r,0,Math.PI*2);ctx.fill();
-        ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();
-        ctx.font=`${p.r}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.shadowBlur=0;ctx.fillStyle='white';
-        ctx.fillText(p.icon,0,2);
-        ctx.restore();
-    });
-
-    // Корабль
-    const sc=COLORS.ship[custom.shipColor];
-    ctx.save();
-    if(custom.glow){ctx.shadowBlur=24;ctx.shadowColor=sc.a;}
-    const pg=ctx.createLinearGradient(player.x-player.w/2,player.y-player.h/2,player.x+player.w/2,player.y+player.h/2);
-    pg.addColorStop(0,sc.a);pg.addColorStop(1,sc.b);
-    ctx.fillStyle=pg;
-    ctx.beginPath();
-    const s=custom.shipShape;
-    if(s==='fighter'){
-        ctx.moveTo(player.x,player.y-player.h/2);
-        ctx.lineTo(player.x-player.w/2,player.y+player.h/2);
-        ctx.lineTo(player.x,player.y+player.h/4);
-        ctx.lineTo(player.x+player.w/2,player.y+player.h/2);
-    }else if(s==='arrow'){
-        ctx.moveTo(player.x,player.y-player.h/2);
-        ctx.lineTo(player.x-player.w/3,player.y+player.h/3);
-        ctx.lineTo(player.x-player.w/2,player.y+player.h/2);
-        ctx.lineTo(player.x,player.y+player.h/6);
-        ctx.lineTo(player.x+player.w/2,player.y+player.h/2);
-        ctx.lineTo(player.x+player.w/3,player.y+player.h/3);
+      }
+      document.getElementById('bossFill').style.width=(e.hp/e.maxHp*100)+'%';
     }else{
-        ctx.moveTo(player.x,player.y-player.h/2);
-        ctx.lineTo(player.x-player.w/2,player.y);
-        ctx.lineTo(player.x,player.y+player.h/2);
-        ctx.lineTo(player.x+player.w/2,player.y);
+      e.y+=e.sp;
+      if(e.type==='zigzag'){ e.zigAngle+=.08; e.x+=Math.sin(e.zigAngle)*3; }
     }
-    ctx.closePath();ctx.fill();
-
-    // Щит
-    if(activePowerups.shield>0){
-        ctx.strokeStyle='#00d4ff88';ctx.lineWidth=3;
-        ctx.shadowBlur=15;ctx.shadowColor='#00d4ff';
-        ctx.beginPath();ctx.arc(player.x,player.y,player.w*.8,0,Math.PI*2);ctx.stroke();
+    if(e.y>canvas.height+30){
+      if(e.isBoss){ bossActive=false; bossEnemy=null; document.getElementById('bossBar').style.display='none'; }
+      else { lives--; updateHUD(); if(lives<=0){endGame();return;} }
+      enemies.splice(i,1);
     }
+  }
 
-    // Двигатель
-    const jg=ctx.createLinearGradient(player.x,player.y+player.h/2,player.x,player.y+player.h/2+20);
-    jg.addColorStop(0,sc.a+'bb');jg.addColorStop(1,'transparent');
-    ctx.fillStyle=jg;ctx.shadowBlur=0;
-    ctx.beginPath();
-    ctx.moveTo(player.x-8,player.y+player.h/2);
-    ctx.lineTo(player.x+8,player.y+player.h/2);
-    ctx.lineTo(player.x,player.y+player.h/2+14+Math.random()*8);
-    ctx.closePath();ctx.fill();
+  // ── Bullet ↔ Enemy collisions ──
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    if(!b) continue;
+    let hit=false;
+    for(let j=enemies.length-1;j>=0;j--){
+      const e=enemies[j];
+      if(!e) continue;
+      // Shotgun pierce: skip already-hit enemies
+      if(b.pierce && b.pierced && b.pierced.has(j)) continue;
+      const hitW=b.type==='rocket'?e.hw+12:e.hw, hitH=b.type==='rocket'?e.hh+12:e.hh;
+      if(b.x>e.x-hitW&&b.x<e.x+hitW&&b.y>e.y-hitH&&b.y<e.y+hitH){
+        if(b.type==='rocket'){
+          explode(b.x,b.y,'#ff6b00',45); triggerShake(12); playSound('explode');
+          enemies.forEach((en,idx)=>{ if(Math.hypot(en.x-b.x,en.y-b.y)<80) en.hp-=Math.ceil((b.dmg||1)*1.5); });
+          bullets.splice(i,1); hit=true;
+        }else if(b.pierce){
+          b.pierced.add(j);
+          e.hp-=Math.ceil(b.dmg||1);
+          playSound('hit');
+        }else{
+          bullets.splice(i,1); hit=true;
+          e.hp-=Math.ceil(b.dmg||1);
+          playSound('hit');
+        }
+        if(e.hp<=0) killEnemy(j, cfg);
+        if(hit) break;
+      }
+    }
+  }
+  // Remove dead shotgun bullets
+  for(let i=bullets.length-1;i>=0;i--){ if(bullets[i]&&bullets[i].pierce&&bullets[i].y<-50) bullets.splice(i,1); }
+
+  // Boss shots ↔ player
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    if(!p.bossShot) continue;
+    if(Math.abs(p.x-player.x)<player.w/2&&Math.abs(p.y-player.y)<player.h/2){
+      particles.splice(i,1);
+      if(activePowerups.shield>0){ activePowerups.shield=0; notify('🛡️ ЩИТ СЛОМАН'); updatePowerupBar(); }
+      else{ lives--; updateHUD(); if(lives<=0){endGame();return;} playSound('hit'); triggerShake(10); }
+    }
+  }
+
+  // Enemy ↔ player collisions
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    if(Math.abs(e.x-player.x)<(e.hw+player.w*.45)&&Math.abs(e.y-player.y)<(e.hh+player.h*.45)){
+      if(activePowerups.shield>0){
+        explode(e.x,e.y,'#00d4ff',20); enemies.splice(i,1);
+        activePowerups.shield=0; notify('🛡️ ЩИТ СЛОМАН'); updatePowerupBar(); playSound('hit');
+      }else{
+        explode(player.x,player.y,(SKIN_COLORS[activeSkin]||SKIN_COLORS.default).a);
+        if(!e.isBoss) enemies.splice(i,1);
+        lives--; updateHUD(); if(lives<=0){endGame();return;}
+        playSound('hit'); triggerShake(12);
+      }
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx||0; p.y+=p.vy||0;
+    p.life-=p.decay;
+    if(p.wave&&p.r!==undefined) p.r=p.maxR*(1-p.life);
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // Spawn enemies
+  if(!bossActive && Math.random()<cfg.spawn+level*.0025) spawnEnemy();
+}
+
+function killEnemy(j, cfg){
+  const e=enemies[j];
+  if(!e) return;
+  if(e.isBoss){
+    explode(e.x,e.y,'#ff0066',60); triggerShake(18); playSound('explode');
+    bossActive=false; bossEnemy=null; document.getElementById('bossBar').style.display='none';
+    bossesKilled++;
+    const pts = 500*level;
+    score+=pts; levelProgress+=pts;
+    LS.set('totalBosses',(+LS.get('totalBosses',0))+1);
+    notify('👾 BOSS DOWN! +'+pts,'boss');
+    checkAch('boss1');
+  }else{
+    const col=e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':'#ff6b00';
+    explode(e.x,e.y,col); triggerShake(4);
+  }
+  enemies.splice(j,1);
+  killedEnemies++;
+  LS.set('totalKills',(+LS.get('totalKills',0))+1);
+  if(killedEnemies===1) checkAch('first_kill');
+  addCombo();
+
+  const pts = Math.floor((e.isBoss?500:10)*level*DIFF[difficulty].scoreMult*combo);
+  score+=pts; levelProgress+=pts;
+
+  // Currency + XP
+  const earnedCoins = Math.floor((e.isBoss?15:1)*level*(combo>5?2:1));
+  coins+=earnedCoins;
+  addShipXP(Math.floor((e.isBoss?100:10)*level));
+  savePersistent();
+
+  // Powerup drop
+  if(Math.random()<DIFF[difficulty].powerupRate&&!e.isBoss) spawnPowerup(e.x,e.y);
+
+  // Floating score
+  if(combo>1) notify('+'+pts+' x'+combo,'gold');
+  else notify('+'+pts,'gold');
+
+  if(score>=1000) checkAch('score1000');
+  if(score>=5000) checkAch('score5000');
+  if(level>=5) checkAch('survive5');
+
+  updateHUD();
+
+  // Level threshold — smoother scaling
+  const threshold = 150 + level*80 + level*level*5;
+  if(levelProgress>=threshold){
+    level++; levelProgress=0;
+    notify('⬆️ УРОВЕНЬ '+level,'levelup');
+    playSound('levelup');
+    if(level%5===0&&!bossActive) spawnBoss();
+  }
+}
+
+// ════════════════════════════════════════════════════
+// DRAW
+// ════════════════════════════════════════════════════
+function draw(){
+  const skinC = SKIN_COLORS[activeSkin] || SKIN_COLORS.default;
+  ctx.save();
+  if(shakeAmount>0) ctx.translate(shakeX, shakeY);
+
+  // Background
+  const bg=ctx.createLinearGradient(0,0,0,canvas.height);
+  bg.addColorStop(0,'#040410'); bg.addColorStop(.5,'#0e0420'); bg.addColorStop(1,'#040410');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Nebulas
+  nebulas.forEach(n=>{
+    const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
+    g.addColorStop(0,`hsla(${n.hue},80%,60%,${n.o})`); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.fillRect(n.x-n.r,n.y-n.r,n.r*2,n.r*2);
+  });
+
+  // Planets
+  planets.forEach(p=>{
+    ctx.save(); ctx.globalAlpha=p.o;
+    const pg=ctx.createRadialGradient(p.x-p.r*.3,p.y-p.r*.3,0,p.x,p.y,p.r);
+    pg.addColorStop(0,`hsl(${p.hue},60%,55%)`); pg.addColorStop(.6,`hsl(${p.hue},50%,30%)`); pg.addColorStop(1,`hsl(${p.hue},40%,10%)`);
+    ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    if(p.rings){
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.ringAngle); ctx.scale(1,.3);
+      ctx.strokeStyle=`hsla(${p.hue},60%,70%,.5)`; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(0,0,p.r*1.5,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle=`hsla(${p.hue},60%,70%,.3)`; ctx.lineWidth=8;
+      ctx.beginPath(); ctx.arc(0,0,p.r*1.8,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
+  });
 
-    // Пули
-    const bc=COLORS.bullet[custom.bulletColor];
-    bullets.forEach(b=>{
-        ctx.save();
-        if(custom.glow){ctx.shadowBlur=13;ctx.shadowColor=bc.a;}
-        const bg2=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
-        bg2.addColorStop(0,bc.a);bg2.addColorStop(1,bc.b);
-        ctx.fillStyle=bg2;
-        ctx.beginPath();ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,3);ctx.fill();
-        ctx.restore();
-    });
+  // Asteroids
+  asteroids.forEach(a=>{
+    ctx.save(); ctx.globalAlpha=.5; ctx.translate(a.x,a.y); ctx.rotate(a.angle);
+    ctx.fillStyle='#554433'; ctx.strokeStyle='#776655'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    a.pts.forEach((p,i)=>{ const px=Math.cos(p.a)*a.r*p.r, py=Math.sin(p.a)*a.r*p.r; i===0?ctx.moveTo(px,py):ctx.lineTo(px,py); });
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  });
 
-    // Враги
-    enemies.forEach(e=>{
-        ctx.save();
-        const col=e.isBoss?'#ff0066':e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':'#ff2080';
-        if(custom.glow){ctx.shadowBlur=e.isBoss?25:14;ctx.shadowColor=col;}
-        const eg=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.hw);
-        eg.addColorStop(0,col);eg.addColorStop(1,col+'55');
-        ctx.fillStyle=eg;
-        ctx.beginPath();
+  // Stars (flickering)
+  const t=Date.now()/1000;
+  stars.forEach(s=>{
+    const f=.7+.3*Math.sin(t*s.sp*3+s.x);
+    ctx.fillStyle=`rgba(255,255,255,${s.o*f})`; ctx.fillRect(s.x,s.y,s.s,s.s);
+  });
 
-        if(e.isBoss){
-            // Форма босса — сложный корабль
-            ctx.moveTo(e.x,e.y-e.hh);
-            ctx.lineTo(e.x-e.hw*.7,e.y-e.hh*.3);
-            ctx.lineTo(e.x-e.hw,e.y+e.hh);
-            ctx.lineTo(e.x-e.hw*.3,e.y+e.hh*.4);
-            ctx.lineTo(e.x,e.y+e.hh*.7);
-            ctx.lineTo(e.x+e.hw*.3,e.y+e.hh*.4);
-            ctx.lineTo(e.x+e.hw,e.y+e.hh);
-            ctx.lineTo(e.x+e.hw*.7,e.y-e.hh*.3);
-        }else if(e.type==='fast'){
-            // Ромб
-            ctx.moveTo(e.x,e.y-e.hh);ctx.lineTo(e.x+e.hw,e.y);
-            ctx.lineTo(e.x,e.y+e.hh);ctx.lineTo(e.x-e.hw,e.y);
-        }else if(e.type==='tank'){
-            // Квадратный
-            ctx.roundRect(e.x-e.hw,e.y-e.hh,e.hw*2,e.hh*2,6);
-        }else{
-            // Шестиугольник
-            for(let a=0;a<6;a++){const ang=(a/6)*Math.PI*2-Math.PI/6;ctx.lineTo(e.x+Math.cos(ang)*e.hw,e.y+Math.sin(ang)*e.hh);}
-        }
-        ctx.closePath();ctx.fill();
+  // Player trail
+  playerTrail.forEach(pt=>{
+    if(pt.life<=0) return;
+    ctx.save(); ctx.globalAlpha=pt.life*.45;
+    ctx.fillStyle=skinC.trail; ctx.shadowBlur=8; ctx.shadowColor=skinC.glow;
+    const sz=6*pt.life; ctx.beginPath(); ctx.arc(pt.x,pt.y,sz,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
 
-        // HP полоска
-        if(e.hp<e.maxHp){
-            const bw=e.hw*2,bh=4,by=e.y-e.hh-(e.isBoss?16:8);
-            ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(e.x-e.hw,by,bw,bh);
-            const pct=e.hp/e.maxHp;
-            ctx.fillStyle=pct>.5?'#00ff88':'#ff6b00';
-            ctx.fillRect(e.x-e.hw,by,bw*pct,bh);
-        }
-        ctx.restore();
-    });
+  // Powerup items
+  powerups.forEach(p=>{
+    ctx.save(); ctx.globalAlpha=p.life; ctx.translate(p.x,p.y); ctx.rotate(p.angle);
+    const col=p.type==='shield'?'#00d4ff':p.type==='speed'?'#ffd700':'#ff6b00';
+    ctx.shadowBlur=20; ctx.shadowColor=col;
+    ctx.fillStyle=col+'33'; ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.stroke();
+    ctx.font=`${p.r}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowBlur=0; ctx.fillStyle='white'; ctx.fillText(p.icon,0,2);
+    ctx.restore();
+  });
 
-    // Частицы и волны
-    particles.forEach(p=>{
-        if(p.wave){
-            ctx.save();ctx.globalAlpha=p.life*.5;
-            ctx.strokeStyle=p.color;ctx.lineWidth=3;
-            ctx.shadowBlur=15;ctx.shadowColor=p.color;
-            ctx.beginPath();ctx.arc(p.x,p.y,p.r||0,0,Math.PI*2);ctx.stroke();
-            ctx.restore();
-        }else{
-            const a=Math.floor(p.life*255).toString(16).padStart(2,'0');
-            ctx.fillStyle=p.color+a;
-            ctx.fillRect(p.x,p.y,p.size||4,p.size||4);
-        }
-    });
+  // Player ship
+  ctx.save();
+  if(custom.glow){ ctx.shadowBlur=24; ctx.shadowColor=skinC.glow; }
+  const sg=ctx.createLinearGradient(player.x-player.w/2,player.y-player.h/2,player.x+player.w/2,player.y+player.h/2);
+  sg.addColorStop(0,skinC.a); sg.addColorStop(1,skinC.b);
+  ctx.fillStyle=sg; ctx.beginPath();
+  const sh=custom.shipShape;
+  if(sh==='fighter'){
+    ctx.moveTo(player.x,player.y-player.h/2);
+    ctx.lineTo(player.x-player.w/2,player.y+player.h/2);
+    ctx.lineTo(player.x,player.y+player.h/4);
+    ctx.lineTo(player.x+player.w/2,player.y+player.h/2);
+  }else if(sh==='arrow'){
+    ctx.moveTo(player.x,player.y-player.h/2);
+    ctx.lineTo(player.x-player.w/3,player.y+player.h/3);
+    ctx.lineTo(player.x-player.w/2,player.y+player.h/2);
+    ctx.lineTo(player.x,player.y+player.h/6);
+    ctx.lineTo(player.x+player.w/2,player.y+player.h/2);
+    ctx.lineTo(player.x+player.w/3,player.y+player.h/3);
+  }else{
+    ctx.moveTo(player.x,player.y-player.h/2);
+    ctx.lineTo(player.x-player.w/2,player.y);
+    ctx.lineTo(player.x,player.y+player.h/2);
+    ctx.lineTo(player.x+player.w/2,player.y);
+  }
+  ctx.closePath(); ctx.fill();
+  // Shield ring
+  if(activePowerups.shield>0){
+    ctx.strokeStyle='#00d4ff88'; ctx.lineWidth=3; ctx.shadowBlur=16; ctx.shadowColor='#00d4ff';
+    ctx.beginPath(); ctx.arc(player.x,player.y,player.w*.9,0,Math.PI*2); ctx.stroke();
+  }
+  // Engine flame
+  const flame=ctx.createLinearGradient(player.x,player.y+player.h/2,player.x,player.y+player.h/2+22);
+  flame.addColorStop(0,skinC.a+'cc'); flame.addColorStop(1,'transparent');
+  ctx.fillStyle=flame; ctx.shadowBlur=0;
+  ctx.beginPath();
+  ctx.moveTo(player.x-9,player.y+player.h/2);
+  ctx.lineTo(player.x+9,player.y+player.h/2);
+  ctx.lineTo(player.x,player.y+player.h/2+14+Math.random()*10);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // Bullets
+  bullets.forEach(b=>{
+    ctx.save();
+    const wc=b.type==='rocket'?{a:'#ff6b00',b:'#ffaa00'}:b.type==='shotgun'?{a:'#ffd700',b:'#ff9900'}:BULLET_COLORS[custom.bulletColor];
+    if(custom.glow){ ctx.shadowBlur=b.type==='rocket'?18:12; ctx.shadowColor=wc.a; }
+    if(b.type==='rocket'){
+      ctx.translate(b.x,b.y); ctx.rotate(b.angle||0);
+      const rg=ctx.createLinearGradient(0,-b.h/2,0,b.h/2);
+      rg.addColorStop(0,wc.a); rg.addColorStop(1,wc.b);
+      ctx.fillStyle=rg; ctx.beginPath(); ctx.roundRect(-b.w/2,-b.h/2,b.w,b.h,4); ctx.fill();
+      ctx.fillStyle=wc.a+'55'; ctx.beginPath();
+      ctx.moveTo(-b.w/2,b.h/2); ctx.lineTo(b.w/2,b.h/2); ctx.lineTo(0,b.h/2+9+Math.random()*6); ctx.closePath(); ctx.fill();
+    }else{
+      const bg2=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
+      bg2.addColorStop(0,wc.a); bg2.addColorStop(1,wc.b);
+      ctx.fillStyle=bg2; ctx.beginPath(); ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,3); ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // Enemies
+  const animT=Date.now()/400;
+  enemies.forEach(e=>{
+    ctx.save();
+    const col=e.isBoss?'#ff0066':e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':e.type==='zigzag'?'#ffaa00':'#ff2080';
+    const pulse=e.isBoss?1+.05*Math.sin(animT*2):1+.03*Math.sin(animT+e.x*.01);
+    ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
+    if(custom.glow){ ctx.shadowBlur=e.isBoss?25:14; ctx.shadowColor=col; }
+    const eg=ctx.createRadialGradient(0,0,0,0,0,e.hw);
+    eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
+    ctx.fillStyle=eg; ctx.beginPath();
+    if(e.isBoss){
+      ctx.moveTo(0,-e.hh); ctx.lineTo(-e.hw*.7,-e.hh*.3); ctx.lineTo(-e.hw,e.hh);
+      ctx.lineTo(-e.hw*.3,e.hh*.4); ctx.lineTo(0,e.hh*.7);
+      ctx.lineTo(e.hw*.3,e.hh*.4); ctx.lineTo(e.hw,e.hh); ctx.lineTo(e.hw*.7,-e.hh*.3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-e.hw*.3,-e.hh*.1,4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.hw*.3,-e.hh*.1,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f00'; ctx.beginPath(); ctx.arc(-e.hw*.3,-e.hh*.1,2,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.hw*.3,-e.hh*.1,2,0,Math.PI*2); ctx.fill();
+    }else if(e.type==='fast'){
+      ctx.moveTo(0,-e.hh); ctx.lineTo(e.hw,0); ctx.lineTo(0,e.hh); ctx.lineTo(-e.hw,0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle=col+'88'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(-e.hw*.5,-e.hh*.3); ctx.lineTo(-e.hw*.5,e.hh*.3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(e.hw*.5,-e.hh*.3); ctx.lineTo(e.hw*.5,e.hh*.3); ctx.stroke();
+    }else if(e.type==='tank'){
+      ctx.roundRect(-e.hw,-e.hh,e.hw*2,e.hh*2,6); ctx.fill();
+      ctx.strokeStyle=col+'88'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.roundRect(-e.hw*.7,-e.hh*.7,e.hw*1.4,e.hh*1.4,4); ctx.stroke();
+    }else{
+      for(let a=0;a<6;a++){ const ang=(a/6)*Math.PI*2-Math.PI/6; ctx.lineTo(Math.cos(ang)*e.hw,Math.sin(ang)*e.hh); }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle=col+'44'; ctx.beginPath(); ctx.arc(0,0,e.hw*.4,0,Math.PI*2); ctx.fill();
+    }
+    // HP bar
+    if(e.hp<e.maxHp){
+      const bw=e.hw*2,bh=4,by=-e.hh-(e.isBoss?16:8);
+      ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(-e.hw,by,bw,bh);
+      const pct=e.hp/e.maxHp; ctx.fillStyle=pct>.5?'#00ff88':'#ff6b00';
+      ctx.fillRect(-e.hw,by,bw*pct,bh);
+    }
+    ctx.restore();
+  });
+
+  // Particles & waves
+  particles.forEach(p=>{
+    if(p.bossShot){
+      ctx.save(); ctx.fillStyle='#ff006688'; ctx.shadowBlur=10; ctx.shadowColor='#ff0066';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size/2||4,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }else if(p.wave){
+      ctx.save(); ctx.globalAlpha=p.life*.5;
+      ctx.strokeStyle=p.color; ctx.lineWidth=3; ctx.shadowBlur=15; ctx.shadowColor=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r||0,0,Math.PI*2); ctx.stroke(); ctx.restore();
+    }else{
+      const a=Math.floor(p.life*255).toString(16).padStart(2,'0');
+      ctx.fillStyle=p.color+a; ctx.fillRect(p.x,p.y,p.size||4,p.size||4);
+    }
+  });
+
+  ctx.restore(); // end shake
 }
 
-// ═══ GAME LOOP ═══
+// ════════════════════════════════════════════════════
+// HUD UPDATE
+// ════════════════════════════════════════════════════
+function updateHUD(){
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('livesVal').textContent = lives;
+  document.getElementById('levelVal').textContent = level;
+  const threshold = 150 + level*80 + level*level*5;
+  document.getElementById('levelFill').style.width = Math.min(100, levelProgress/threshold*100)+'%';
+}
+
+// ════════════════════════════════════════════════════
+// GAME LOOP
+// ════════════════════════════════════════════════════
 function loop(ts){
-    if(!gameRunning)return;
-    const dt=ts-lastTime;lastTime=ts;
-    update(Math.min(dt,50));draw();
-    requestAnimationFrame(loop);
+  if(!gameRunning || gamePaused) return;
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
 }
 
-// ═══ КОНЕЦ ИГРЫ ═══
+// ════════════════════════════════════════════════════
+// START / END
+// ════════════════════════════════════════════════════
+function startGame(){
+  const cfg = DIFF[difficulty];
+  const bonus = getBonus();
+  score=0; lives=cfg.lives; level=1; levelProgress=0;
+  combo=1; maxCombo=1; comboTimer=0;
+  killedEnemies=0; bossesKilled=0;
+  bossActive=false; bossEnemy=null;
+  sessionAch=[];
+  activePowerups = {shield: bonus.hasStartShield?9999:0, speed:0};
+  bullets.length=0; enemies.length=0; particles.length=0; powerups.length=0;
+  playerTrail.length=0;
+  player.x=player.targetX=canvas.width/2;
+  gamePaused=false;
+  gameRunning=true;
+  updateHUD(); renderXPBar();
+  document.getElementById('bossBar').style.display='none';
+  if(activePowerups.shield>0) updatePowerupBar();
+
+  // Touch hint
+  const old=document.querySelector('.touch-hint');if(old)old.remove();
+  const hint=document.createElement('div');
+  hint.className='touch-hint'; hint.textContent='☝️ Ведите пальцем • ESC = пауза';
+  document.body.appendChild(hint); setTimeout(()=>hint.remove(),4500);
+
+  lastTime=performance.now();
+  requestAnimationFrame(loop);
+}
+
 function endGame(){
-    gameRunning=false;
-    if(score>bestScore){bestScore=score;localStorage.setItem('bestScore',bestScore);}
+  gameRunning=false;
+  if(score>bestScore){ bestScore=score; LS.set('bestScore',bestScore); }
 
-    // Сохранить в лидерборд
-    const myName=tg?.initDataUnsafe?.user?.first_name||'Игрок';
-    const myId=tg?.initDataUnsafe?.user?.id||0;
-    let lb=JSON.parse(localStorage.getItem('leaderboard')||'[]');
-    lb=lb.filter(e=>e.id!==myId);
-    lb.push({id:myId,name:myName,score:bestScore,lvl:shipLvl});
-    lb.sort((a,b)=>b.score-a.score);
-    lb=lb.slice(0,20);
-    localStorage.setItem('leaderboard',JSON.stringify(lb));
+  // Update leaderboard
+  const myName=tg?.initDataUnsafe?.user?.first_name||'Игрок';
+  const myId=tg?.initDataUnsafe?.user?.id||0;
+  let lb=LS.getJ('leaderboard',[]);
+  lb=lb.filter(e=>e.id!==myId);
+  lb.push({id:myId,name:myName,score:bestScore,lvl:shipLvl});
+  lb.sort((a,b)=>b.score-a.score); lb=lb.slice(0,20);
+  LS.setJ('leaderboard',lb);
 
-    document.getElementById('finalScore').textContent=score;
-    document.getElementById('finalLevel').textContent=level;
-    document.getElementById('finalCombo').textContent='x'+maxCombo;
-    document.getElementById('bestScore').textContent=bestScore;
+  document.getElementById('goScore').innerHTML = score + (score===bestScore&&score>0?'<span class="new-record">NEW!</span>':'');
+  document.getElementById('goLevel').textContent = level;
+  document.getElementById('goCombo').textContent = 'x'+maxCombo;
+  document.getElementById('goBest').textContent = bestScore;
+  document.getElementById('goCoins').textContent = '💰 Монет в кошельке: '+coins;
 
-    // Достижения
-    const list=document.getElementById('achieveList');list.innerHTML='';
-    ACHIEVEMENTS.forEach(a=>{
-        const b=document.createElement('div');
-        b.className='achieve-badge'+(unlockedAchievements.includes(a.id)?'':' locked');
-        b.textContent=a.name;list.appendChild(b);
-    });
+  const achEl=document.getElementById('goAch'); achEl.innerHTML='';
+  ACHIEVEMENTS.forEach(a=>{
+    const b=document.createElement('div');
+    b.className='ach-badge '+(unlockedAch.includes(a.id)?'unlocked':'locked');
+    b.textContent=a.name; achEl.appendChild(b);
+  });
 
-    // Монеты заработанные за игру
-    const coinsEl=document.createElement('div');
-    coinsEl.style.cssText='text-align:center;color:#ffd700;font-size:13px;margin-top:8px';
-    coinsEl.textContent='💰 Монет в кошельке: '+coins;
-    list.after(coinsEl);
-
-    show('gameOver');
-    if(tg?.initDataUnsafe?.user)tg.sendData(JSON.stringify({score,level,difficulty,maxCombo,coins,shipLvl,userId:tg.initDataUnsafe.user.id}));
+  showScreen('gameOverScreen');
+  if(tg?.initDataUnsafe?.user) tg.sendData(JSON.stringify({score,level,difficulty,maxCombo,coins,shipLvl,userId:tg.initDataUnsafe.user.id}));
 }
 
-function updateUI(){
-    document.getElementById('score').textContent=score;
-    document.getElementById('lives').textContent=lives;
-    document.getElementById('level').textContent=level;
-    const threshold=200*(level*.6+.6);
-    document.getElementById('levelProgress').style.width=Math.min(100,levelProgress/threshold*100)+'%';
-}
-
-window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;player.x=player.targetX=canvas.width/2;});
+// ════════════════════════════════════════════════════
+// RESIZE
+// ════════════════════════════════════════════════════
+window.addEventListener('resize',()=>{
+  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  player.x=player.targetX=canvas.width/2;
+});
 </script>
 </body>
 </html>
