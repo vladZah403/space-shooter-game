@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Database - НЕ загружать на Git!
+*.db
+*.sqlite
+*.sqlite3
+space_shooter.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Секретные данные (если хотите не коммитить токены)
+# config.py
+
+# Временные файлы
+*.tmp
+*.bak
+*.swp
+*~.nib
+
+# Загруженные файлы пользователей
+uploads/
+user-data/
+
