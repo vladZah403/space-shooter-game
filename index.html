@@ -8,1402 +8,867 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             overflow: hidden;
-            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a0a1a 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            font-family: 'Segoe UI', sans-serif;
             touch-action: none;
+            user-select: none;
         }
 
-        #gameCanvas {
-            display: block;
-            touch-action: none;
-        }
+        #gameCanvas { display: block; touch-action: none; }
 
+        /* ── UI поверх игры ── */
         #ui {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: 10px; left: 10px; right: 10px;
             z-index: 10;
             pointer-events: none;
         }
-
         .stat-card {
-            background: rgba(13, 27, 42, 0.9);
-            border: 2px solid rgba(0, 255, 136, 0.3);
+            background: rgba(5, 15, 30, 0.85);
+            border: 1.5px solid rgba(0,255,136,0.35);
             border-radius: 8px;
-            padding: 6px 10px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.2);
+            padding: 5px 10px;
+            backdrop-filter: blur(8px);
         }
+        .stat-label { font-size: 9px; color: rgba(0,255,136,0.65); text-transform: uppercase; letter-spacing: .5px; }
+        .stat-value { font-size: 16px; font-weight: 700; color: #00ff88; text-shadow: 0 0 8px #00ff8888; }
+        .progress { height: 5px; background: rgba(0,255,136,.1); border-radius: 10px; overflow: hidden; }
+        .progress-bar { background: linear-gradient(90deg,#00ff88,#00d4ff); transition: width .3s; }
 
-        .stat-label {
-            font-size: 9px;
-            color: rgba(0, 255, 136, 0.7);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1px;
-        }
-
-        .stat-value {
-            font-size: 16px;
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-        }
-
-        #gameOver, #startScreen, #difficultyScreen {
+        /* Подсказка касания */
+        #touchHint {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(10, 10, 26, 0.95);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 30;
-            backdrop-filter: blur(10px);
-            overflow-y: auto;
-            padding: 15px;
-        }
-
-        .game-card {
-            background: linear-gradient(135deg, rgba(13, 27, 42, 0.98), rgba(26, 10, 46, 0.98));
-            border: 2px solid rgba(0, 255, 136, 0.3);
-            border-radius: 15px;
-            padding: 20px 15px;
-            max-width: 400px;
-            width: 100%;
-            box-shadow: 0 10px 50px rgba(0, 255, 136, 0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .game-title {
-            font-size: 32px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #00ff88, #00d4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-            margin-bottom: 5px;
-            animation: pulse 2s infinite;
-            line-height: 1.2;
-        }
-
-        .game-subtitle {
-            color: rgba(0, 255, 136, 0.7);
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 11px;
-            letter-spacing: 1.5px;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-
-        .difficulty-card {
-            background: rgba(13, 27, 42, 0.6);
-            border: 2px solid rgba(0, 255, 136, 0.2);
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .difficulty-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.1), transparent);
-            transition: left 0.5s;
-        }
-
-        .difficulty-card:active::before {
-            left: 100%;
-        }
-
-        .difficulty-card:active {
-            border-color: #00ff88;
-            transform: scale(0.98);
-            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.3);
-        }
-
-        .difficulty-card.selected {
-            border-color: #00ff88;
-            background: rgba(0, 255, 136, 0.15);
-        }
-
-        .difficulty-icon {
-            font-size: 28px;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-
-        .difficulty-name {
-            font-size: 18px;
-            font-weight: bold;
-            color: #00ff88;
-            margin-bottom: 3px;
-        }
-
-        .difficulty-description {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.7);
-            line-height: 1.3;
-        }
-
-        .btn-game {
-            background: linear-gradient(135deg, #00ff88, #00d4ff);
-            border: none;
-            color: #0a0a1a;
-            font-weight: bold;
-            font-size: 16px;
-            padding: 12px 30px;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
-        }
-
-        .btn-game:active {
-            transform: scale(0.95);
-        }
-
-        .btn-secondary-game {
-            background: rgba(13, 27, 42, 0.8);
-            border: 2px solid rgba(0, 255, 136, 0.5);
-            color: #00ff88;
-            font-size: 14px;
-            padding: 10px 25px;
-        }
-
-        .btn-secondary-game:active {
-            background: rgba(0, 255, 136, 0.1);
-        }
-
-        #controls {
-            position: absolute;
-            bottom: 20px;
+            bottom: 100px;
             left: 50%;
             transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            z-index: 10;
-            flex-direction: column;
-            align-items: center;
+            color: rgba(0,255,136,0.5);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 5;
+            animation: fadeHint 3s ease forwards;
+        }
+        @keyframes fadeHint {
+            0%   { opacity: 1; }
+            70%  { opacity: 1; }
+            100% { opacity: 0; }
         }
 
-        .controls-row {
-            display: flex;
-            gap: 15px;
-        }
-
-        .auto-shoot-indicator {
-            background: rgba(13, 27, 42, 0.85);
-            border: 2px solid rgba(0, 255, 136, 0.5);
+        /* Индикатор авто-стрельбы */
+        #autoShootIndicator {
+            position: absolute;
+            bottom: 20px;
+            right: 15px;
+            background: rgba(5,15,30,0.85);
+            border: 1.5px solid rgba(0,255,136,0.4);
             border-radius: 20px;
-            padding: 6px 15px;
+            padding: 7px 14px;
             color: #00ff88;
             font-size: 11px;
             display: flex;
             align-items: center;
             gap: 5px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+            backdrop-filter: blur(8px);
             cursor: pointer;
-            transition: all 0.3s;
-            user-select: none;
+            z-index: 10;
+            transition: all .25s;
         }
+        #autoShootIndicator.active { background: rgba(0,255,136,.18); border-color: #00ff88; }
+        #autoShootIndicator:active { transform: scale(.93); }
 
-        .auto-shoot-indicator:active {
-            transform: scale(0.95);
-        }
-
-        .auto-shoot-indicator.active {
-            background: rgba(0, 255, 136, 0.2);
-            border-color: #00ff88;
-        }
-
-        .auto-shoot-indicator i {
-            font-size: 14px;
-        }
-
-        /* Стили кастомизации */
-        .customize-section {
-            margin-bottom: 20px;
-        }
-
-        .customize-label {
-            color: #00ff88;
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .color-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
-        .color-option {
-            width: 100%;
-            aspect-ratio: 1;
-            border-radius: 12px;
-            border: 3px solid rgba(0, 255, 136, 0.2);
-            cursor: pointer;
-            transition: all 0.3s;
+        /* ── Экраны ── */
+        #gameOver, #difficultyScreen, #customizeScreen {
+            position: absolute;
+            inset: 0;
+            background: rgba(10,10,26,.95);
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            z-index: 30;
+            backdrop-filter: blur(12px);
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .game-card {
+            background: linear-gradient(135deg, rgba(13,27,42,.98), rgba(26,10,46,.98));
+            border: 1.5px solid rgba(0,255,136,.3);
+            border-radius: 16px;
+            padding: 20px 16px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 10px 50px rgba(0,255,136,.25);
+            max-height: 92vh;
+            overflow-y: auto;
         }
 
-        .color-option i {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 24px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .color-option.selected {
-            border-color: #00ff88;
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-            transform: scale(1.05);
-        }
-
-        .color-option.selected i {
-            opacity: 1;
-        }
-
-        .color-option:active {
-            transform: scale(0.95);
-        }
-
-        .shoot-style-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-        }
-
-        .shoot-style-option {
-            background: rgba(13, 27, 42, 0.6);
-            border: 2px solid rgba(0, 255, 136, 0.2);
-            border-radius: 10px;
-            padding: 12px 8px;
-            cursor: pointer;
-            transition: all 0.3s;
+        .game-title {
+            font-size: 30px;
+            font-weight: 800;
+            background: linear-gradient(135deg,#00ff88,#00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             text-align: center;
+            line-height: 1.15;
+            margin-bottom: 4px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+
+        .game-subtitle {
+            color: rgba(0,255,136,.6);
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: 2px;
+            margin-bottom: 18px;
         }
 
-        .shoot-style-option:active {
-            transform: scale(0.95);
+        /* Карточки сложности */
+        .difficulty-card {
+            background: rgba(13,27,42,.6);
+            border: 1.5px solid rgba(0,255,136,.2);
+            border-radius: 12px;
+            padding: 11px 13px;
+            margin-bottom: 9px;
+            cursor: pointer;
+            transition: all .25s;
         }
+        .difficulty-card:active { transform: scale(.97); border-color: #00ff88; }
+        .difficulty-card.selected { border-color: #00ff88; background: rgba(0,255,136,.13); }
+        .difficulty-icon { font-size: 26px; margin-right: 11px; flex-shrink: 0; }
+        .difficulty-name { font-size: 17px; font-weight: 700; color: #00ff88; margin-bottom: 2px; }
+        .difficulty-description { font-size: 11px; color: rgba(255,255,255,.65); }
 
-        .shoot-style-option.selected {
-            border-color: #00ff88;
-            background: rgba(0, 255, 136, 0.15);
+        /* Кнопки */
+        .btn-game {
+            background: linear-gradient(135deg,#00ff88,#00d4ff);
+            border: none;
+            color: #0a0a1a;
+            font-weight: 700;
+            font-size: 15px;
+            padding: 12px 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            box-shadow: 0 4px 18px rgba(0,255,136,.4);
+            transition: all .25s;
         }
-
-        .shoot-style-name {
+        .btn-game:active { transform: scale(.95); }
+        .btn-secondary-game {
+            background: rgba(13,27,42,.8);
+            border: 1.5px solid rgba(0,255,136,.45);
             color: #00ff88;
             font-size: 13px;
-            font-weight: bold;
-            margin-bottom: 3px;
+            padding: 10px 24px;
         }
 
-        .shoot-style-desc {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 11px;
-        }
-
-        @media (max-width: 360px) {
-            .color-grid {
-                gap: 8px;
-            }
-
-            .shoot-style-grid {
-                gap: 6px;
-            }
-
-            .customize-label {
-                font-size: 13px;
-            }
-        }
-
-        .control-btn {
-            width: 65px;
-            height: 65px;
-            background: rgba(13, 27, 42, 0.85);
-            border: 2px solid rgba(0, 255, 136, 0.5);
-            border-radius: 50%;
-            color: #00ff88;
-            font-size: 26px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            touch-action: manipulation;
-            user-select: none;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
-            transition: all 0.2s;
-        }
-
-        .control-btn:active {
-            background: rgba(0, 255, 136, 0.3);
-            transform: scale(0.92);
-            box-shadow: 0 2px 10px rgba(0, 255, 136, 0.5);
-        }
-
+        /* Game Over */
         .score-row {
-            background: rgba(13, 27, 42, 0.8);
-            border: 2px solid rgba(0, 255, 136, 0.2);
+            background: rgba(13,27,42,.8);
+            border: 1.5px solid rgba(0,255,136,.2);
             border-radius: 10px;
-            padding: 12px;
+            padding: 11px 13px;
             margin-bottom: 8px;
         }
+        .score-label { font-size: 12px; color: rgba(0,255,136,.7); }
+        .score-value { font-size: 24px; font-weight: 700; color: #00ff88; text-shadow: 0 0 10px #00ff8866; }
 
-        .score-label {
-            font-size: 12px;
-            color: rgba(0, 255, 136, 0.7);
+        /* ── Кастомизация ── */
+        .customize-section { margin-bottom: 18px; }
+        .customize-label { color: #00ff88; font-size: 13px; font-weight: 700; margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+        .color-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+        .color-option {
+            aspect-ratio: 1; border-radius: 11px;
+            border: 2.5px solid rgba(0,255,136,.2);
+            cursor: pointer; transition: all .25s;
+            display: flex; align-items: center; justify-content: center;
         }
-
-        .score-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        .color-option i { color: #fff; font-size: 22px; opacity: 0; transition: opacity .25s; text-shadow: 0 1px 4px #0008; }
+        .color-option.selected { border-color: #00ff88; box-shadow: 0 0 16px rgba(0,255,136,.5); transform: scale(1.06); }
+        .color-option.selected i { opacity: 1; }
+        .color-option:active { transform: scale(.93); }
+        .shoot-style-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+        .shoot-style-option {
+            background: rgba(13,27,42,.6); border: 1.5px solid rgba(0,255,136,.2);
+            border-radius: 10px; padding: 11px 6px; cursor: pointer; transition: all .25s; text-align: center;
         }
+        .shoot-style-option:active { transform: scale(.94); }
+        .shoot-style-option.selected { border-color: #00ff88; background: rgba(0,255,136,.14); }
+        .shoot-style-name { color: #00ff88; font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+        .shoot-style-desc { color: rgba(255,255,255,.55); font-size: 10px; }
 
-        .progress {
-            height: 6px;
-            background: rgba(13, 27, 42, 0.8);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .progress-bar {
-            background: linear-gradient(90deg, #00ff88, #00d4ff);
-            transition: width 0.3s ease;
-        }
-
-        /* Оптимизация для маленьких экранов */
-        @media (max-height: 700px) {
-            .game-card {
-                padding: 15px 12px;
-            }
-
-            .game-title {
-                font-size: 28px;
-                margin-bottom: 3px;
-            }
-
-            .game-subtitle {
-                font-size: 10px;
-                margin-bottom: 15px;
-            }
-
-            .difficulty-card {
-                padding: 10px;
-                margin-bottom: 8px;
-            }
-
-            .difficulty-name {
-                font-size: 16px;
-            }
-
-            .difficulty-description {
-                font-size: 10px;
-            }
-
-            .difficulty-icon {
-                font-size: 24px;
-            }
-
-            .btn-game {
-                font-size: 14px;
-                padding: 10px 25px;
-            }
-
-            .btn-secondary-game {
-                font-size: 12px;
-                padding: 8px 20px;
-            }
-        }
-
-        @media (max-width: 360px) {
-            .control-btn {
-                width: 55px;
-                height: 55px;
-                font-size: 22px;
-            }
-
-            .stat-value {
-                font-size: 14px;
-            }
-
-            .stat-label {
-                font-size: 8px;
-            }
+        @media (max-height: 680px) {
+            .game-card { padding: 14px 13px; }
+            .game-title { font-size: 26px; }
+            .difficulty-card { padding: 9px 11px; margin-bottom: 7px; }
+            .difficulty-name { font-size: 15px; }
+            .btn-game { font-size: 13px; padding: 10px 22px; }
         }
     </style>
 </head>
 <body>
-    <!-- Экран выбора сложности -->
-    <div id="difficultyScreen">
-        <div class="game-card">
-            <h1 class="game-title">🚀 SPACE<br>SHOOTER</h1>
-            <p class="game-subtitle">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
 
-            <div class="difficulty-card" data-difficulty="easy">
-                <div class="d-flex align-items-center">
-                    <div class="difficulty-icon">😊</div>
-                    <div class="flex-grow-1">
-                        <div class="difficulty-name">Легко</div>
-                        <div class="difficulty-description">
-                            Медленные враги • 5 жизней
-                        </div>
-                    </div>
+<!-- ══ ЭКРАН СЛОЖНОСТИ ══ -->
+<div id="difficultyScreen">
+    <div class="game-card">
+        <h1 class="game-title">🚀 SPACE<br>SHOOTER</h1>
+        <p class="game-subtitle">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
+
+        <div class="difficulty-card" data-difficulty="easy">
+            <div class="d-flex align-items-center">
+                <div class="difficulty-icon">😊</div>
+                <div><div class="difficulty-name">Легко</div><div class="difficulty-description">Медленные враги • 5 жизней</div></div>
+            </div>
+        </div>
+        <div class="difficulty-card" data-difficulty="normal">
+            <div class="d-flex align-items-center">
+                <div class="difficulty-icon">😎</div>
+                <div><div class="difficulty-name">Нормально</div><div class="difficulty-description">Сбалансированная игра • 3 жизни</div></div>
+            </div>
+        </div>
+        <div class="difficulty-card" data-difficulty="hard">
+            <div class="d-flex align-items-center">
+                <div class="difficulty-icon">😤</div>
+                <div><div class="difficulty-name">Сложно</div><div class="difficulty-description">Быстрые враги • 2 жизни</div></div>
+            </div>
+        </div>
+        <div class="difficulty-card" data-difficulty="nightmare">
+            <div class="d-flex align-items-center">
+                <div class="difficulty-icon">💀</div>
+                <div><div class="difficulty-name">Кошмар</div><div class="difficulty-description">Экстремально • 1 жизнь • Удачи!</div></div>
+            </div>
+        </div>
+
+        <div class="form-check mt-3 mb-3" style="text-align:left">
+            <input class="form-check-input" type="checkbox" id="autoShootToggle" checked>
+            <label class="form-check-label" for="autoShootToggle" style="color:#00ff88;font-size:13px">
+                <i class="bi bi-lightning-fill"></i> Автоматическая стрельба
+            </label>
+        </div>
+
+        <button class="btn btn-game w-100 mb-2" id="startBtn" disabled>НАЧАТЬ ИГРУ</button>
+        <button class="btn btn-game btn-secondary-game w-100" id="customizeBtn">
+            <i class="bi bi-palette-fill"></i> КАСТОМИЗАЦИЯ
+        </button>
+    </div>
+</div>
+
+<!-- ══ ЭКРАН КАСТОМИЗАЦИИ ══ -->
+<div id="customizeScreen" style="display:none">
+    <div class="game-card">
+        <h1 class="game-title" style="font-size:26px">🎨 КАСТОМИЗАЦИЯ</h1>
+        <p class="game-subtitle">НАСТРОЙТЕ КОРАБЛЬ</p>
+
+        <div class="customize-section">
+            <div class="customize-label"><i class="bi bi-brush-fill"></i> Цвет корабля</div>
+            <div class="color-grid">
+                <div class="color-option" data-ship-color="green"  style="background:linear-gradient(135deg,#00ff88,#00d4ff)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-ship-color="blue"   style="background:linear-gradient(135deg,#00d4ff,#0080ff)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-ship-color="purple" style="background:linear-gradient(135deg,#a855f7,#ec4899)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-ship-color="orange" style="background:linear-gradient(135deg,#ff6b00,#ff9900)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-ship-color="red"    style="background:linear-gradient(135deg,#ff0066,#ff3366)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-ship-color="yellow" style="background:linear-gradient(135deg,#ffd700,#ffed4e)"><i class="bi bi-check-lg"></i></div>
+            </div>
+        </div>
+
+        <div class="customize-section">
+            <div class="customize-label"><i class="bi bi-circle-fill"></i> Цвет пуль</div>
+            <div class="color-grid">
+                <div class="color-option" data-bullet-color="yellow" style="background:linear-gradient(135deg,#ffff00,#ff9900)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-bullet-color="cyan"   style="background:linear-gradient(135deg,#00ffff,#00d4ff)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-bullet-color="pink"   style="background:linear-gradient(135deg,#ff69b4,#ff1493)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-bullet-color="green"  style="background:linear-gradient(135deg,#00ff88,#00ff00)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-bullet-color="white"  style="background:linear-gradient(135deg,#ffffff,#cccccc)"><i class="bi bi-check-lg"></i></div>
+                <div class="color-option" data-bullet-color="purple" style="background:linear-gradient(135deg,#a855f7,#8b5cf6)"><i class="bi bi-check-lg"></i></div>
+            </div>
+        </div>
+
+        <div class="customize-section">
+            <div class="customize-label"><i class="bi bi-stars"></i> Стиль стрельбы</div>
+            <div class="shoot-style-grid">
+                <div class="shoot-style-option selected" data-shoot-style="single">
+                    <div class="shoot-style-name">Одиночная</div><div class="shoot-style-desc">1 пуля</div>
+                </div>
+                <div class="shoot-style-option" data-shoot-style="double">
+                    <div class="shoot-style-name">Двойная</div><div class="shoot-style-desc">2 пули</div>
+                </div>
+                <div class="shoot-style-option" data-shoot-style="triple">
+                    <div class="shoot-style-name">Тройная</div><div class="shoot-style-desc">3 пули</div>
                 </div>
             </div>
+        </div>
 
-            <div class="difficulty-card" data-difficulty="normal">
-                <div class="d-flex align-items-center">
-                    <div class="difficulty-icon">😎</div>
-                    <div class="flex-grow-1">
-                        <div class="difficulty-name">Нормально</div>
-                        <div class="difficulty-description">
-                            Сбалансированная игра • 3 жизни
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="difficulty-card" data-difficulty="hard">
-                <div class="d-flex align-items-center">
-                    <div class="difficulty-icon">😤</div>
-                    <div class="flex-grow-1">
-                        <div class="difficulty-name">Сложно</div>
-                        <div class="difficulty-description">
-                            Быстрые враги • 2 жизни
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="difficulty-card" data-difficulty="nightmare">
-                <div class="d-flex align-items-center">
-                    <div class="difficulty-icon">💀</div>
-                    <div class="flex-grow-1">
-                        <div class="difficulty-name">Кошмар</div>
-                        <div class="difficulty-description">
-                            Экстремально • 1 жизнь • Удачи!
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-check mb-3 mt-2" style="text-align: left;">
-                <input class="form-check-input" type="checkbox" id="autoShootToggle" checked>
-                <label class="form-check-label" for="autoShootToggle" style="color: #00ff88; font-size: 14px;">
-                    <i class="bi bi-lightning-fill"></i> Автоматическая стрельба
+        <div class="customize-section">
+            <div class="form-check mb-2" style="text-align:left">
+                <input class="form-check-input" type="checkbox" id="particlesToggle" checked>
+                <label class="form-check-label" for="particlesToggle" style="color:#00ff88;font-size:12px">
+                    <i class="bi bi-star-fill"></i> Эффекты частиц
                 </label>
             </div>
+            <div class="form-check" style="text-align:left">
+                <input class="form-check-input" type="checkbox" id="glowToggle" checked>
+                <label class="form-check-label" for="glowToggle" style="color:#00ff88;font-size:12px">
+                    <i class="bi bi-brightness-high-fill"></i> Эффекты свечения
+                </label>
+            </div>
+        </div>
 
-            <button class="btn btn-game w-100 mb-2" id="startBtn" disabled>
-                НАЧАТЬ ИГРУ
-            </button>
-            <button class="btn btn-game btn-secondary-game w-100" id="customizeBtn">
-                <i class="bi bi-palette-fill"></i> КАСТОМИЗАЦИЯ
-            </button>
+        <div class="d-grid gap-2 mt-2">
+            <button class="btn btn-game" id="saveCustomizationBtn"><i class="bi bi-check2-circle"></i> СОХРАНИТЬ</button>
+            <button class="btn btn-game btn-secondary-game" id="backToMenuBtn"><i class="bi bi-arrow-left"></i> НАЗАД</button>
         </div>
     </div>
+</div>
 
-    <!-- Экран кастомизации -->
-    <div id="customizeScreen" style="display: none;">
-        <div class="game-card">
-            <h1 class="game-title" style="font-size: 28px;">🎨 КАСТОМИЗАЦИЯ</h1>
-            <p class="game-subtitle">НАСТРОЙТЕ СВОЙ КОРАБЛЬ</p>
+<!-- ══ ИГРОВОЙ UI ══ -->
+<div id="ui">
+    <div class="row g-2">
+        <div class="col-4"><div class="stat-card"><div class="stat-label">Очки</div><div class="stat-value" id="score">0</div></div></div>
+        <div class="col-4"><div class="stat-card"><div class="stat-label">❤️ Жизни</div><div class="stat-value" id="lives">3</div></div></div>
+        <div class="col-4"><div class="stat-card"><div class="stat-label">Уровень</div><div class="stat-value" id="level">1</div></div></div>
+    </div>
+    <div class="mt-2"><div class="progress"><div class="progress-bar" id="levelProgress" style="width:0%"></div></div></div>
+</div>
 
-            <!-- Цвет корабля -->
-            <div class="customize-section">
-                <div class="customize-label">
-                    <i class="bi bi-brush-fill"></i> Цвет корабля
-                </div>
-                <div class="color-grid">
-                    <div class="color-option" data-ship-color="green" style="background: linear-gradient(135deg, #00ff88, #00d4ff);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-ship-color="blue" style="background: linear-gradient(135deg, #00d4ff, #0080ff);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-ship-color="purple" style="background: linear-gradient(135deg, #a855f7, #ec4899);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-ship-color="orange" style="background: linear-gradient(135deg, #ff6b00, #ff9900);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-ship-color="red" style="background: linear-gradient(135deg, #ff0066, #ff3366);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-ship-color="yellow" style="background: linear-gradient(135deg, #ffd700, #ffed4e);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                </div>
-            </div>
+<!-- Подсказка -->
+<div id="touchHint">☝️ Ведите пальцем для управления</div>
 
-            <!-- Цвет пуль -->
-            <div class="customize-section">
-                <div class="customize-label">
-                    <i class="bi bi-circle-fill"></i> Цвет пуль
-                </div>
-                <div class="color-grid">
-                    <div class="color-option" data-bullet-color="yellow" style="background: linear-gradient(135deg, #ffff00, #ff9900);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-bullet-color="cyan" style="background: linear-gradient(135deg, #00ffff, #00d4ff);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-bullet-color="pink" style="background: linear-gradient(135deg, #ff69b4, #ff1493);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-bullet-color="green" style="background: linear-gradient(135deg, #00ff88, #00ff00);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-bullet-color="white" style="background: linear-gradient(135deg, #ffffff, #cccccc);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                    <div class="color-option" data-bullet-color="purple" style="background: linear-gradient(135deg, #a855f7, #8b5cf6);">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-                </div>
-            </div>
+<!-- Индикатор авто-стрельбы -->
+<div id="autoShootIndicator" class="active">
+    <i class="bi bi-lightning-fill"></i>
+    <span id="autoShootText">АВТО</span>
+</div>
 
-            <!-- Стиль стрельбы -->
-            <div class="customize-section">
-                <div class="customize-label">
-                    <i class="bi bi-stars"></i> Стиль стрельбы
-                </div>
-                <div class="shoot-style-grid">
-                    <div class="shoot-style-option selected" data-shoot-style="single">
-                        <div class="shoot-style-name">Одиночная</div>
-                        <div class="shoot-style-desc">1 пуля</div>
-                    </div>
-                    <div class="shoot-style-option" data-shoot-style="double">
-                        <div class="shoot-style-name">Двойная</div>
-                        <div class="shoot-style-desc">2 пули</div>
-                    </div>
-                    <div class="shoot-style-option" data-shoot-style="triple">
-                        <div class="shoot-style-name">Тройная</div>
-                        <div class="shoot-style-desc">3 пули</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Эффекты -->
-            <div class="customize-section">
-                <div class="form-check" style="text-align: left;">
-                    <input class="form-check-input" type="checkbox" id="particlesToggle" checked>
-                    <label class="form-check-label" for="particlesToggle" style="color: #00ff88; font-size: 13px;">
-                        <i class="bi bi-star-fill"></i> Эффекты частиц
-                    </label>
-                </div>
-                <div class="form-check mt-2" style="text-align: left;">
-                    <input class="form-check-input" type="checkbox" id="glowToggle" checked>
-                    <label class="form-check-label" for="glowToggle" style="color: #00ff88; font-size: 13px;">
-                        <i class="bi bi-brightness-high-fill"></i> Эффекты свечения
-                    </label>
-                </div>
-            </div>
-
-            <div class="d-grid gap-2 mt-3">
-                <button class="btn btn-game" id="saveCustomizationBtn">
-                    <i class="bi bi-check2-circle"></i> СОХРАНИТЬ
-                </button>
-                <button class="btn btn-game btn-secondary-game" id="backToMenuBtn">
-                    <i class="bi bi-arrow-left"></i> НАЗАД
-                </button>
-            </div>
+<!-- ══ GAME OVER ══ -->
+<div id="gameOver" style="display:none">
+    <div class="game-card text-center">
+        <h1 class="game-title mb-3">GAME OVER</h1>
+        <div class="score-row mb-2"><div class="score-label">Ваш счет</div><div class="score-value" id="finalScore">0</div></div>
+        <div class="score-row mb-2"><div class="score-label">Уровень</div><div class="score-value" id="finalLevel">1</div></div>
+        <div class="score-row mb-3">
+            <div class="score-label"><i class="bi bi-trophy-fill text-warning"></i> Рекорд</div>
+            <div class="score-value" id="bestScore">0</div>
+        </div>
+        <div class="d-grid gap-2">
+            <button class="btn btn-game" id="restartBtn"><i class="bi bi-arrow-clockwise"></i> СНОВА</button>
+            <button class="btn btn-game btn-secondary-game" id="changeDifficultyBtn"><i class="bi bi-gear-fill"></i> СЛОЖНОСТЬ</button>
         </div>
     </div>
+</div>
 
-    <!-- Интерфейс игры -->
-    <div id="ui">
-        <div class="row g-2">
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-label">Очки</div>
-                    <div class="stat-value" id="score">0</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-label">
-                        <i class="bi bi-heart-fill text-danger"></i> Жизни
-                    </div>
-                    <div class="stat-value" id="lives">3</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-label">Уровень</div>
-                    <div class="stat-value" id="level">1</div>
-                </div>
-            </div>
-        </div>
-        <div class="mt-2">
-            <div class="progress">
-                <div class="progress-bar" id="levelProgress" role="progressbar" style="width: 0%"></div>
-            </div>
-        </div>
-    </div>
+<canvas id="gameCanvas"></canvas>
 
-    <!-- Экран Game Over -->
-    <div id="gameOver" style="display: none;">
-        <div class="game-card text-center">
-            <h1 class="game-title mb-3">GAME OVER</h1>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // ═══════════════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════════════
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.expand(); tg.enableClosingConfirmation(); }
 
-            <div class="score-row mb-2">
-                <div class="score-label">Ваш счет</div>
-                <div class="score-value" id="finalScore">0</div>
-            </div>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx    = canvas.getContext('2d');
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-            <div class="score-row mb-2">
-                <div class="score-label">Достигнутый уровень</div>
-                <div class="score-value" id="finalLevel">1</div>
-            </div>
+    // ═══════════════════════════════════════════
+    //  НАСТРОЙКИ СЛОЖНОСТИ
+    // ═══════════════════════════════════════════
+    const DIFFICULTY = {
+        easy:      { lives:5, enemySpeed:.7,  spawnRate:.015, scoreMult:1   },
+        normal:    { lives:3, enemySpeed:1,   spawnRate:.02,  scoreMult:1.5 },
+        hard:      { lives:2, enemySpeed:1.5, spawnRate:.03,  scoreMult:2   },
+        nightmare: { lives:1, enemySpeed:2,   spawnRate:.04,  scoreMult:3   }
+    };
 
-            <div class="score-row mb-3">
-                <div class="score-label">
-                    <i class="bi bi-trophy-fill text-warning"></i> Лучший счет
-                </div>
-                <div class="score-value" id="bestScore">0</div>
-            </div>
-
-            <div class="d-grid gap-2">
-                <button class="btn btn-game" id="restartBtn">
-                    <i class="bi bi-arrow-clockwise"></i> ИГРАТЬ СНОВА
-                </button>
-                <button class="btn btn-game btn-secondary-game" id="changeDifficultyBtn">
-                    <i class="bi bi-gear-fill"></i> СЛОЖНОСТЬ
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-
-    <!-- Управление -->
-    <div id="controls">
-        <div class="auto-shoot-indicator" id="autoShootIndicator">
-            <i class="bi bi-lightning-fill"></i>
-            <span id="autoShootText">АВТО</span>
-        </div>
-        <div class="controls-row">
-            <div class="control-btn" id="leftBtn">
-                <i class="bi bi-arrow-left"></i>
-            </div>
-            <div class="control-btn" id="shootBtn">
-                <i class="bi bi-circle-fill"></i>
-            </div>
-            <div class="control-btn" id="rightBtn">
-                <i class="bi bi-arrow-right"></i>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.enableClosingConfirmation();
-
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        // Настройки сложности
-        const difficultySettings = {
-            easy: {
-                name: 'Легко',
-                lives: 5,
-                enemySpeed: 0.7,
-                enemySpawnRate: 0.015,
-                scoreMultiplier: 1
-            },
-            normal: {
-                name: 'Нормально',
-                lives: 3,
-                enemySpeed: 1,
-                enemySpawnRate: 0.02,
-                scoreMultiplier: 1.5
-            },
-            hard: {
-                name: 'Сложно',
-                lives: 2,
-                enemySpeed: 1.5,
-                enemySpawnRate: 0.03,
-                scoreMultiplier: 2
-            },
-            nightmare: {
-                name: 'Кошмар',
-                lives: 1,
-                enemySpeed: 2,
-                enemySpawnRate: 0.04,
-                scoreMultiplier: 3
-            }
-        };
-
-        let currentDifficulty = null;
-        let gameStarted = false;
-        let gameRunning = false;
-        let score = 0;
-        let lives = 3;
-        let level = 1;
-        let levelProgress = 0;
-        let bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
-        let autoShoot = true; // Автоматическая стрельба включена по умолчанию
-
-        // Настройки кастомизации
-        let customization = {
-            shipColor: localStorage.getItem('shipColor') || 'green',
-            bulletColor: localStorage.getItem('bulletColor') || 'yellow',
-            shootStyle: localStorage.getItem('shootStyle') || 'single',
-            particles: localStorage.getItem('particles') !== 'false',
-            glow: localStorage.getItem('glow') !== 'false'
-        };
-
-        // Цветовые схемы
-        const colorSchemes = {
-            ship: {
-                green: { primary: '#00ff88', secondary: '#00d4ff', shadow: '#00ff88' },
-                blue: { primary: '#00d4ff', secondary: '#0080ff', shadow: '#00d4ff' },
-                purple: { primary: '#a855f7', secondary: '#ec4899', shadow: '#a855f7' },
-                orange: { primary: '#ff6b00', secondary: '#ff9900', shadow: '#ff6b00' },
-                red: { primary: '#ff0066', secondary: '#ff3366', shadow: '#ff0066' },
-                yellow: { primary: '#ffd700', secondary: '#ffed4e', shadow: '#ffd700' }
-            },
-            bullet: {
-                yellow: { primary: '#ffff00', secondary: '#ff9900', shadow: '#ffff00' },
-                cyan: { primary: '#00ffff', secondary: '#00d4ff', shadow: '#00ffff' },
-                pink: { primary: '#ff69b4', secondary: '#ff1493', shadow: '#ff69b4' },
-                green: { primary: '#00ff88', secondary: '#00ff00', shadow: '#00ff88' },
-                white: { primary: '#ffffff', secondary: '#cccccc', shadow: '#ffffff' },
-                purple: { primary: '#a855f7', secondary: '#8b5cf6', shadow: '#a855f7' }
-            }
-        };
-
-        const player = {
-            x: canvas.width / 2,
-            y: canvas.height - 100,
-            width: 40,
-            height: 40,
-            speed: 6,
-            vx: 0
-        };
-
-        const bullets = [];
-        const enemies = [];
-        const stars = [];
-        const particles = [];
-
-        let leftPressed = false;
-        let rightPressed = false;
-        let shootPressed = false;
-        let lastShootTime = 0;
-        const shootCooldown = 200;
-
-        // Выбор сложности
-        document.querySelectorAll('.difficulty-card').forEach(card => {
-            card.addEventListener('click', function() {
-                document.querySelectorAll('.difficulty-card').forEach(c => c.classList.remove('selected'));
-                this.classList.add('selected');
-                currentDifficulty = this.getAttribute('data-difficulty');
-                document.getElementById('startBtn').disabled = false;
-            });
-        });
-
-        // Переключатель автоматической стрельбы
-        document.getElementById('autoShootToggle').addEventListener('change', function() {
-            autoShoot = this.checked;
-            localStorage.setItem('autoShoot', autoShoot);
-            updateAutoShootIndicator();
-        });
-
-        // Загрузка настройки автострельбы из localStorage
-        const savedAutoShoot = localStorage.getItem('autoShoot');
-        if (savedAutoShoot !== null) {
-            autoShoot = savedAutoShoot === 'true';
-            document.getElementById('autoShootToggle').checked = autoShoot;
+    // ═══════════════════════════════════════════
+    //  ЦВЕТА
+    // ═══════════════════════════════════════════
+    const COLORS = {
+        ship: {
+            green:  {a:'#00ff88', b:'#00d4ff'},
+            blue:   {a:'#00d4ff', b:'#0080ff'},
+            purple: {a:'#a855f7', b:'#ec4899'},
+            orange: {a:'#ff6b00', b:'#ff9900'},
+            red:    {a:'#ff0066', b:'#ff3366'},
+            yellow: {a:'#ffd700', b:'#ffed4e'}
+        },
+        bullet: {
+            yellow: {a:'#ffff00', b:'#ff9900'},
+            cyan:   {a:'#00ffff', b:'#00d4ff'},
+            pink:   {a:'#ff69b4', b:'#ff1493'},
+            green:  {a:'#00ff88', b:'#00ff00'},
+            white:  {a:'#ffffff', b:'#cccccc'},
+            purple: {a:'#a855f7', b:'#8b5cf6'}
         }
+    };
 
-        // Обновление индикатора автострельбы
-        function updateAutoShootIndicator() {
-            const indicator = document.getElementById('autoShootIndicator');
-            const text = document.getElementById('autoShootText');
-            if (autoShoot) {
-                indicator.classList.add('active');
-                text.textContent = 'АВТО';
-            } else {
-                indicator.classList.remove('active');
-                text.textContent = 'РУЧН.';
-            }
+    // ═══════════════════════════════════════════
+    //  СОСТОЯНИЕ
+    // ═══════════════════════════════════════════
+    let difficulty  = null;
+    let gameRunning = false;
+    let score = 0, lives = 0, level = 1, levelProgress = 0;
+    let bestScore = +localStorage.getItem('bestScore') || 0;
+    let autoShoot = localStorage.getItem('autoShoot') !== 'false';
+
+    let custom = {
+        shipColor:   localStorage.getItem('shipColor')   || 'green',
+        bulletColor: localStorage.getItem('bulletColor') || 'yellow',
+        shootStyle:  localStorage.getItem('shootStyle')  || 'single',
+        particles:   localStorage.getItem('particles')   !== 'false',
+        glow:        localStorage.getItem('glow')        !== 'false'
+    };
+
+    // ═══════════════════════════════════════════
+    //  ИГРОВЫЕ ОБЪЕКТЫ
+    // ═══════════════════════════════════════════
+    const player = { x: canvas.width/2, y: canvas.height - 110, targetX: canvas.width/2, w:42, h:42 };
+    const bullets=[], enemies=[], stars=[], particles=[];
+
+    let lastShot = 0;
+    const SHOOT_CD = 200; // мс
+
+    // ═══════════════════════════════════════════
+    //  ЗВЁЗДЫ
+    // ═══════════════════════════════════════════
+    for (let i=0;i<120;i++) {
+        stars.push({
+            x: Math.random()*canvas.width,
+            y: Math.random()*canvas.height,
+            s: Math.random()*2+.5,
+            sp: Math.random()*1.8+.4,
+            o: Math.random()*.5+.4
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    //  УПРАВЛЕНИЕ КАСАНИЕМ — корабль следует за пальцем
+    // ═══════════════════════════════════════════
+    let touching = false;
+
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (!gameRunning) return;
+        touching = true;
+        player.targetX = e.touches[0].clientX;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (!gameRunning) return;
+        player.targetX = e.touches[0].clientX;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+        e.preventDefault();
+        touching = false;
+    }, { passive: false });
+
+    // ═══════════════════════════════════════════
+    //  КЛАВИАТУРА (для десктопного теста)
+    // ═══════════════════════════════════════════
+    const keys = {};
+    document.addEventListener('keydown', e => {
+        keys[e.key] = true;
+        if (e.key===' ') e.preventDefault();
+    });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // ═══════════════════════════════════════════
+    //  АВТО-СТРЕЛЬБА ИНДИКАТОР
+    // ═══════════════════════════════════════════
+    function syncAutoShootUI() {
+        const el = document.getElementById('autoShootIndicator');
+        document.getElementById('autoShootText').textContent = autoShoot ? 'АВТО' : 'РУЧН.';
+        el.classList.toggle('active', autoShoot);
+    }
+    syncAutoShootUI();
+    document.getElementById('autoShootToggle').checked = autoShoot;
+
+    document.getElementById('autoShootIndicator').addEventListener('click', () => {
+        autoShoot = !autoShoot;
+        localStorage.setItem('autoShoot', autoShoot);
+        syncAutoShootUI();
+    });
+    document.getElementById('autoShootToggle').addEventListener('change', function() {
+        autoShoot = this.checked;
+        localStorage.setItem('autoShoot', autoShoot);
+        syncAutoShootUI();
+    });
+
+    // ═══════════════════════════════════════════
+    //  ЭКРАНЫ
+    // ═══════════════════════════════════════════
+    document.querySelectorAll('.difficulty-card').forEach(c => {
+        c.addEventListener('click', function() {
+            document.querySelectorAll('.difficulty-card').forEach(x=>x.classList.remove('selected'));
+            this.classList.add('selected');
+            difficulty = this.dataset.difficulty;
+            document.getElementById('startBtn').disabled = false;
+        });
+    });
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        if (difficulty) { hide('difficultyScreen'); startGame(); }
+    });
+    document.getElementById('restartBtn').addEventListener('click', () => {
+        hide('gameOver'); startGame();
+    });
+    document.getElementById('changeDifficultyBtn').addEventListener('click', () => {
+        hide('gameOver'); show('difficultyScreen');
+        difficulty = null;
+        document.getElementById('startBtn').disabled = true;
+        document.querySelectorAll('.difficulty-card').forEach(c=>c.classList.remove('selected'));
+    });
+
+    // Кастомизация
+    document.getElementById('customizeBtn').addEventListener('click', () => {
+        hide('difficultyScreen'); show('customizeScreen'); loadCustomUI();
+    });
+    document.getElementById('backToMenuBtn').addEventListener('click', () => {
+        hide('customizeScreen'); show('difficultyScreen');
+    });
+    document.getElementById('saveCustomizationBtn').addEventListener('click', () => {
+        saveCustom(); hide('customizeScreen'); show('difficultyScreen');
+    });
+
+    document.querySelectorAll('[data-ship-color]').forEach(el => {
+        el.addEventListener('click', function() {
+            document.querySelectorAll('[data-ship-color]').forEach(e=>e.classList.remove('selected'));
+            this.classList.add('selected'); custom.shipColor = this.dataset.shipColor;
+        });
+    });
+    document.querySelectorAll('[data-bullet-color]').forEach(el => {
+        el.addEventListener('click', function() {
+            document.querySelectorAll('[data-bullet-color]').forEach(e=>e.classList.remove('selected'));
+            this.classList.add('selected'); custom.bulletColor = this.dataset.bulletColor;
+        });
+    });
+    document.querySelectorAll('[data-shoot-style]').forEach(el => {
+        el.addEventListener('click', function() {
+            document.querySelectorAll('[data-shoot-style]').forEach(e=>e.classList.remove('selected'));
+            this.classList.add('selected'); custom.shootStyle = this.dataset.shootStyle;
+        });
+    });
+
+    function loadCustomUI() {
+        document.querySelectorAll('[data-ship-color]').forEach(e=>e.classList.toggle('selected',e.dataset.shipColor===custom.shipColor));
+        document.querySelectorAll('[data-bullet-color]').forEach(e=>e.classList.toggle('selected',e.dataset.bulletColor===custom.bulletColor));
+        document.querySelectorAll('[data-shoot-style]').forEach(e=>e.classList.toggle('selected',e.dataset.shootStyle===custom.shootStyle));
+        document.getElementById('particlesToggle').checked = custom.particles;
+        document.getElementById('glowToggle').checked = custom.glow;
+    }
+    function saveCustom() {
+        custom.particles = document.getElementById('particlesToggle').checked;
+        custom.glow      = document.getElementById('glowToggle').checked;
+        Object.entries(custom).forEach(([k,v])=>localStorage.setItem(k,v));
+    }
+
+    function show(id) { document.getElementById(id).style.display='flex'; }
+    function hide(id) { document.getElementById(id).style.display='none'; }
+
+    // ═══════════════════════════════════════════
+    //  СТАРТ ИГРЫ
+    // ═══════════════════════════════════════════
+    function startGame() {
+        const cfg = DIFFICULTY[difficulty];
+        score=0; lives=cfg.lives; level=1; levelProgress=0;
+        bullets.length=0; enemies.length=0; particles.length=0;
+        player.x = player.targetX = canvas.width/2;
+        gameRunning = true;
+
+        // Показать подсказку
+        const hint = document.getElementById('touchHint');
+        hint.style.animation = 'none';
+        void hint.offsetWidth;
+        hint.style.animation = 'fadeHint 3s ease forwards';
+
+        updateUI();
+        requestAnimationFrame(loop);
+    }
+
+    // ═══════════════════════════════════════════
+    //  СТРЕЛЬБА
+    // ═══════════════════════════════════════════
+    function shoot() {
+        const now = Date.now();
+        if (now - lastShot < SHOOT_CD) return;
+        lastShot = now;
+        const base = { y: player.y, w:5, h:18, sp:11 };
+        if (custom.shootStyle==='single') {
+            bullets.push({...base, x: player.x});
+        } else if (custom.shootStyle==='double') {
+            bullets.push({...base, x: player.x-11});
+            bullets.push({...base, x: player.x+11});
+        } else {
+            bullets.push({...base, x: player.x-16});
+            bullets.push({...base, x: player.x});
+            bullets.push({...base, x: player.x+16});
         }
+    }
 
-        // Переключение автострельбы во время игры
-        document.getElementById('autoShootIndicator').addEventListener('click', function() {
-            autoShoot = !autoShoot;
-            localStorage.setItem('autoShoot', autoShoot);
-            updateAutoShootIndicator();
+    // ═══════════════════════════════════════════
+    //  ВЗРЫВ
+    // ═══════════════════════════════════════════
+    function explode(x,y,color) {
+        if (!custom.particles) return;
+        for (let i=0;i<28;i++) particles.push({
+            x,y,
+            vx:(Math.random()-.5)*10,
+            vy:(Math.random()-.5)*10,
+            life:1, decay:.016+Math.random()*.008, color
         });
+    }
 
-        // Инициализация индикатора
-        updateAutoShootIndicator();
+    // ═══════════════════════════════════════════
+    //  UPDATE
+    // ═══════════════════════════════════════════
+    function update() {
+        const cfg = DIFFICULTY[difficulty];
 
-        // Кастомизация - открытие экрана
-        document.getElementById('customizeBtn').addEventListener('click', () => {
-            document.getElementById('difficultyScreen').style.display = 'none';
-            document.getElementById('customizeScreen').style.display = 'flex';
-            loadCustomization();
-        });
-
-        // Кастомизация - возврат
-        document.getElementById('backToMenuBtn').addEventListener('click', () => {
-            document.getElementById('customizeScreen').style.display = 'none';
-            document.getElementById('difficultyScreen').style.display = 'flex';
-        });
-
-        // Кастомизация - сохранение
-        document.getElementById('saveCustomizationBtn').addEventListener('click', () => {
-            saveCustomization();
-            document.getElementById('customizeScreen').style.display = 'none';
-            document.getElementById('difficultyScreen').style.display = 'flex';
-        });
-
-        // Загрузка кастомизации
-        function loadCustomization() {
-            // Цвет корабля
-            document.querySelectorAll('[data-ship-color]').forEach(el => {
-                el.classList.toggle('selected', el.dataset.shipColor === customization.shipColor);
-            });
-
-            // Цвет пуль
-            document.querySelectorAll('[data-bullet-color]').forEach(el => {
-                el.classList.toggle('selected', el.dataset.bulletColor === customization.bulletColor);
-            });
-
-            // Стиль стрельбы
-            document.querySelectorAll('[data-shoot-style]').forEach(el => {
-                el.classList.toggle('selected', el.dataset.shootStyle === customization.shootStyle);
-            });
-
-            // Эффекты
-            document.getElementById('particlesToggle').checked = customization.particles;
-            document.getElementById('glowToggle').checked = customization.glow;
+        // --- Движение игрока ---
+        // Касание: плавное следование за пальцем
+        if (touching) {
+            const dx = player.targetX - player.x;
+            player.x += dx * 0.18;  // коэффициент инерции
         }
-
-        // Обработчики выбора цвета корабля
-        document.querySelectorAll('[data-ship-color]').forEach(el => {
-            el.addEventListener('click', function() {
-                document.querySelectorAll('[data-ship-color]').forEach(e => e.classList.remove('selected'));
-                this.classList.add('selected');
-                customization.shipColor = this.dataset.shipColor;
-            });
-        });
-
-        // Обработчики выбора цвета пуль
-        document.querySelectorAll('[data-bullet-color]').forEach(el => {
-            el.addEventListener('click', function() {
-                document.querySelectorAll('[data-bullet-color]').forEach(e => e.classList.remove('selected'));
-                this.classList.add('selected');
-                customization.bulletColor = this.dataset.bulletColor;
-            });
-        });
-
-        // Обработчики выбора стиля стрельбы
-        document.querySelectorAll('[data-shoot-style]').forEach(el => {
-            el.addEventListener('click', function() {
-                document.querySelectorAll('[data-shoot-style]').forEach(e => e.classList.remove('selected'));
-                this.classList.add('selected');
-                customization.shootStyle = this.dataset.shootStyle;
-            });
-        });
-
-        // Сохранение кастомизации
-        function saveCustomization() {
-            customization.particles = document.getElementById('particlesToggle').checked;
-            customization.glow = document.getElementById('glowToggle').checked;
-
-            localStorage.setItem('shipColor', customization.shipColor);
-            localStorage.setItem('bulletColor', customization.bulletColor);
-            localStorage.setItem('shootStyle', customization.shootStyle);
-            localStorage.setItem('particles', customization.particles);
-            localStorage.setItem('glow', customization.glow);
-        }
-
-        document.getElementById('startBtn').addEventListener('click', () => {
-            if (currentDifficulty) {
-                document.getElementById('difficultyScreen').style.display = 'none';
-                startGame();
-            }
-        });
-
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            document.getElementById('gameOver').style.display = 'none';
-            startGame();
-        });
-
-        document.getElementById('changeDifficultyBtn').addEventListener('click', () => {
-            document.getElementById('gameOver').style.display = 'none';
-            document.getElementById('difficultyScreen').style.display = 'flex';
-            currentDifficulty = null;
-            document.getElementById('startBtn').disabled = true;
-            document.querySelectorAll('.difficulty-card').forEach(c => c.classList.remove('selected'));
-        });
-
-        // Звездное поле
-        for (let i = 0; i < 100; i++) {
-            stars.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                size: Math.random() * 2,
-                speed: Math.random() * 2 + 0.5,
-                opacity: Math.random() * 0.5 + 0.5
-            });
-        }
-
-        // Управление
-        document.getElementById('leftBtn').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            leftPressed = true;
-        });
-        document.getElementById('leftBtn').addEventListener('touchend', () => leftPressed = false);
-
-        document.getElementById('rightBtn').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            rightPressed = true;
-        });
-        document.getElementById('rightBtn').addEventListener('touchend', () => rightPressed = false);
-
-        document.getElementById('shootBtn').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            shootPressed = true;
-        });
-        document.getElementById('shootBtn').addEventListener('touchend', () => shootPressed = false);
-
         // Клавиатура
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') leftPressed = true;
-            if (e.key === 'ArrowRight') rightPressed = true;
-            if (e.key === ' ') {
-                e.preventDefault();
-                shootPressed = true;
-            }
-        });
+        if (keys['ArrowLeft'])  player.x -= 6;
+        if (keys['ArrowRight']) player.x += 6;
+        // Стрелять по пробелу вручную
+        if (keys[' '] && !autoShoot) shoot();
 
-        document.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowLeft') leftPressed = false;
-            if (e.key === 'ArrowRight') rightPressed = false;
-            if (e.key === ' ') shootPressed = false;
-        });
+        player.x = Math.max(player.w/2, Math.min(canvas.width - player.w/2, player.x));
 
-        function startGame() {
-            const settings = difficultySettings[currentDifficulty];
-            gameStarted = true;
-            gameRunning = true;
-            score = 0;
-            lives = settings.lives;
-            level = 1;
-            levelProgress = 0;
-            bullets.length = 0;
-            enemies.length = 0;
-            particles.length = 0;
-            player.x = canvas.width / 2;
-            updateUI();
-            gameLoop();
+        // --- Стрельба ---
+        if (autoShoot) shoot();
+
+        // --- Звёзды ---
+        stars.forEach(s => { s.y += s.sp; if (s.y > canvas.height) { s.y=0; s.x=Math.random()*canvas.width; } });
+
+        // --- Пули ---
+        for (let i=bullets.length-1;i>=0;i--) {
+            bullets[i].y -= bullets[i].sp;
+            if (bullets[i].y < -20) bullets.splice(i,1);
         }
 
-        function shoot() {
-            const now = Date.now();
-            if (now - lastShootTime > shootCooldown) {
-                const bulletData = {
-                    y: player.y,
-                    width: 5,
-                    height: 18,
-                    speed: 10
-                };
-
-                if (customization.shootStyle === 'single') {
-                    // Одиночная пуля
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x
-                    });
-                } else if (customization.shootStyle === 'double') {
-                    // Двойная пуля
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x - 10
-                    });
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x + 10
-                    });
-                } else if (customization.shootStyle === 'triple') {
-                    // Тройная пуля
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x - 15
-                    });
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x
-                    });
-                    bullets.push({
-                        ...bulletData,
-                        x: player.x + 15
-                    });
-                }
-
-                lastShootTime = now;
+        // --- Враги ---
+        for (let i=enemies.length-1;i>=0;i--) {
+            enemies[i].y += enemies[i].sp;
+            if (enemies[i].y > canvas.height+20) {
+                enemies.splice(i,1);
+                lives--;
+                updateUI();
+                if (lives<=0) endGame();
             }
         }
 
-        function spawnEnemy() {
-            const settings = difficultySettings[currentDifficulty];
-            const size = 30 + Math.random() * 25;
-            enemies.push({
-                x: Math.random() * (canvas.width - size),
-                y: -size,
-                width: size,
-                height: size,
-                speed: (1 + level * 0.3 + Math.random() * 2) * settings.enemySpeed,
-                health: 1 + Math.floor(level / 3),
-                maxHealth: 1 + Math.floor(level / 3)
-            });
-        }
-
-        function createExplosion(x, y, color = '#ff6b00') {
-            if (!customization.particles) return; // Пропустить если эффекты выключены
-
-            for (let i = 0; i < 30; i++) {
-                particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    life: 1,
-                    decay: 0.015,
-                    color: color
-                });
-            }
-        }
-
-        function updateUI() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('lives').textContent = lives;
-            document.getElementById('level').textContent = level;
-
-            const progressPercent = (levelProgress % 200) / 200 * 100;
-            document.getElementById('levelProgress').style.width = progressPercent + '%';
-        }
-
-        function gameOver() {
-            gameRunning = false;
-            if (score > bestScore) {
-                bestScore = score;
-                localStorage.setItem('bestScore', bestScore);
-
-                // Отправка данных в Telegram
-                if (tg.initDataUnsafe?.user) {
-                    tg.sendData(JSON.stringify({
-                        score: score,
-                        level: level,
-                        difficulty: currentDifficulty,
-                        userId: tg.initDataUnsafe.user.id
-                    }));
-                }
-            }
-
-            document.getElementById('finalScore').textContent = score;
-            document.getElementById('finalLevel').textContent = level;
-            document.getElementById('bestScore').textContent = bestScore;
-            document.getElementById('gameOver').style.display = 'flex';
-        }
-
-        function update() {
-            if (!gameRunning) return;
-
-            const settings = difficultySettings[currentDifficulty];
-
-            // Движение игрока
-            player.vx = 0;
-            if (leftPressed) player.vx = -player.speed;
-            if (rightPressed) player.vx = player.speed;
-            player.x += player.vx;
-            player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
-
-            // Стрельба
-            if (autoShoot) {
-                // Автоматическая стрельба
-                shoot();
-            } else {
-                // Ручная стрельба (только при нажатии)
-                if (shootPressed) shoot();
-            }
-
-            // Обновление звезд
-            stars.forEach(star => {
-                star.y += star.speed;
-                if (star.y > canvas.height) {
-                    star.y = 0;
-                    star.x = Math.random() * canvas.width;
-                }
-            });
-
-            // Обновление пуль
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].y -= bullets[i].speed;
-                if (bullets[i].y < 0) {
-                    bullets.splice(i, 1);
-                }
-            }
-
-            // Обновление врагов
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                enemies[i].y += enemies[i].speed;
-
-                if (enemies[i].y > canvas.height) {
-                    enemies.splice(i, 1);
-                    lives--;
-                    updateUI();
-                    if (lives <= 0) gameOver();
-                }
-            }
-
-            // Столкновения пуль с врагами
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                for (let j = enemies.length - 1; j >= 0; j--) {
-                    if (bullets[i] && enemies[j] &&
-                        bullets[i].x > enemies[j].x - enemies[j].width / 2 &&
-                        bullets[i].x < enemies[j].x + enemies[j].width / 2 &&
-                        bullets[i].y > enemies[j].y - enemies[j].height / 2 &&
-                        bullets[i].y < enemies[j].y + enemies[j].height / 2) {
-
-                        bullets.splice(i, 1);
-                        enemies[j].health--;
-
-                        if (enemies[j].health <= 0) {
-                            createExplosion(enemies[j].x, enemies[j].y, '#ff6b00');
-                            enemies.splice(j, 1);
-                            const points = Math.floor(10 * level * settings.scoreMultiplier);
-                            score += points;
-                            levelProgress += points;
-                            updateUI();
-
-                            if (levelProgress >= 200) {
-                                level++;
-                                levelProgress = 0;
-                                updateUI();
-                            }
-                        }
-                        break;
+        // --- Коллизии пули ↔ враги ---
+        for (let i=bullets.length-1;i>=0;i--) {
+            for (let j=enemies.length-1;j>=0;j--) {
+                const b=bullets[i], e=enemies[j];
+                if (!b||!e) continue;
+                if (b.x > e.x-e.hw && b.x < e.x+e.hw && b.y > e.y-e.hh && b.y < e.y+e.hh) {
+                    bullets.splice(i,1);
+                    e.hp--;
+                    if (e.hp<=0) {
+                        explode(e.x, e.y, '#ff6b00');
+                        enemies.splice(j,1);
+                        const pts = Math.floor(10*level*cfg.scoreMult);
+                        score += pts; levelProgress += pts;
+                        if (levelProgress >= 200*(level*.5+.5)) { level++; levelProgress=0; }
+                        updateUI();
                     }
+                    break;
                 }
-            }
-
-            // Столкновения с игроком
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                if (Math.abs(enemies[i].x - player.x) < (enemies[i].width + player.width) / 2 &&
-                    Math.abs(enemies[i].y - player.y) < (enemies[i].height + player.height) / 2) {
-                    createExplosion(player.x, player.y, '#00ff88');
-                    enemies.splice(i, 1);
-                    lives--;
-                    updateUI();
-                    if (lives <= 0) gameOver();
-                }
-            }
-
-            // Обновление частиц
-            for (let i = particles.length - 1; i >= 0; i--) {
-                particles[i].x += particles[i].vx;
-                particles[i].y += particles[i].vy;
-                particles[i].life -= particles[i].decay;
-                if (particles[i].life <= 0) {
-                    particles.splice(i, 1);
-                }
-            }
-
-            // Спавн врагов
-            if (Math.random() < settings.enemySpawnRate + level * 0.003) {
-                spawnEnemy();
             }
         }
 
-        function draw() {
-            // Градиентный фон
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#0a0a1a');
-            gradient.addColorStop(0.5, '#1a0a2e');
-            gradient.addColorStop(1, '#0a0a1a');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Звезды
-            stars.forEach(star => {
-                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
-                ctx.fillRect(star.x, star.y, star.size, star.size);
-            });
-
-            // Игрок
-            ctx.save();
-            const shipColors = colorSchemes.ship[customization.shipColor];
-
-            if (customization.glow) {
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = shipColors.shadow;
+        // --- Коллизии враги ↔ игрок ---
+        for (let i=enemies.length-1;i>=0;i--) {
+            const e=enemies[i];
+            if (Math.abs(e.x-player.x)<(e.hw+player.w/2) && Math.abs(e.y-player.y)<(e.hh+player.h/2)) {
+                explode(player.x, player.y, COLORS.ship[custom.shipColor].a);
+                enemies.splice(i,1);
+                lives--;
+                updateUI();
+                if (lives<=0) endGame();
             }
+        }
 
-            const playerGradient = ctx.createLinearGradient(
-                player.x - player.width / 2, player.y - player.height / 2,
-                player.x + player.width / 2, player.y + player.height / 2
-            );
-            playerGradient.addColorStop(0, shipColors.primary);
-            playerGradient.addColorStop(1, shipColors.secondary);
-            ctx.fillStyle = playerGradient;
+        // --- Частицы ---
+        for (let i=particles.length-1;i>=0;i--) {
+            const p=particles[i];
+            p.x+=p.vx; p.y+=p.vy; p.life-=p.decay;
+            if (p.life<=0) particles.splice(i,1);
+        }
 
+        // --- Спавн врагов ---
+        if (Math.random() < cfg.spawnRate + level*.003) spawnEnemy(cfg);
+    }
+
+    function spawnEnemy(cfg) {
+        const hw = 16 + Math.random()*16;
+        const hh = hw * (.8 + Math.random()*.4);
+        const hp = 1 + Math.floor(level/3);
+        enemies.push({
+            x: hw + Math.random()*(canvas.width-hw*2),
+            y: -hh*2,
+            hw, hh,
+            sp: (1 + level*.25 + Math.random()*1.5)*cfg.enemySpeed,
+            hp, maxHp: hp
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    //  DRAW
+    // ═══════════════════════════════════════════
+    function draw() {
+        // Фон
+        const bg = ctx.createLinearGradient(0,0,0,canvas.height);
+        bg.addColorStop(0,'#0a0a1a'); bg.addColorStop(.5,'#1a0a2e'); bg.addColorStop(1,'#0a0a1a');
+        ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        // Звёзды
+        stars.forEach(s=>{
+            ctx.fillStyle=`rgba(255,255,255,${s.o})`;
+            ctx.fillRect(s.x,s.y,s.s,s.s);
+        });
+
+        // Корабль
+        const sc = COLORS.ship[custom.shipColor];
+        ctx.save();
+        if (custom.glow) { ctx.shadowBlur=22; ctx.shadowColor=sc.a; }
+        const pg = ctx.createLinearGradient(player.x-player.w/2,player.y-player.h/2,player.x+player.w/2,player.y+player.h/2);
+        pg.addColorStop(0,sc.a); pg.addColorStop(1,sc.b);
+        ctx.fillStyle=pg;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y - player.h/2);
+        ctx.lineTo(player.x - player.w/2, player.y + player.h/2);
+        ctx.lineTo(player.x, player.y + player.h/4);
+        ctx.lineTo(player.x + player.w/2, player.y + player.h/2);
+        ctx.closePath(); ctx.fill();
+
+        // Двигатель (реактивная струя)
+        const jetG = ctx.createLinearGradient(player.x,player.y+player.h/2,player.x,player.y+player.h/2+18);
+        jetG.addColorStop(0, sc.a+'cc'); jetG.addColorStop(1,'transparent');
+        ctx.fillStyle=jetG;
+        ctx.beginPath();
+        ctx.moveTo(player.x-8, player.y+player.h/2);
+        ctx.lineTo(player.x+8, player.y+player.h/2);
+        const jitterY = player.y+player.h/2+12+Math.random()*8;
+        ctx.lineTo(player.x, jitterY);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+
+        // Пули
+        const bc = COLORS.bullet[custom.bulletColor];
+        bullets.forEach(b=>{
+            ctx.save();
+            if (custom.glow) { ctx.shadowBlur=12; ctx.shadowColor=bc.a; }
+            const bg2=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
+            bg2.addColorStop(0,bc.a); bg2.addColorStop(1,bc.b);
+            ctx.fillStyle=bg2;
             ctx.beginPath();
-            ctx.moveTo(player.x, player.y - player.height / 2);
-            ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
-            ctx.lineTo(player.x, player.y + player.height / 4);
-            ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
-            ctx.closePath();
+            ctx.roundRect(b.x-b.w/2, b.y, b.w, b.h, 3);
             ctx.fill();
             ctx.restore();
-
-            // Пули
-            bullets.forEach(bullet => {
-                ctx.save();
-                const bulletColors = colorSchemes.bullet[customization.bulletColor];
-
-                if (customization.glow) {
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = bulletColors.shadow;
-                }
-
-                const bulletGradient = ctx.createLinearGradient(
-                    bullet.x, bullet.y,
-                    bullet.x, bullet.y + bullet.height
-                );
-                bulletGradient.addColorStop(0, bulletColors.primary);
-                bulletGradient.addColorStop(1, bulletColors.secondary);
-                ctx.fillStyle = bulletGradient;
-
-                ctx.fillRect(
-                    bullet.x - bullet.width / 2,
-                    bullet.y,
-                    bullet.width,
-                    bullet.height
-                );
-                ctx.restore();
-            });
-
-            // Враги
-            enemies.forEach(enemy => {
-                ctx.save();
-
-                if (customization.glow) {
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = '#ff0066';
-                }
-
-                const enemyGradient = ctx.createRadialGradient(
-                    enemy.x, enemy.y, 0,
-                    enemy.x, enemy.y, enemy.width / 2
-                );
-                enemyGradient.addColorStop(0, '#ff0066');
-                enemyGradient.addColorStop(1, '#cc0033');
-                ctx.fillStyle = enemyGradient;
-
-                ctx.fillRect(
-                    enemy.x - enemy.width / 2,
-                    enemy.y - enemy.height / 2,
-                    enemy.width,
-                    enemy.height
-                );
-
-                // Полоска здоровья
-                if (enemy.health < enemy.maxHealth) {
-                    const healthBarWidth = enemy.width;
-                    const healthBarHeight = 4;
-                    const healthPercent = enemy.health / enemy.maxHealth;
-
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                    ctx.fillRect(
-                        enemy.x - healthBarWidth / 2,
-                        enemy.y - enemy.height / 2 - 8,
-                        healthBarWidth,
-                        healthBarHeight
-                    );
-
-                    ctx.fillStyle = healthPercent > 0.5 ? '#00ff88' : '#ff6b00';
-                    ctx.fillRect(
-                        enemy.x - healthBarWidth / 2,
-                        enemy.y - enemy.height / 2 - 8,
-                        healthBarWidth * healthPercent,
-                        healthBarHeight
-                    );
-                }
-
-                ctx.restore();
-            });
-
-            // Частицы
-            particles.forEach(particle => {
-                ctx.fillStyle = `${particle.color}${Math.floor(particle.life * 255).toString(16).padStart(2, '0')}`;
-                ctx.fillRect(particle.x, particle.y, 4, 4);
-            });
-        }
-
-        function gameLoop() {
-            if (gameRunning) {
-                update();
-                draw();
-                requestAnimationFrame(gameLoop);
-            }
-        }
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            player.x = canvas.width / 2;
         });
-    </script>
+
+        // Враги
+        enemies.forEach(e=>{
+            ctx.save();
+            if (custom.glow) { ctx.shadowBlur=14; ctx.shadowColor='#ff0066'; }
+            const eg=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.hw);
+            eg.addColorStop(0,'#ff2080'); eg.addColorStop(1,'#880033');
+            ctx.fillStyle=eg;
+            ctx.beginPath();
+            // Форма — шестиугольник
+            for (let a=0;a<6;a++) {
+                const ang=(a/6)*Math.PI*2 - Math.PI/6;
+                const px=e.x+Math.cos(ang)*e.hw;
+                const py=e.y+Math.sin(ang)*e.hh;
+                a===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+            }
+            ctx.closePath(); ctx.fill();
+
+            // HP-полоска
+            if (e.hp < e.maxHp) {
+                const bw=e.hw*2, bh=4, by=e.y-e.hh-8;
+                ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(e.x-e.hw, by, bw, bh);
+                const pct=e.hp/e.maxHp;
+                ctx.fillStyle=pct>.5?'#00ff88':'#ff6b00';
+                ctx.fillRect(e.x-e.hw, by, bw*pct, bh);
+            }
+            ctx.restore();
+        });
+
+        // Частицы
+        particles.forEach(p=>{
+            const hex=Math.floor(p.life*255).toString(16).padStart(2,'0');
+            ctx.fillStyle=p.color+hex;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        });
+
+        // Визуальный указатель под пальцем
+        if (touching) {
+            const sc2 = COLORS.ship[custom.shipColor];
+            ctx.save();
+            ctx.strokeStyle = sc2.a+'66';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4,4]);
+            ctx.beginPath();
+            ctx.moveTo(player.targetX, player.y - player.h/2 - 10);
+            ctx.lineTo(player.targetX, player.y - player.h/2 - 30);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    //  GAME LOOP
+    // ═══════════════════════════════════════════
+    function loop() {
+        if (!gameRunning) return;
+        update(); draw();
+        requestAnimationFrame(loop);
+    }
+
+    // ═══════════════════════════════════════════
+    //  КОНЕЦ ИГРЫ
+    // ═══════════════════════════════════════════
+    function endGame() {
+        gameRunning = false;
+        if (score > bestScore) { bestScore=score; localStorage.setItem('bestScore',bestScore); }
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('finalLevel').textContent = level;
+        document.getElementById('bestScore').textContent  = bestScore;
+        show('gameOver');
+        if (tg?.initDataUnsafe?.user) {
+            tg.sendData(JSON.stringify({score,level,difficulty,userId:tg.initDataUnsafe.user.id}));
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    //  UI
+    // ═══════════════════════════════════════════
+    function updateUI() {
+        document.getElementById('score').textContent = score;
+        document.getElementById('lives').textContent = lives;
+        document.getElementById('level').textContent = level;
+        const threshold = 200*(level*.5+.5);
+        document.getElementById('levelProgress').style.width = Math.min(100, levelProgress/threshold*100)+'%';
+    }
+
+    window.addEventListener('resize', () => {
+        canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+        player.x = player.targetX = canvas.width/2;
+    });
+</script>
 </body>
 </html>
