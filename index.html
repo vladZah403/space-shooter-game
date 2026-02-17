@@ -29,9 +29,9 @@
 
         #ui {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             z-index: 10;
             pointer-events: none;
         }
@@ -39,22 +39,22 @@
         .stat-card {
             background: rgba(13, 27, 42, 0.9);
             border: 2px solid rgba(0, 255, 136, 0.3);
-            border-radius: 12px;
-            padding: 8px 16px;
+            border-radius: 8px;
+            padding: 6px 10px;
             backdrop-filter: blur(10px);
             box-shadow: 0 4px 20px rgba(0, 255, 136, 0.2);
         }
 
         .stat-label {
-            font-size: 11px;
+            font-size: 9px;
             color: rgba(0, 255, 136, 0.7);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 2px;
+            letter-spacing: 0.5px;
+            margin-bottom: 1px;
         }
 
         .stat-value {
-            font-size: 20px;
+            font-size: 16px;
             font-weight: bold;
             color: #00ff88;
             text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
@@ -72,48 +72,53 @@
             justify-content: center;
             z-index: 30;
             backdrop-filter: blur(10px);
+            overflow-y: auto;
+            padding: 15px;
         }
 
         .game-card {
             background: linear-gradient(135deg, rgba(13, 27, 42, 0.98), rgba(26, 10, 46, 0.98));
             border: 2px solid rgba(0, 255, 136, 0.3);
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 500px;
-            width: 90%;
+            border-radius: 15px;
+            padding: 20px 15px;
+            max-width: 400px;
+            width: 100%;
             box-shadow: 0 10px 50px rgba(0, 255, 136, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .game-title {
-            font-size: 48px;
+            font-size: 32px;
             font-weight: bold;
             background: linear-gradient(135deg, #00ff88, #00d4ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             animation: pulse 2s infinite;
+            line-height: 1.2;
         }
 
         .game-subtitle {
             color: rgba(0, 255, 136, 0.7);
             text-align: center;
-            margin-bottom: 30px;
-            font-size: 14px;
-            letter-spacing: 2px;
+            margin-bottom: 20px;
+            font-size: 11px;
+            letter-spacing: 1.5px;
         }
 
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
         }
 
         .difficulty-card {
             background: rgba(13, 27, 42, 0.6);
             border: 2px solid rgba(0, 255, 136, 0.2);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
@@ -131,14 +136,14 @@
             transition: left 0.5s;
         }
 
-        .difficulty-card:hover::before {
+        .difficulty-card:active::before {
             left: 100%;
         }
 
-        .difficulty-card:hover {
+        .difficulty-card:active {
             border-color: #00ff88;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.3);
+            transform: scale(0.98);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.3);
         }
 
         .difficulty-card.selected {
@@ -147,20 +152,22 @@
         }
 
         .difficulty-icon {
-            font-size: 32px;
-            margin-right: 15px;
+            font-size: 28px;
+            margin-right: 12px;
+            flex-shrink: 0;
         }
 
         .difficulty-name {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
             color: #00ff88;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .difficulty-description {
-            font-size: 13px;
+            font-size: 11px;
             color: rgba(255, 255, 255, 0.7);
+            line-height: 1.3;
         }
 
         .btn-game {
@@ -168,53 +175,50 @@
             border: none;
             color: #0a0a1a;
             font-weight: bold;
-            font-size: 18px;
-            padding: 15px 40px;
+            font-size: 16px;
+            padding: 12px 30px;
             border-radius: 50px;
             cursor: pointer;
             transition: all 0.3s ease;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1.5px;
             box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
         }
 
-        .btn-game:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(0, 255, 136, 0.6);
-        }
-
         .btn-game:active {
-            transform: translateY(0);
+            transform: scale(0.95);
         }
 
         .btn-secondary-game {
             background: rgba(13, 27, 42, 0.8);
             border: 2px solid rgba(0, 255, 136, 0.5);
             color: #00ff88;
+            font-size: 14px;
+            padding: 10px 25px;
         }
 
-        .btn-secondary-game:hover {
+        .btn-secondary-game:active {
             background: rgba(0, 255, 136, 0.1);
         }
 
         #controls {
             position: absolute;
-            bottom: 30px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 20px;
+            gap: 15px;
             z-index: 10;
         }
 
         .control-btn {
-            width: 70px;
-            height: 70px;
-            background: rgba(13, 27, 42, 0.8);
+            width: 65px;
+            height: 65px;
+            background: rgba(13, 27, 42, 0.85);
             border: 2px solid rgba(0, 255, 136, 0.5);
             border-radius: 50%;
             color: #00ff88;
-            font-size: 28px;
+            font-size: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -227,32 +231,32 @@
 
         .control-btn:active {
             background: rgba(0, 255, 136, 0.3);
-            transform: scale(0.95);
+            transform: scale(0.92);
             box-shadow: 0 2px 10px rgba(0, 255, 136, 0.5);
         }
 
         .score-row {
             background: rgba(13, 27, 42, 0.8);
             border: 2px solid rgba(0, 255, 136, 0.2);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 10px;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
         }
 
         .score-label {
-            font-size: 14px;
+            font-size: 12px;
             color: rgba(0, 255, 136, 0.7);
         }
 
         .score-value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             color: #00ff88;
             text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
 
         .progress {
-            height: 8px;
+            height: 6px;
             background: rgba(13, 27, 42, 0.8);
             border-radius: 10px;
             overflow: hidden;
@@ -263,17 +267,63 @@
             transition: width 0.3s ease;
         }
 
-        @media (max-width: 576px) {
+        /* Оптимизация для маленьких экранов */
+        @media (max-height: 700px) {
+            .game-card {
+                padding: 15px 12px;
+            }
+
             .game-title {
-                font-size: 36px;
+                font-size: 28px;
+                margin-bottom: 3px;
             }
+
+            .game-subtitle {
+                font-size: 10px;
+                margin-bottom: 15px;
+            }
+
+            .difficulty-card {
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+
             .difficulty-name {
-                font-size: 20px;
+                font-size: 16px;
             }
-            .control-btn {
-                width: 60px;
-                height: 60px;
+
+            .difficulty-description {
+                font-size: 10px;
+            }
+
+            .difficulty-icon {
                 font-size: 24px;
+            }
+
+            .btn-game {
+                font-size: 14px;
+                padding: 10px 25px;
+            }
+
+            .btn-secondary-game {
+                font-size: 12px;
+                padding: 8px 20px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .control-btn {
+                width: 55px;
+                height: 55px;
+                font-size: 22px;
+            }
+
+            .stat-value {
+                font-size: 14px;
+            }
+
+            .stat-label {
+                font-size: 8px;
             }
         }
     </style>
@@ -282,7 +332,7 @@
     <!-- Экран выбора сложности -->
     <div id="difficultyScreen">
         <div class="game-card">
-            <h1 class="game-title">🚀 SPACE SHOOTER</h1>
+            <h1 class="game-title">🚀 SPACE<br>SHOOTER</h1>
             <p class="game-subtitle">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
 
             <div class="difficulty-card" data-difficulty="easy">
@@ -291,7 +341,7 @@
                     <div class="flex-grow-1">
                         <div class="difficulty-name">Легко</div>
                         <div class="difficulty-description">
-                            Медленные враги • Больше здоровья • Идеально для начинающих
+                            Медленные враги • 5 жизней
                         </div>
                     </div>
                 </div>
@@ -303,7 +353,7 @@
                     <div class="flex-grow-1">
                         <div class="difficulty-name">Нормально</div>
                         <div class="difficulty-description">
-                            Сбалансированный геймплей • Стандартная сложность
+                            Сбалансированная игра • 3 жизни
                         </div>
                     </div>
                 </div>
@@ -315,7 +365,7 @@
                     <div class="flex-grow-1">
                         <div class="difficulty-name">Сложно</div>
                         <div class="difficulty-description">
-                            Быстрые враги • Меньше жизней • Для опытных игроков
+                            Быстрые враги • 2 жизни
                         </div>
                     </div>
                 </div>
@@ -327,7 +377,7 @@
                     <div class="flex-grow-1">
                         <div class="difficulty-name">Кошмар</div>
                         <div class="difficulty-description">
-                            Экстремальная сложность • Только для мастеров • Удачи!
+                            Экстремально • 1 жизнь • Удачи!
                         </div>
                     </div>
                 </div>
@@ -373,7 +423,7 @@
     <!-- Экран Game Over -->
     <div id="gameOver" style="display: none;">
         <div class="game-card text-center">
-            <h1 class="game-title mb-4">GAME OVER</h1>
+            <h1 class="game-title mb-3">GAME OVER</h1>
 
             <div class="score-row mb-2">
                 <div class="score-label">Ваш счет</div>
@@ -385,7 +435,7 @@
                 <div class="score-value" id="finalLevel">1</div>
             </div>
 
-            <div class="score-row mb-4">
+            <div class="score-row mb-3">
                 <div class="score-label">
                     <i class="bi bi-trophy-fill text-warning"></i> Лучший счет
                 </div>
@@ -397,7 +447,7 @@
                     <i class="bi bi-arrow-clockwise"></i> ИГРАТЬ СНОВА
                 </button>
                 <button class="btn btn-game btn-secondary-game" id="changeDifficultyBtn">
-                    <i class="bi bi-gear-fill"></i> ИЗМЕНИТЬ СЛОЖНОСТЬ
+                    <i class="bi bi-gear-fill"></i> СЛОЖНОСТЬ
                 </button>
             </div>
         </div>
@@ -484,7 +534,6 @@
         const enemies = [];
         const stars = [];
         const particles = [];
-        const powerups = [];
 
         let leftPressed = false;
         let rightPressed = false;
@@ -523,11 +572,11 @@
         });
 
         // Звездное поле
-        for (let i = 0; i < 150; i++) {
+        for (let i = 0; i < 100; i++) {
             stars.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                size: Math.random() * 2.5,
+                size: Math.random() * 2,
                 speed: Math.random() * 2 + 0.5,
                 opacity: Math.random() * 0.5 + 0.5
             });
@@ -579,7 +628,6 @@
             bullets.length = 0;
             enemies.length = 0;
             particles.length = 0;
-            powerups.length = 0;
             player.x = canvas.width / 2;
             updateUI();
             gameLoop();
@@ -771,13 +819,13 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Звезды с мерцанием
+            // Звезды
             stars.forEach(star => {
                 ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
                 ctx.fillRect(star.x, star.y, star.size, star.size);
             });
 
-            // Игрок с градиентом
+            // Игрок
             ctx.save();
             ctx.shadowBlur = 20;
             ctx.shadowColor = '#00ff88';
@@ -799,7 +847,7 @@
             ctx.fill();
             ctx.restore();
 
-            // Пули с эффектом
+            // Пули
             bullets.forEach(bullet => {
                 ctx.save();
                 ctx.shadowBlur = 15;
@@ -822,7 +870,7 @@
                 ctx.restore();
             });
 
-            // Враги с полоской здоровья
+            // Враги
             enemies.forEach(enemy => {
                 ctx.save();
                 ctx.shadowBlur = 15;
@@ -869,7 +917,7 @@
                 ctx.restore();
             });
 
-            // Частицы взрывов
+            // Частицы
             particles.forEach(particle => {
                 ctx.fillStyle = `${particle.color}${Math.floor(particle.life * 255).toString(16).padStart(2, '0')}`;
                 ctx.fillRect(particle.x, particle.y, 4, 4);
