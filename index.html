@@ -72,7 +72,8 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 
 /* ── BOSS BAR ── */
 #bossBar{position:absolute;bottom:72px;left:10px;right:10px;z-index:10;display:none;pointer-events:none}
-.boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink)}
+.boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink);animation:bossNamePulse 1.5s infinite}
+@keyframes bossNamePulse{0%,100%{opacity:1;text-shadow:0 0 10px var(--pink)}50%{opacity:.7;text-shadow:0 0 20px var(--pink),0 0 40px var(--pink)}}
 .boss-track{height:8px;background:rgba(255,0,102,.1);border-radius:6px;border:1px solid rgba(255,0,102,.3);overflow:hidden}
 #bossFill{height:100%;background:linear-gradient(90deg,var(--pink),#ff6b00);border-radius:6px;transition:width .3s;box-shadow:0 0 8px rgba(255,0,102,.6)}
 
@@ -273,7 +274,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 
 <!-- Boss bar -->
 <div id="bossBar">
-  <div class="boss-lbl">👾 BOSS</div>
+  <div class="boss-lbl">👾 <span id="bossName">BOSS</span></div>
   <div class="boss-track"><div id="bossFill" style="width:100%"></div></div>
 </div>
 
@@ -992,19 +993,370 @@ function shoot(){
 }
 
 // ════════════════════════════════════════════════════
-// BOSS
+// BOSS DEFINITIONS — 5 уникальных боссов
 // ════════════════════════════════════════════════════
+const BOSS_TYPES = [
+  // 0 — СТРАЖ (уровень 5): классика, 3 снаряда веером
+  {
+    id:'guardian', name:'⚔️ СТРАЖ', color:'#ff0066',
+    hw:55, hh:45,
+    init(b){ b.dir=1; b.shootTimer=0; b.phase=0; },
+    update(b,dt){
+      b.x+=b.sp*b.dir;
+      if(b.x>canvas.width-b.hw||b.x<b.hw) b.dir*=-1;
+      if(b.y<120) b.y+=1.8;
+      b.shootTimer-=dt;
+      if(b.shootTimer<=0){
+        b.shootTimer = Math.max(700, 1600-level*70);
+        // 3-снарядный веер
+        for(let a=-1;a<=1;a++){
+          spawnBossShot(b.x+a*20, b.y+b.hh, a*.7, 3+level*.05, '#ff0066', 8);
+        }
+      }
+    },
+    draw(b,ctx,animT){
+      const col='#ff0066';
+      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
+      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
+      ctx.fillStyle=eg; ctx.beginPath();
+      ctx.moveTo(0,-b.hh); ctx.lineTo(-b.hw*.7,-b.hh*.3); ctx.lineTo(-b.hw,b.hh);
+      ctx.lineTo(-b.hw*.3,b.hh*.4); ctx.lineTo(0,b.hh*.7);
+      ctx.lineTo(b.hw*.3,b.hh*.4); ctx.lineTo(b.hw,b.hh); ctx.lineTo(b.hw*.7,-b.hh*.3);
+      ctx.closePath(); ctx.fill();
+      // Глаза
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-b.hw*.3,-b.hh*.1,4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.hw*.3,-b.hh*.1,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f00'; ctx.beginPath(); ctx.arc(-b.hw*.3,-b.hh*.1,2,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.hw*.3,-b.hh*.1,2,0,Math.PI*2); ctx.fill();
+    }
+  },
+
+  // 1 — СНАЙПЕР (уровень 10): наводится на игрока, стреляет точно
+  {
+    id:'sniper', name:'🎯 СНАЙПЕР', color:'#ff9900',
+    hw:45, hh:55,
+    init(b){ b.dir=1; b.shootTimer=0; b.chargeTimer=0; b.charging=false; b.aimX=0; b.aimY=0; },
+    update(b,dt){
+      // Медленно дрейфует по горизонтали
+      b.x += Math.sin(Date.now()/1200)*1.2;
+      b.x = Math.max(b.hw, Math.min(canvas.width-b.hw, b.x));
+      if(b.y<100) b.y+=1.2;
+      b.shootTimer-=dt;
+      if(b.shootTimer<=0 && !b.charging){
+        // Начать зарядку — прицел фиксируется на игроке
+        b.charging=true; b.chargeTimer=900;
+        b.aimX=player.x; b.aimY=player.y;
+      }
+      if(b.charging){
+        b.chargeTimer-=dt;
+        if(b.chargeTimer<=0){
+          b.charging=false;
+          b.shootTimer = Math.max(1000, 2200-level*90);
+          // Мощный снаряд точно в зафиксированную позицию
+          const dx=b.aimX-b.x, dy=b.aimY-b.y, dist=Math.max(Math.hypot(dx,dy),1);
+          const spd=7+level*.2;
+          spawnBossShot(b.x, b.y+b.hh, dx/dist*spd, dy/dist*spd, '#ff9900', 12);
+          spawnBossShot(b.x-10, b.y+b.hh, dx/dist*(spd*.9), dy/dist*(spd*.9)+'', '#ff9900', 7);
+          spawnBossShot(b.x+10, b.y+b.hh, dx/dist*(spd*.9), dy/dist*(spd*.9), '#ff9900', 7);
+        }
+      }
+    },
+    draw(b,ctx,animT){
+      const col='#ff9900';
+      // Тонкий угловатый корпус
+      ctx.fillStyle=ctx.createRadialGradient(0,0,0,0,0,b.hw);
+      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
+      eg.addColorStop(0,col+'ff'); eg.addColorStop(.5,col+'99'); eg.addColorStop(1,col+'11');
+      ctx.fillStyle=eg;
+      ctx.beginPath();
+      ctx.moveTo(0,-b.hh); ctx.lineTo(-b.hw*.4,-b.hh*.2);
+      ctx.lineTo(-b.hw,0); ctx.lineTo(-b.hw*.4,b.hh*.3);
+      ctx.lineTo(0,b.hh); ctx.lineTo(b.hw*.4,b.hh*.3);
+      ctx.lineTo(b.hw,0); ctx.lineTo(b.hw*.4,-b.hh*.2);
+      ctx.closePath(); ctx.fill();
+      // Центральный глаз / прицел
+      const eyeR = b.charging ? 10+5*Math.sin(animT*8) : 7;
+      ctx.fillStyle = b.charging ? '#ffffff' : col+'99';
+      ctx.beginPath(); ctx.arc(0,0,eyeR,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,eyeR+4,0,Math.PI*2); ctx.stroke();
+      // Лазерный прицел во время зарядки
+      if(b.charging){
+        ctx.save(); ctx.globalAlpha=.5;
+        ctx.strokeStyle='#ff9900'; ctx.lineWidth=1;
+        ctx.setLineDash([4,6]);
+        ctx.beginPath(); ctx.moveTo(0,b.hh); ctx.lineTo(b.aimX-b.x, b.aimY-b.y); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+      }
+      // Боковые пушки
+      [-b.hw*.8,b.hw*.8].forEach(ox=>{
+        ctx.fillStyle=col+'88';
+        ctx.beginPath(); ctx.roundRect(ox-5,-6,10,20,3); ctx.fill();
+      });
+    }
+  },
+
+  // 2 — ОСЬМИНОГ (уровень 15): спавнит миниврагов, щупальца
+  {
+    id:'octopus', name:'🐙 ОСЬМИНОГ', color:'#a855f7',
+    hw:60, hh:50,
+    init(b){ b.spawnTimer=0; b.shootTimer=0; b.tentacleAngle=0; b.phase=0; },
+    update(b,dt){
+      // Синусоидальное движение
+      b.x = canvas.width/2 + Math.sin(Date.now()/900)*(canvas.width*.35);
+      if(b.y<110) b.y+=1.5;
+      b.tentacleAngle += dt*.003;
+      b.spawnTimer-=dt;
+      if(b.spawnTimer<=0){
+        b.spawnTimer = Math.max(1500, 4000-level*100);
+        // Спавнит маленького врага рядом с боссом
+        if(enemies.filter(e=>!e.isBoss).length < 8){
+          enemies.push({x:b.x+(Math.random()-.5)*80,y:b.y+20,hw:10,hh:10,sp:2,hp:1,maxHp:1,type:'fast',zigAngle:0,isBoss:false});
+        }
+      }
+      b.shootTimer-=dt;
+      if(b.shootTimer<=0){
+        b.shootTimer = Math.max(500, 1200-level*50);
+        // 8 снарядов по кругу
+        for(let i=0;i<8;i++){
+          const ang = (i/8)*Math.PI*2 + b.tentacleAngle;
+          spawnBossShot(b.x, b.y, Math.cos(ang)*2.5, Math.sin(ang)*2.5, '#a855f7', 7);
+        }
+      }
+    },
+    draw(b,ctx,animT){
+      const col='#a855f7';
+      // Тело
+      ctx.fillStyle=ctx.createRadialGradient(0,0,0,0,0,b.hw);
+      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
+      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'bb'); eg.addColorStop(1,col+'11');
+      ctx.fillStyle=eg;
+      ctx.beginPath(); ctx.arc(0,0,b.hw*.7,0,Math.PI*2); ctx.fill();
+      // Щупальца
+      for(let i=0;i<8;i++){
+        const ang = (i/8)*Math.PI*2 + b.tentacleAngle;
+        const len = b.hw*.9 + 10*Math.sin(animT*3+i);
+        ctx.save();
+        ctx.strokeStyle=col+'99'; ctx.lineWidth=4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(ang)*b.hw*.5, Math.sin(ang)*b.hw*.5);
+        ctx.quadraticCurveTo(
+          Math.cos(ang+.4)*len*.6, Math.sin(ang+.4)*len*.6,
+          Math.cos(ang)*len, Math.sin(ang)*len
+        );
+        ctx.stroke(); ctx.restore();
+      }
+      // Глаза
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-12,-8,6,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(12,-8,6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#6600ff'; ctx.beginPath(); ctx.arc(-12,-8,3,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(12,-8,3,0,Math.PI*2); ctx.fill();
+    }
+  },
+
+  // 3 — ДРЕДНОУТ (уровень 20): огромный, медленный, стреляет лазерными балками
+  {
+    id:'dreadnought', name:'🛸 ДРЕДНОУТ', color:'#00d4ff',
+    hw:75, hh:55,
+    init(b){ b.dir=.5; b.shootTimer=0; b.laserChargeTimer=0; b.laserFiring=false; b.laserDuration=0; b.laserX=0; },
+    update(b,dt){
+      b.x+=b.sp*.5*b.dir;
+      if(b.x>canvas.width-b.hw||b.x<b.hw) b.dir*=-1;
+      if(b.y<90) b.y+=1;
+      // Лазерная атака
+      b.shootTimer-=dt;
+      if(b.shootTimer<=0 && !b.laserFiring){
+        b.shootTimer = Math.max(800, 3000-level*80);
+        b.laserChargeTimer=600;
+        b.laserX=player.x; // фиксируем X
+      }
+      if(b.laserChargeTimer>0){
+        b.laserChargeTimer-=dt;
+        if(b.laserChargeTimer<=0){
+          b.laserFiring=true;
+          b.laserDuration=400+level*15;
+          triggerShake(8);
+        }
+      }
+      if(b.laserFiring){
+        b.laserDuration-=dt;
+        // Лазерный луч наносит урон постоянно
+        if(Math.abs(player.x - b.laserX)<18){
+          if(activePowerups.shield>0){ activePowerups.shield=0; notify('🛡️ ЩИТ СЛОМАН'); updatePowerupBar(); }
+          else { lives--; updateHUD(); if(lives<=0) endGame(); }
+          b.laserX = player.x + (Math.random()-.5)*60; // небольшой сдвиг после попадания
+        }
+        if(b.laserDuration<=0) b.laserFiring=false;
+        // Редкие боковые снаряды
+        if(Math.random()<.02) spawnBossShot(b.x+(Math.random()-.5)*b.hw*1.5, b.y+b.hh, (Math.random()-.5)*2, 2.5+level*.04, '#00d4ff', 8);
+      }
+    },
+    draw(b,ctx,animT){
+      const col='#00d4ff';
+      // Корпус
+      ctx.fillStyle='#001122';
+      ctx.beginPath(); ctx.roundRect(-b.hw,-b.hh,b.hw*2,b.hh*2,10); ctx.fill();
+      // Панели
+      const eg=ctx.createLinearGradient(-b.hw,-b.hh,b.hw,b.hh);
+      eg.addColorStop(0,col+'66'); eg.addColorStop(.5,col+'33'); eg.addColorStop(1,col+'66');
+      ctx.fillStyle=eg;
+      ctx.beginPath(); ctx.roundRect(-b.hw,-b.hh,b.hw*2,b.hh*2,10); ctx.fill();
+      // Детали корпуса
+      ctx.strokeStyle=col+'55'; ctx.lineWidth=1.5;
+      for(let i=-2;i<=2;i++){
+        ctx.beginPath(); ctx.moveTo(i*b.hw*.35,-b.hh); ctx.lineTo(i*b.hw*.35,b.hh); ctx.stroke();
+      }
+      // Двигатели
+      [-b.hw*.6,-b.hw*.2,b.hw*.2,b.hw*.6].forEach(ox=>{
+        const glow=ctx.createRadialGradient(ox,b.hh,0,ox,b.hh,10);
+        glow.addColorStop(0,col+'ff'); glow.addColorStop(1,'transparent');
+        ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(ox,b.hh,10+3*Math.sin(animT*5+ox),0,Math.PI*2); ctx.fill();
+      });
+      // Лазерная пушка
+      ctx.fillStyle=b.laserChargeTimer>0||b.laserFiring?'#ffffff':col+'88';
+      ctx.beginPath(); ctx.arc(0,b.hh*.4,8,0,Math.PI*2); ctx.fill();
+      // Лазерный луч
+      if(b.laserFiring){
+        const lx=b.laserX-b.x;
+        ctx.save(); ctx.globalAlpha=.7+.3*Math.sin(animT*20);
+        const lg=ctx.createLinearGradient(lx,b.hh*.4,lx,canvas.height);
+        lg.addColorStop(0,'#ffffff'); lg.addColorStop(.1,col); lg.addColorStop(1,col+'00');
+        ctx.fillStyle=lg; ctx.fillRect(lx-6, b.hh*.4, 12, canvas.height);
+        ctx.restore();
+      }
+      // Прицел лазера
+      if(b.laserChargeTimer>0){
+        const lx=b.laserX-b.x;
+        ctx.save(); ctx.globalAlpha=.4*(1-b.laserChargeTimer/600)*2;
+        ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.moveTo(lx,b.hh*.4); ctx.lineTo(lx,canvas.height); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+      }
+    }
+  },
+
+  // 4 — ФЕНИКС (уровень 25+): возрождается 1 раз, меняет фазу
+  {
+    id:'phoenix', name:'🔥 ФЕНИКС', color:'#ff4400',
+    hw:58, hh:52,
+    init(b){ b.dir=1; b.shootTimer=0; b.orbAngle=0; b.orbits=[]; b.reborn=false; b.phase=1;
+      // Создаём орбитальные снаряды
+      b.orbits=[0,1,2].map(i=>({angle:i/3*Math.PI*2, dist:90+i*15}));
+    },
+    update(b,dt){
+      // Фигура-8 движение
+      const t=Date.now()/1500;
+      b.x = canvas.width/2 + Math.sin(t)*(canvas.width*.3);
+      if(b.y<100) b.y+=1.5; else b.y=100 + Math.sin(t*1.3)*20;
+      b.orbAngle += dt*.0025;
+      // Орбитальные снаряды движутся вокруг и дамажат игрока
+      b.orbits.forEach(o=>{
+        o.angle += dt*.002;
+        const ox=b.x+Math.cos(o.angle)*o.dist;
+        const oy=b.y+Math.sin(o.angle)*o.dist;
+        if(Math.hypot(ox-player.x,oy-player.y)<20){
+          if(activePowerups.shield>0){ activePowerups.shield=0; notify('🛡️ ЩИТ СЛОМАН'); updatePowerupBar(); }
+          else { lives--; updateHUD(); if(lives<=0) endGame(); }
+          o.angle+=Math.PI; // отскок
+        }
+      });
+      b.shootTimer-=dt;
+      if(b.shootTimer<=0){
+        b.shootTimer = Math.max(600, 1400-level*60);
+        if(b.phase===1){
+          // Спираль
+          for(let i=0;i<5;i++){
+            const ang=b.orbAngle+i/5*Math.PI*2;
+            spawnBossShot(b.x, b.y, Math.cos(ang)*2.8, Math.sin(ang)*2.8, '#ff4400', 9);
+          }
+        } else {
+          // Фаза 2 (после возрождения): агрессивнее — 10 снарядов
+          for(let i=0;i<10;i++){
+            const ang=b.orbAngle+i/10*Math.PI*2;
+            spawnBossShot(b.x, b.y, Math.cos(ang)*3.5, Math.sin(ang)*3.5, '#ffaa00', 8);
+          }
+        }
+      }
+      // Возрождение при 0 HP происходит в killEnemy
+    },
+    draw(b,ctx,animT){
+      const col = b.phase===2 ? '#ffaa00' : '#ff4400';
+      // Крылья
+      for(let side of [-1,1]){
+        ctx.save();
+        ctx.fillStyle=col+(b.phase===2?'cc':'88');
+        ctx.beginPath();
+        ctx.moveTo(0,-b.hh*.2);
+        ctx.quadraticCurveTo(side*b.hw*.8,-b.hh*.8, side*b.hw*1.1,-b.hh*.1);
+        ctx.quadraticCurveTo(side*b.hw*.7, b.hh*.5, 0,b.hh*.3);
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      // Тело
+      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw*.55);
+      eg.addColorStop(0,col+'ff'); eg.addColorStop(.5,col+'cc'); eg.addColorStop(1,col+'22');
+      ctx.fillStyle=eg;
+      ctx.beginPath(); ctx.arc(0,0,b.hw*.55,0,Math.PI*2); ctx.fill();
+      // Хвостовые перья
+      for(let i=-2;i<=2;i++){
+        ctx.save(); ctx.translate(i*10, b.hh*.4);
+        const fl=ctx.createLinearGradient(0,0,0,25+10*Math.sin(animT*4+i));
+        fl.addColorStop(0,col+'cc'); fl.addColorStop(1,'transparent');
+        ctx.fillStyle=fl;
+        ctx.beginPath(); ctx.moveTo(-4,0); ctx.lineTo(4,0); ctx.lineTo(0,25+10*Math.sin(animT*4+i)); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      // Орбитальные шары
+      b.orbits.forEach(o=>{
+        const ox=Math.cos(o.angle)*o.dist, oy=Math.sin(o.angle)*o.dist;
+        ctx.save();
+        ctx.shadowBlur=15; ctx.shadowColor=col;
+        ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ox,oy,7,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      });
+      // Глаз
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,-8,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.phase===2?'#ff8800':'#cc2200';
+      ctx.beginPath(); ctx.arc(0,-8,4,0,Math.PI*2); ctx.fill();
+    }
+  },
+];
+
+// Вспомогательная функция — спавн снаряда босса
+function spawnBossShot(x, y, vx, vy, color, size){
+  if(particles.length >= MAX_PARTICLES) return;
+  particles.push({x,y,vx,vy,life:1,decay:.005,color,bossShot:true,wave:false,size});
+}
+
+// Выбор типа босса по уровню
+function getBossType(){
+  if(level>=25) return BOSS_TYPES[4]; // Феникс
+  if(level>=20) return BOSS_TYPES[3]; // Дредноут
+  if(level>=15) return BOSS_TYPES[2]; // Осьминог
+  if(level>=10) return BOSS_TYPES[1]; // Снайпер
+  return BOSS_TYPES[0];               // Страж
+}
+
 function spawnBoss(){
   bossActive=true;
   const cfg=DIFF[difficulty];
-  // Better HP scaling: capped growth
+  const btype=getBossType();
   const hp = Math.floor((30 + level*10 + Math.sqrt(level)*20) * cfg.bossHpMult);
-  bossEnemy={x:canvas.width/2,y:-80,w:80,h:60,hw:55,hh:45,sp:1+level*.08,hp,maxHp:hp,dir:1,shootTimer:0,isBoss:true};
+  bossEnemy={
+    x:canvas.width/2, y:-80,
+    hw:btype.hw, hh:btype.hh,
+    sp:1+level*.07,
+    hp, maxHp:hp,
+    isBoss:true,
+    bossType:btype,
+    bossId:btype.id,
+  };
+  btype.init(bossEnemy);
   enemies.push(bossEnemy);
   document.getElementById('bossBar').style.display='block';
-  notify('👾 BOSS!','boss');
+  document.getElementById('bossName').textContent=btype.name;
+  notify(btype.name+' ПОЯВИЛСЯ!','boss');
   playSound('boss');
-  triggerShake(12);
+  triggerShake(14);
 }
 
 // ════════════════════════════════════════════════════
@@ -1128,22 +1480,13 @@ function update(dt){
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i];
     if(e.isBoss){
-      e.x+=e.sp*e.dir;
-      if(e.x>canvas.width-e.hw||e.x<e.hw) e.dir*=-1;
-      if(e.y<120) e.y+=1.5;
-      e.shootTimer-=dt;
-      if(e.shootTimer<=0){
-        e.shootTimer = Math.max(800, 1800-level*80);
-        for(let a=-1;a<=1;a++){
-          particles.push({x:e.x+a*20,y:e.y+e.hh,vx:a*.6,vy:3+level*.05,life:1,decay:.007,color:'#ff0066',bossShot:true,wave:false,size:8});
-        }
-      }
+      e.bossType.update(e, dt);
       document.getElementById('bossFill').style.width=(e.hp/e.maxHp*100)+'%';
     }else{
       e.y+=e.sp;
       if(e.type==='zigzag'){ e.zigAngle+=.08; e.x+=Math.sin(e.zigAngle)*3; }
     }
-    if(e.y>canvas.height+30){
+    if(e.y>canvas.height+80){
       if(e.isBoss){ bossActive=false; bossEnemy=null; document.getElementById('bossBar').style.display='none'; }
       else { lives--; updateHUD(); if(lives<=0){endGame();return;} }
       enemies.splice(i,1);
@@ -1227,13 +1570,23 @@ function killEnemy(j, cfg){
   const e=enemies[j];
   if(!e) return;
   if(e.isBoss){
-    explode(e.x,e.y,'#ff0066',60); triggerShake(18); playSound('explode');
+    // Феникс — возрождается один раз
+    if(e.bossId==='phoenix' && !e.reborn){
+      e.reborn=true; e.phase=2;
+      e.hp=Math.floor(e.maxHp*.6);
+      explode(e.x,e.y,'#ff4400',40); triggerShake(14); playSound('explode');
+      notify('🔥 ФЕНИКС ВОЗРОЖДАЕТСЯ!','boss');
+      // Орбитальные шары ускоряются
+      return; // не умирает
+    }
+    const col=e.bossType.color;
+    explode(e.x,e.y,col,60); triggerShake(20); playSound('explode');
     bossActive=false; bossEnemy=null; document.getElementById('bossBar').style.display='none';
     bossesKilled++;
     const pts = 500*level;
     score+=pts; levelProgress+=pts;
     LS.set('totalBosses',(+LS.get('totalBosses',0))+1);
-    notify('👾 BOSS DOWN! +'+pts,'boss');
+    notify(e.bossType.name+' УНИЧТОЖЕН! +'+pts,'boss');
     checkAch('boss1');
   }else{
     const col=e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':'#ff6b00';
@@ -1248,16 +1601,13 @@ function killEnemy(j, cfg){
   const pts = Math.floor((e.isBoss?500:10)*level*DIFF[difficulty].scoreMult*combo);
   score+=pts; levelProgress+=pts;
 
-  // Currency + XP
   const earnedCoins = Math.floor((e.isBoss?15:1)*level*(combo>5?2:1));
   coins+=earnedCoins;
   addShipXP(Math.floor((e.isBoss?100:10)*level));
   savePersistent();
 
-  // Powerup drop
   if(Math.random()<DIFF[difficulty].powerupRate&&!e.isBoss) spawnPowerup(e.x,e.y);
 
-  // Floating score
   if(combo>1) notify('+'+pts+' x'+combo,'gold');
   else notify('+'+pts,'gold');
 
@@ -1267,7 +1617,6 @@ function killEnemy(j, cfg){
 
   updateHUD();
 
-  // Level threshold — smoother scaling
   const threshold = 150 + level*80 + level*level*5;
   if(levelProgress>=threshold){
     level++; levelProgress=0;
@@ -1417,43 +1766,50 @@ function draw(){
   const animT=Date.now()/400;
   enemies.forEach(e=>{
     ctx.save();
-    const col=e.isBoss?'#ff0066':e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':e.type==='zigzag'?'#ffaa00':'#ff2080';
-    const pulse=e.isBoss?1+.05*Math.sin(animT*2):1+.03*Math.sin(animT+e.x*.01);
-    ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
-    if(custom.glow){ ctx.shadowBlur=e.isBoss?25:14; ctx.shadowColor=col; }
-    const eg=ctx.createRadialGradient(0,0,0,0,0,e.hw);
-    eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
-    ctx.fillStyle=eg; ctx.beginPath();
     if(e.isBoss){
-      ctx.moveTo(0,-e.hh); ctx.lineTo(-e.hw*.7,-e.hh*.3); ctx.lineTo(-e.hw,e.hh);
-      ctx.lineTo(-e.hw*.3,e.hh*.4); ctx.lineTo(0,e.hh*.7);
-      ctx.lineTo(e.hw*.3,e.hh*.4); ctx.lineTo(e.hw,e.hh); ctx.lineTo(e.hw*.7,-e.hh*.3);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-e.hw*.3,-e.hh*.1,4,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(e.hw*.3,-e.hh*.1,4,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#f00'; ctx.beginPath(); ctx.arc(-e.hw*.3,-e.hh*.1,2,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(e.hw*.3,-e.hh*.1,2,0,Math.PI*2); ctx.fill();
-    }else if(e.type==='fast'){
-      ctx.moveTo(0,-e.hh); ctx.lineTo(e.hw,0); ctx.lineTo(0,e.hh); ctx.lineTo(-e.hw,0);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle=col+'88'; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.moveTo(-e.hw*.5,-e.hh*.3); ctx.lineTo(-e.hw*.5,e.hh*.3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(e.hw*.5,-e.hh*.3); ctx.lineTo(e.hw*.5,e.hh*.3); ctx.stroke();
-    }else if(e.type==='tank'){
-      ctx.roundRect(-e.hw,-e.hh,e.hw*2,e.hh*2,6); ctx.fill();
-      ctx.strokeStyle=col+'88'; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.roundRect(-e.hw*.7,-e.hh*.7,e.hw*1.4,e.hh*1.4,4); ctx.stroke();
+      const col=e.bossType.color;
+      const pulse=1+.05*Math.sin(animT*2);
+      ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
+      if(custom.glow){ ctx.shadowBlur=30; ctx.shadowColor=col; }
+      e.bossType.draw(e,ctx,animT);
+      // HP bar for boss (above)
+      if(e.hp<e.maxHp){
+        const bw=e.hw*2,bh=5,by=-e.hh-18;
+        ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(-e.hw,by,bw,bh);
+        const pct=e.hp/e.maxHp;
+        ctx.fillStyle=pct>.5?'#00ff88':pct>.25?'#ff9900':'#ff0066';
+        ctx.fillRect(-e.hw,by,bw*pct,bh);
+      }
     }else{
-      for(let a=0;a<6;a++){ const ang=(a/6)*Math.PI*2-Math.PI/6; ctx.lineTo(Math.cos(ang)*e.hw,Math.sin(ang)*e.hh); }
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle=col+'44'; ctx.beginPath(); ctx.arc(0,0,e.hw*.4,0,Math.PI*2); ctx.fill();
-    }
-    // HP bar
-    if(e.hp<e.maxHp){
-      const bw=e.hw*2,bh=4,by=-e.hh-(e.isBoss?16:8);
-      ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(-e.hw,by,bw,bh);
-      const pct=e.hp/e.maxHp; ctx.fillStyle=pct>.5?'#00ff88':'#ff6b00';
-      ctx.fillRect(-e.hw,by,bw*pct,bh);
+      const col=e.type==='fast'?'#00d4ff':e.type==='tank'?'#a855f7':e.type==='zigzag'?'#ffaa00':'#ff2080';
+      const pulse=1+.03*Math.sin(animT+e.x*.01);
+      ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
+      if(custom.glow){ ctx.shadowBlur=14; ctx.shadowColor=col; }
+      const eg=ctx.createRadialGradient(0,0,0,0,0,e.hw);
+      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
+      ctx.fillStyle=eg; ctx.beginPath();
+      if(e.type==='fast'){
+        ctx.moveTo(0,-e.hh); ctx.lineTo(e.hw,0); ctx.lineTo(0,e.hh); ctx.lineTo(-e.hw,0);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle=col+'88'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(-e.hw*.5,-e.hh*.3); ctx.lineTo(-e.hw*.5,e.hh*.3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(e.hw*.5,-e.hh*.3); ctx.lineTo(e.hw*.5,e.hh*.3); ctx.stroke();
+      }else if(e.type==='tank'){
+        ctx.roundRect(-e.hw,-e.hh,e.hw*2,e.hh*2,6); ctx.fill();
+        ctx.strokeStyle=col+'88'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.roundRect(-e.hw*.7,-e.hh*.7,e.hw*1.4,e.hh*1.4,4); ctx.stroke();
+      }else{
+        for(let a=0;a<6;a++){ const ang=(a/6)*Math.PI*2-Math.PI/6; ctx.lineTo(Math.cos(ang)*e.hw,Math.sin(ang)*e.hh); }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle=col+'44'; ctx.beginPath(); ctx.arc(0,0,e.hw*.4,0,Math.PI*2); ctx.fill();
+      }
+      // HP bar
+      if(e.hp<e.maxHp){
+        const bw=e.hw*2,bh=4,by=-e.hh-8;
+        ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(-e.hw,by,bw,bh);
+        const pct=e.hp/e.maxHp; ctx.fillStyle=pct>.5?'#00ff88':'#ff6b00';
+        ctx.fillRect(-e.hw,by,bw*pct,bh);
+      }
     }
     ctx.restore();
   });
@@ -1461,8 +1817,14 @@ function draw(){
   // Particles & waves
   particles.forEach(p=>{
     if(p.bossShot){
-      ctx.save(); ctx.fillStyle='#ff006688'; ctx.shadowBlur=10; ctx.shadowColor='#ff0066';
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.size/2||4,0,Math.PI*2); ctx.fill(); ctx.restore();
+      ctx.save();
+      ctx.fillStyle=p.color+'aa';
+      ctx.shadowBlur=12; ctx.shadowColor=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,(p.size||8)/2,0,Math.PI*2); ctx.fill();
+      // Inner glow
+      ctx.fillStyle=p.color+'ff';
+      ctx.beginPath(); ctx.arc(p.x,p.y,(p.size||8)/4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
     }else if(p.wave){
       ctx.save(); ctx.globalAlpha=p.life*.5;
       ctx.strokeStyle=p.color; ctx.lineWidth=3; ctx.shadowBlur=15; ctx.shadowColor=p.color;
