@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Space Shooter</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         * {
             margin: 0;
@@ -15,65 +17,184 @@
 
         body {
             overflow: hidden;
-            background: #000;
-            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a0a1a 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             touch-action: none;
         }
 
         #gameCanvas {
             display: block;
-            background: #000;
             touch-action: none;
         }
 
         #ui {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #0f0;
-            font-size: 18px;
-            text-shadow: 0 0 10px #0f0;
+            top: 15px;
+            left: 15px;
+            right: 15px;
             z-index: 10;
             pointer-events: none;
         }
 
-        #gameOver {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            color: #0f0;
-            display: none;
-            z-index: 20;
+        .stat-card {
+            background: rgba(13, 27, 42, 0.9);
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 8px 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.2);
         }
 
-        #gameOver h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 20px #0f0;
+        .stat-label {
+            font-size: 11px;
+            color: rgba(0, 255, 136, 0.7);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
         }
 
-        #gameOver p {
-            font-size: 24px;
-            margin: 10px 0;
-        }
-
-        #restartBtn {
-            margin-top: 30px;
-            padding: 15px 40px;
+        .stat-value {
             font-size: 20px;
-            background: #0f0;
-            color: #000;
-            border: none;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
             font-weight: bold;
-            box-shadow: 0 0 20px #0f0;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
 
-        #restartBtn:active {
-            transform: scale(0.95);
+        #gameOver, #startScreen, #difficultyScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 26, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            backdrop-filter: blur(10px);
+        }
+
+        .game-card {
+            background: linear-gradient(135deg, rgba(13, 27, 42, 0.98), rgba(26, 10, 46, 0.98));
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 50px rgba(0, 255, 136, 0.3);
+        }
+
+        .game-title {
+            font-size: 48px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            margin-bottom: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .game-subtitle {
+            color: rgba(0, 255, 136, 0.7);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .difficulty-card {
+            background: rgba(13, 27, 42, 0.6);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .difficulty-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .difficulty-card:hover::before {
+            left: 100%;
+        }
+
+        .difficulty-card:hover {
+            border-color: #00ff88;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.3);
+        }
+
+        .difficulty-card.selected {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.15);
+        }
+
+        .difficulty-icon {
+            font-size: 32px;
+            margin-right: 15px;
+        }
+
+        .difficulty-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        .difficulty-description {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .btn-game {
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            border: none;
+            color: #0a0a1a;
+            font-weight: bold;
+            font-size: 18px;
+            padding: 15px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-game:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 255, 136, 0.6);
+        }
+
+        .btn-game:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary-game {
+            background: rgba(13, 27, 42, 0.8);
+            border: 2px solid rgba(0, 255, 136, 0.5);
+            color: #00ff88;
+        }
+
+        .btn-secondary-game:hover {
+            background: rgba(0, 255, 136, 0.1);
         }
 
         #controls {
@@ -89,89 +210,215 @@
         .control-btn {
             width: 70px;
             height: 70px;
-            background: rgba(0, 255, 0, 0.2);
-            border: 2px solid #0f0;
+            background: rgba(13, 27, 42, 0.8);
+            border: 2px solid rgba(0, 255, 136, 0.5);
             border-radius: 50%;
-            color: #0f0;
-            font-size: 24px;
+            color: #00ff88;
+            font-size: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
             touch-action: manipulation;
             user-select: none;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+            transition: all 0.2s;
         }
 
         .control-btn:active {
-            background: rgba(0, 255, 0, 0.4);
+            background: rgba(0, 255, 136, 0.3);
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(0, 255, 136, 0.5);
         }
 
-        #startScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 30;
-            color: #0f0;
+        .score-row {
+            background: rgba(13, 27, 42, 0.8);
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
         }
 
-        #startScreen h1 {
-            font-size: 48px;
-            margin-bottom: 30px;
-            text-shadow: 0 0 20px #0f0;
-            animation: pulse 2s infinite;
+        .score-label {
+            font-size: 14px;
+            color: rgba(0, 255, 136, 0.7);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        #startBtn {
-            padding: 20px 50px;
-            font-size: 24px;
-            background: #0f0;
-            color: #000;
-            border: none;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
+        .score-value {
+            font-size: 28px;
             font-weight: bold;
-            box-shadow: 0 0 20px #0f0;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .progress {
+            height: 8px;
+            background: rgba(13, 27, 42, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 576px) {
+            .game-title {
+                font-size: 36px;
+            }
+            .difficulty-name {
+                font-size: 20px;
+            }
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 24px;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="startScreen">
-        <h1>🚀 SPACE SHOOTER 🚀</h1>
-        <button id="startBtn">НАЧАТЬ ИГРУ</button>
+    <!-- Экран выбора сложности -->
+    <div id="difficultyScreen">
+        <div class="game-card">
+            <h1 class="game-title">🚀 SPACE SHOOTER</h1>
+            <p class="game-subtitle">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
+
+            <div class="difficulty-card" data-difficulty="easy">
+                <div class="d-flex align-items-center">
+                    <div class="difficulty-icon">😊</div>
+                    <div class="flex-grow-1">
+                        <div class="difficulty-name">Легко</div>
+                        <div class="difficulty-description">
+                            Медленные враги • Больше здоровья • Идеально для начинающих
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-card" data-difficulty="normal">
+                <div class="d-flex align-items-center">
+                    <div class="difficulty-icon">😎</div>
+                    <div class="flex-grow-1">
+                        <div class="difficulty-name">Нормально</div>
+                        <div class="difficulty-description">
+                            Сбалансированный геймплей • Стандартная сложность
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-card" data-difficulty="hard">
+                <div class="d-flex align-items-center">
+                    <div class="difficulty-icon">😤</div>
+                    <div class="flex-grow-1">
+                        <div class="difficulty-name">Сложно</div>
+                        <div class="difficulty-description">
+                            Быстрые враги • Меньше жизней • Для опытных игроков
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-card" data-difficulty="nightmare">
+                <div class="d-flex align-items-center">
+                    <div class="difficulty-icon">💀</div>
+                    <div class="flex-grow-1">
+                        <div class="difficulty-name">Кошмар</div>
+                        <div class="difficulty-description">
+                            Экстремальная сложность • Только для мастеров • Удачи!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-game w-100 mt-3" id="startBtn" disabled>
+                НАЧАТЬ ИГРУ
+            </button>
+        </div>
     </div>
 
+    <!-- Интерфейс игры -->
     <div id="ui">
-        <div>Очки: <span id="score">0</span></div>
-        <div>Жизни: <span id="lives">3</span></div>
-        <div>Уровень: <span id="level">1</span></div>
+        <div class="row g-2">
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-label">Очки</div>
+                    <div class="stat-value" id="score">0</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-label">
+                        <i class="bi bi-heart-fill text-danger"></i> Жизни
+                    </div>
+                    <div class="stat-value" id="lives">3</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-label">Уровень</div>
+                    <div class="stat-value" id="level">1</div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-2">
+            <div class="progress">
+                <div class="progress-bar" id="levelProgress" role="progressbar" style="width: 0%"></div>
+            </div>
+        </div>
     </div>
 
-    <div id="gameOver">
-        <h1>GAME OVER</h1>
-        <p>Ваш счет: <span id="finalScore">0</span></p>
-        <p>Лучший счет: <span id="bestScore">0</span></p>
-        <button id="restartBtn">ИГРАТЬ СНОВА</button>
+    <!-- Экран Game Over -->
+    <div id="gameOver" style="display: none;">
+        <div class="game-card text-center">
+            <h1 class="game-title mb-4">GAME OVER</h1>
+
+            <div class="score-row mb-2">
+                <div class="score-label">Ваш счет</div>
+                <div class="score-value" id="finalScore">0</div>
+            </div>
+
+            <div class="score-row mb-2">
+                <div class="score-label">Достигнутый уровень</div>
+                <div class="score-value" id="finalLevel">1</div>
+            </div>
+
+            <div class="score-row mb-4">
+                <div class="score-label">
+                    <i class="bi bi-trophy-fill text-warning"></i> Лучший счет
+                </div>
+                <div class="score-value" id="bestScore">0</div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button class="btn btn-game" id="restartBtn">
+                    <i class="bi bi-arrow-clockwise"></i> ИГРАТЬ СНОВА
+                </button>
+                <button class="btn btn-game btn-secondary-game" id="changeDifficultyBtn">
+                    <i class="bi bi-gear-fill"></i> ИЗМЕНИТЬ СЛОЖНОСТЬ
+                </button>
+            </div>
+        </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
+    <!-- Управление -->
     <div id="controls">
-        <div class="control-btn" id="leftBtn">◄</div>
-        <div class="control-btn" id="shootBtn">●</div>
-        <div class="control-btn" id="rightBtn">►</div>
+        <div class="control-btn" id="leftBtn">
+            <i class="bi bi-arrow-left"></i>
+        </div>
+        <div class="control-btn" id="shootBtn">
+            <i class="bi bi-circle-fill"></i>
+        </div>
+        <div class="control-btn" id="rightBtn">
+            <i class="bi bi-arrow-right"></i>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -183,11 +430,45 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        // Настройки сложности
+        const difficultySettings = {
+            easy: {
+                name: 'Легко',
+                lives: 5,
+                enemySpeed: 0.7,
+                enemySpawnRate: 0.015,
+                scoreMultiplier: 1
+            },
+            normal: {
+                name: 'Нормально',
+                lives: 3,
+                enemySpeed: 1,
+                enemySpawnRate: 0.02,
+                scoreMultiplier: 1.5
+            },
+            hard: {
+                name: 'Сложно',
+                lives: 2,
+                enemySpeed: 1.5,
+                enemySpawnRate: 0.03,
+                scoreMultiplier: 2
+            },
+            nightmare: {
+                name: 'Кошмар',
+                lives: 1,
+                enemySpeed: 2,
+                enemySpawnRate: 0.04,
+                scoreMultiplier: 3
+            }
+        };
+
+        let currentDifficulty = null;
         let gameStarted = false;
         let gameRunning = false;
         let score = 0;
         let lives = 3;
         let level = 1;
+        let levelProgress = 0;
         let bestScore = parseInt(localStorage.getItem('bestScore')) || 0;
 
         const player = {
@@ -195,7 +476,7 @@
             y: canvas.height - 100,
             width: 40,
             height: 40,
-            speed: 5,
+            speed: 6,
             vx: 0
         };
 
@@ -203,20 +484,52 @@
         const enemies = [];
         const stars = [];
         const particles = [];
+        const powerups = [];
 
         let leftPressed = false;
         let rightPressed = false;
         let shootPressed = false;
         let lastShootTime = 0;
-        const shootCooldown = 250;
+        const shootCooldown = 200;
+
+        // Выбор сложности
+        document.querySelectorAll('.difficulty-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.difficulty-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                currentDifficulty = this.getAttribute('data-difficulty');
+                document.getElementById('startBtn').disabled = false;
+            });
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (currentDifficulty) {
+                document.getElementById('difficultyScreen').style.display = 'none';
+                startGame();
+            }
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('gameOver').style.display = 'none';
+            startGame();
+        });
+
+        document.getElementById('changeDifficultyBtn').addEventListener('click', () => {
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('difficultyScreen').style.display = 'flex';
+            currentDifficulty = null;
+            document.getElementById('startBtn').disabled = true;
+            document.querySelectorAll('.difficulty-card').forEach(c => c.classList.remove('selected'));
+        });
 
         // Звездное поле
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 150; i++) {
             stars.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                size: Math.random() * 2,
-                speed: Math.random() * 2 + 1
+                size: Math.random() * 2.5,
+                speed: Math.random() * 2 + 0.5,
+                opacity: Math.random() * 0.5 + 0.5
             });
         }
 
@@ -256,25 +569,21 @@
         });
 
         function startGame() {
-            document.getElementById('startScreen').style.display = 'none';
+            const settings = difficultySettings[currentDifficulty];
             gameStarted = true;
             gameRunning = true;
             score = 0;
-            lives = 3;
+            lives = settings.lives;
             level = 1;
+            levelProgress = 0;
             bullets.length = 0;
             enemies.length = 0;
             particles.length = 0;
+            powerups.length = 0;
             player.x = canvas.width / 2;
             updateUI();
             gameLoop();
         }
-
-        document.getElementById('startBtn').addEventListener('click', startGame);
-        document.getElementById('restartBtn').addEventListener('click', () => {
-            document.getElementById('gameOver').style.display = 'none';
-            startGame();
-        });
 
         function shoot() {
             const now = Date.now();
@@ -282,35 +591,38 @@
                 bullets.push({
                     x: player.x,
                     y: player.y,
-                    width: 4,
-                    height: 15,
-                    speed: 8
+                    width: 5,
+                    height: 18,
+                    speed: 10
                 });
                 lastShootTime = now;
             }
         }
 
         function spawnEnemy() {
-            const size = 30 + Math.random() * 20;
+            const settings = difficultySettings[currentDifficulty];
+            const size = 30 + Math.random() * 25;
             enemies.push({
                 x: Math.random() * (canvas.width - size),
                 y: -size,
                 width: size,
                 height: size,
-                speed: 1 + level * 0.3 + Math.random() * 2,
-                health: 1 + Math.floor(level / 3)
+                speed: (1 + level * 0.3 + Math.random() * 2) * settings.enemySpeed,
+                health: 1 + Math.floor(level / 3),
+                maxHealth: 1 + Math.floor(level / 3)
             });
         }
 
-        function createExplosion(x, y) {
-            for (let i = 0; i < 20; i++) {
+        function createExplosion(x, y, color = '#ff6b00') {
+            for (let i = 0; i < 30; i++) {
                 particles.push({
                     x: x,
                     y: y,
-                    vx: (Math.random() - 0.5) * 8,
-                    vy: (Math.random() - 0.5) * 8,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
                     life: 1,
-                    decay: 0.02
+                    decay: 0.015,
+                    color: color
                 });
             }
         }
@@ -319,6 +631,9 @@
             document.getElementById('score').textContent = score;
             document.getElementById('lives').textContent = lives;
             document.getElementById('level').textContent = level;
+
+            const progressPercent = (levelProgress % 200) / 200 * 100;
+            document.getElementById('levelProgress').style.width = progressPercent + '%';
         }
 
         function gameOver() {
@@ -332,18 +647,22 @@
                     tg.sendData(JSON.stringify({
                         score: score,
                         level: level,
+                        difficulty: currentDifficulty,
                         userId: tg.initDataUnsafe.user.id
                     }));
                 }
             }
 
             document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalLevel').textContent = level;
             document.getElementById('bestScore').textContent = bestScore;
-            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('gameOver').style.display = 'flex';
         }
 
         function update() {
             if (!gameRunning) return;
+
+            const settings = difficultySettings[currentDifficulty];
 
             // Движение игрока
             player.vx = 0;
@@ -384,7 +703,7 @@
                 }
             }
 
-            // Столкновения
+            // Столкновения пуль с врагами
             for (let i = bullets.length - 1; i >= 0; i--) {
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     if (bullets[i] && enemies[j] &&
@@ -397,13 +716,16 @@
                         enemies[j].health--;
 
                         if (enemies[j].health <= 0) {
-                            createExplosion(enemies[j].x, enemies[j].y);
+                            createExplosion(enemies[j].x, enemies[j].y, '#ff6b00');
                             enemies.splice(j, 1);
-                            score += 10 * level;
+                            const points = Math.floor(10 * level * settings.scoreMultiplier);
+                            score += points;
+                            levelProgress += points;
                             updateUI();
 
-                            if (score > 0 && score % 200 === 0) {
+                            if (levelProgress >= 200) {
                                 level++;
+                                levelProgress = 0;
                                 updateUI();
                             }
                         }
@@ -416,7 +738,7 @@
             for (let i = enemies.length - 1; i >= 0; i--) {
                 if (Math.abs(enemies[i].x - player.x) < (enemies[i].width + player.width) / 2 &&
                     Math.abs(enemies[i].y - player.y) < (enemies[i].height + player.height) / 2) {
-                    createExplosion(player.x, player.y);
+                    createExplosion(player.x, player.y, '#00ff88');
                     enemies.splice(i, 1);
                     lives--;
                     updateUI();
@@ -435,60 +757,122 @@
             }
 
             // Спавн врагов
-            if (Math.random() < 0.02 + level * 0.005) {
+            if (Math.random() < settings.enemySpawnRate + level * 0.003) {
                 spawnEnemy();
             }
         }
 
         function draw() {
-            ctx.fillStyle = '#000';
+            // Градиентный фон
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#0a0a1a');
+            gradient.addColorStop(0.5, '#1a0a2e');
+            gradient.addColorStop(1, '#0a0a1a');
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Звезды
+            // Звезды с мерцанием
             stars.forEach(star => {
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
                 ctx.fillRect(star.x, star.y, star.size, star.size);
             });
 
-            // Игрок
-            ctx.fillStyle = '#0f0';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#0f0';
+            // Игрок с градиентом
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00ff88';
+
+            const playerGradient = ctx.createLinearGradient(
+                player.x - player.width / 2, player.y - player.height / 2,
+                player.x + player.width / 2, player.y + player.height / 2
+            );
+            playerGradient.addColorStop(0, '#00ff88');
+            playerGradient.addColorStop(1, '#00d4ff');
+            ctx.fillStyle = playerGradient;
+
             ctx.beginPath();
             ctx.moveTo(player.x, player.y - player.height / 2);
             ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
+            ctx.lineTo(player.x, player.y + player.height / 4);
             ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
             ctx.closePath();
             ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.restore();
 
-            // Пули
-            ctx.fillStyle = '#ff0';
+            // Пули с эффектом
             bullets.forEach(bullet => {
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#ff0';
-                ctx.fillRect(bullet.x - bullet.width / 2, bullet.y, bullet.width, bullet.height);
-            });
-            ctx.shadowBlur = 0;
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ffff00';
 
-            // Враги
+                const bulletGradient = ctx.createLinearGradient(
+                    bullet.x, bullet.y,
+                    bullet.x, bullet.y + bullet.height
+                );
+                bulletGradient.addColorStop(0, '#ffff00');
+                bulletGradient.addColorStop(1, '#ff9900');
+                ctx.fillStyle = bulletGradient;
+
+                ctx.fillRect(
+                    bullet.x - bullet.width / 2,
+                    bullet.y,
+                    bullet.width,
+                    bullet.height
+                );
+                ctx.restore();
+            });
+
+            // Враги с полоской здоровья
             enemies.forEach(enemy => {
-                ctx.fillStyle = '#f00';
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#f00';
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff0066';
+
+                const enemyGradient = ctx.createRadialGradient(
+                    enemy.x, enemy.y, 0,
+                    enemy.x, enemy.y, enemy.width / 2
+                );
+                enemyGradient.addColorStop(0, '#ff0066');
+                enemyGradient.addColorStop(1, '#cc0033');
+                ctx.fillStyle = enemyGradient;
+
                 ctx.fillRect(
                     enemy.x - enemy.width / 2,
                     enemy.y - enemy.height / 2,
                     enemy.width,
                     enemy.height
                 );
-            });
-            ctx.shadowBlur = 0;
 
-            // Частицы
+                // Полоска здоровья
+                if (enemy.health < enemy.maxHealth) {
+                    const healthBarWidth = enemy.width;
+                    const healthBarHeight = 4;
+                    const healthPercent = enemy.health / enemy.maxHealth;
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(
+                        enemy.x - healthBarWidth / 2,
+                        enemy.y - enemy.height / 2 - 8,
+                        healthBarWidth,
+                        healthBarHeight
+                    );
+
+                    ctx.fillStyle = healthPercent > 0.5 ? '#00ff88' : '#ff6b00';
+                    ctx.fillRect(
+                        enemy.x - healthBarWidth / 2,
+                        enemy.y - enemy.height / 2 - 8,
+                        healthBarWidth * healthPercent,
+                        healthBarHeight
+                    );
+                }
+
+                ctx.restore();
+            });
+
+            // Частицы взрывов
             particles.forEach(particle => {
-                ctx.fillStyle = `rgba(255, ${Math.floor(particle.life * 255)}, 0, ${particle.life})`;
-                ctx.fillRect(particle.x, particle.y, 3, 3);
+                ctx.fillStyle = `${particle.color}${Math.floor(particle.life * 255).toString(16).padStart(2, '0')}`;
+                ctx.fillRect(particle.x, particle.y, 4, 4);
             });
         }
 
