@@ -1,0 +1,45 @@
+2026-02-18 15:26:22,422 - __main__ - ERROR - ❌ Критическая ошибка при запуске: You must pass the token you received from https://t.me/Botfather!
+Traceback (most recent call last):
+  File "C:\Progect\space_shooter\bot.py", line 674, in main
+    .build()
+     ~~~~~^^
+  File "C:\Users\Vlad\AppData\Local\Programs\Python\Python313\Lib\site-packages\telegram\ext\_applicationbuilder.py", line 309, in build
+    bot: Bot = self._build_ext_bot()  # build a bot
+               ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Vlad\AppData\Local\Programs\Python\Python313\Lib\site-packages\telegram\ext\_applicationbuilder.py", line 271, in _build_ext_bot
+    return ExtBot(
+        token=self._token,
+    ...<9 lines>...
+        local_mode=DefaultValue.get_value(self._local_mode),
+    )
+  File "C:\Users\Vlad\AppData\Local\Programs\Python\Python313\Lib\site-packages\telegram\ext\_extbot.py", line 243, in __init__
+    super().__init__(
+    ~~~~~~~~~~~~~~~~^
+        token=token,
+        ^^^^^^^^^^^^
+    ...<6 lines>...
+        local_mode=local_mode,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Vlad\AppData\Local\Programs\Python\Python313\Lib\site-packages\telegram\_bot.py", line 328, in __init__
+    raise InvalidToken("You must pass the token you received from https://t.me/Botfather!")
+telegram.error.InvalidToken: You must pass the token you received from https://t.me/Botfather!
+2026-02-18 15:27:10,369 - __main__ - INFO - 🚀 Space Shooter Bot v2.0 запущен!
+2026-02-18 15:27:10,371 - __main__ - INFO - 📊 База данных: space_shooter.db
+2026-02-18 15:27:10,371 - __main__ - INFO - 🎮 URL игры: https://vladzah403.github.io/space-shooter-game/
+2026-02-18 15:27:11,177 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getMe "HTTP/1.1 200 OK"
+2026-02-18 15:27:11,336 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/setMyCommands "HTTP/1.1 200 OK"
+2026-02-18 15:27:11,338 - __main__ - INFO - ✅ Команды бота установлены
+2026-02-18 15:27:11,397 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/deleteWebhook "HTTP/1.1 200 OK"
+2026-02-18 15:27:11,399 - telegram.ext.Application - INFO - Application started
+2026-02-18 15:27:21,574 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:27:31,633 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:27:41,701 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:27:51,768 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:28:01,830 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:28:11,883 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:28:21,944 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:28:27,190 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o/getUpdates "HTTP/1.1 200 OK"
+2026-02-18 15:28:27,193 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2026-02-18 15:28:27,195 - telegram.ext.Application - INFO - Application.stop() complete
