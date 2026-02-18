@@ -131,22 +131,50 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .btn-purple{border-color:rgba(168,85,247,.4);color:var(--purple)}
 .btn-red{border-color:rgba(255,0,102,.4);color:var(--pink)}
 
-/* ── DIFFICULTY SCREEN ── */
-.diff-item{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px}
-.diff-item:active{transform:scale(.97)}
-.diff-item.selected{border-color:var(--green);background:rgba(0,255,136,.1);box-shadow:0 0 20px rgba(0,255,136,.15)}
-.diff-icon{font-size:28px;flex-shrink:0}
-.diff-name{font-size:16px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;margin-bottom:2px}
-.diff-desc{font-size:11px;color:rgba(255,255,255,.55)}
-.diff-badge{font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid;margin-left:6px;font-family:'Orbitron',monospace;vertical-align:middle}
+/* ── DIFFICULTY SCREEN REDESIGN ── */
+.main-hero{text-align:center;padding:10px 0 6px;position:relative}
+.main-title{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;line-height:1;letter-spacing:4px;background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;margin-bottom:2px}
+.main-sub{font-size:8px;color:rgba(0,212,255,0.5);font-family:'Orbitron',monospace;letter-spacing:5px;text-transform:uppercase;margin-bottom:10px}
+.main-ship-preview{width:60px;height:60px;margin:0 auto 8px;position:relative}
+.main-ship-preview canvas{display:block}
+.best-score-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:4px 12px;font-family:'Orbitron',monospace;font-size:10px;color:var(--gold);margin-bottom:12px}
+
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+.diff-item::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(circle at center,rgba(0,255,136,.12),transparent 70%)}
+.diff-item:active{transform:scale(.95)}
+.diff-item.selected{border-color:var(--green);background:rgba(0,255,136,.1);box-shadow:0 0 18px rgba(0,255,136,.2)}
+.diff-item.selected::before{opacity:1}
+.diff-icon{font-size:24px;margin-bottom:3px;display:block}
+.diff-name{font-size:12px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;margin-bottom:1px}
+.diff-desc{font-size:9px;color:rgba(255,255,255,.45);line-height:1.3}
+.diff-badge{font-size:8px;padding:1px 6px;border-radius:8px;border:1px solid;font-family:'Orbitron',monospace;vertical-align:middle;display:block;margin-top:3px}
 .diff-badge.nm{color:var(--pink);border-color:var(--pink)}
 
-.check-row{display:flex;align-items:center;gap:8px;padding:8px 4px;cursor:pointer;margin:8px 0}
-.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
-.check-row label{color:var(--green);font-size:12px;font-family:'Rajdhani',sans-serif;cursor:pointer}
+.auto-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(8,18,35,.5);border-radius:10px;border:1px solid rgba(0,255,136,.1);margin-bottom:10px;cursor:pointer}
+.auto-row-lbl{font-size:11px;font-family:'Rajdhani',sans-serif;color:var(--green)}
+.auto-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
 
-.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.menu-grid .btn{font-size:10px;padding:10px 6px}
+.start-btn-wrap{margin-bottom:10px}
+
+.nav-menu{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.nav-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:9px 4px 7px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:3px;letter-spacing:.5px}
+.nav-btn:active{transform:scale(.93)}
+.nav-btn .nav-ico{font-size:20px;display:block}
+.nav-btn.gold{border-color:rgba(255,215,0,.25);color:var(--gold)}
+.nav-btn.cyan{border-color:rgba(0,212,255,.25);color:var(--cyan)}
+.nav-btn.purple{border-color:rgba(168,85,247,.25);color:var(--purple)}
+.nav-btn.green{border-color:rgba(0,255,136,.25);color:var(--green)}
+
+/* animated glow rings on main title */
+@keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(0,255,136,.4)}50%{text-shadow:0 0 60px rgba(0,255,136,.7),0 0 100px rgba(0,212,255,.3)}}
+.diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+
+/* ── CUSTOMIZE SCREEN - ship preview ── */
+.ship-preview-wrap{background:rgba(4,4,15,.8);border:1.5px solid rgba(0,255,136,.2);border-radius:14px;padding:10px;margin-bottom:14px;text-align:center;position:relative}
+.ship-preview-lbl{font-size:8px;color:rgba(0,255,136,.45);font-family:'Orbitron',monospace;letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
+#shipPreviewCanvas{display:block;margin:0 auto;border-radius:8px}
+
 
 /* ── GAME OVER SCREEN ── */
 .score-block{background:rgba(8,18,35,.7);border:1px solid rgba(0,255,136,.15);border-radius:12px;padding:12px 14px;margin-bottom:8px}
@@ -195,7 +223,13 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .color-opt.sel{border-color:var(--green);box-shadow:0 0 14px rgba(0,255,136,.4);transform:scale(1.08)}
 .color-opt.sel i{opacity:1}
 .color-opt:active{transform:scale(.92)}
-.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.trail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.trail-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,255,255,.65);font-weight:700}
+.trail-opt:active{transform:scale(.94)}
+.trail-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12);color:var(--green)}
+
+/* Updated shape grid - 3 cols */
+.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .shape-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
 .shape-opt:active{transform:scale(.94)}
 .shape-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
@@ -308,6 +342,8 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
     <div class="weapon-btn active" data-weapon="laser"><div class="weapon-emoji">🔵</div><div class="weapon-lbl">LASER</div></div>
     <div class="weapon-btn" data-weapon="rocket"><div class="weapon-emoji">🚀</div><div class="weapon-lbl">ROCKET</div></div>
     <div class="weapon-btn" data-weapon="shotgun"><div class="weapon-emoji">💥</div><div class="weapon-lbl">SHOT</div></div>
+    <div class="weapon-btn" data-weapon="plasma"><div class="weapon-emoji">🟣</div><div class="weapon-lbl">PLASMA</div></div>
+    <div class="weapon-btn" data-weapon="lightning"><div class="weapon-emoji">⚡</div><div class="weapon-lbl">BOLT</div></div>
   </div>
   <button id="autoBtn" class="active">⚡ АВТО</button>
 </div>
@@ -325,23 +361,60 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 <!-- DIFFICULTY / MAIN MENU -->
 <div id="difficultyScreen" class="screen active">
   <div class="card">
-    <h1 class="screen-title green">🚀 SPACE<br>SHOOTER</h1>
-    <p class="screen-sub">ВЫБЕРИТЕ СЛОЖНОСТЬ</p>
-    <div class="diff-item" data-diff="easy"><div class="diff-icon">😊</div><div><div class="diff-name">ЛЕГКО</div><div class="diff-desc">5 жизней • Медленные враги • Больше бонусов</div></div></div>
-    <div class="diff-item" data-diff="normal"><div class="diff-icon">😎</div><div><div class="diff-name">НОРМАЛЬНО</div><div class="diff-desc">3 жизни • Сбалансированная игра</div></div></div>
-    <div class="diff-item" data-diff="hard"><div class="diff-icon">😤</div><div><div class="diff-name">СЛОЖНО</div><div class="diff-desc">2 жизни • Быстрые враги • Сильные боссы</div></div></div>
-    <div class="diff-item" data-diff="nightmare"><div class="diff-icon">💀</div><div><div class="diff-name">КОШМАР <span class="diff-badge nm">ХАРДКОР</span></div><div class="diff-desc">1 жизнь • Без бонусов • Экстремально</div></div></div>
-    <div class="check-row">
+
+    <!-- Hero -->
+    <div class="main-hero">
+      <div class="main-ship-preview">
+        <canvas id="menuShipCanvas" width="60" height="60"></canvas>
+      </div>
+      <div class="main-title">SPACE<br>SHOOTER</div>
+      <div class="main-sub">Выберите сложность</div>
+      <div class="best-score-badge" id="bestScoreBadge">🏆 <span id="menuBestScore">0</span></div>
+    </div>
+
+    <!-- Difficulty grid 2x2 -->
+    <div class="diff-grid">
+      <div class="diff-item" data-diff="easy">
+        <span class="diff-icon">😊</span>
+        <div class="diff-name">ЛЕГКО</div>
+        <div class="diff-desc">6 жизней<br>Медленно</div>
+      </div>
+      <div class="diff-item" data-diff="normal">
+        <span class="diff-icon">😎</span>
+        <div class="diff-name">НОРМАЛЬНО</div>
+        <div class="diff-desc">4 жизни<br>Баланс</div>
+      </div>
+      <div class="diff-item" data-diff="hard">
+        <span class="diff-icon">😤</span>
+        <div class="diff-name">СЛОЖНО</div>
+        <div class="diff-desc">2 жизни<br>Быстро</div>
+      </div>
+      <div class="diff-item" data-diff="nightmare">
+        <span class="diff-icon">💀</span>
+        <div class="diff-name">КОШМАР</div>
+        <div class="diff-desc">1 жизнь<br><span class="diff-badge nm">ХАРДКОР</span></div>
+      </div>
+    </div>
+
+    <!-- Auto toggle -->
+    <label class="auto-row" for="autoChk">
+      <span class="auto-row-lbl">⚡ Автоматическая стрельба</span>
       <input type="checkbox" id="autoChk" checked>
-      <label for="autoChk">⚡ Автоматическая стрельба</label>
+    </label>
+
+    <!-- Start -->
+    <div class="start-btn-wrap">
+      <button class="btn btn-primary" id="startBtn" disabled>▶ НАЧАТЬ ИГРУ</button>
     </div>
-    <button class="btn btn-primary" id="startBtn" disabled>▶ НАЧАТЬ ИГРУ</button>
-    <div class="menu-grid mt2">
-      <button class="btn btn-secondary" id="customBtn">🎨 СТИЛЬ</button>
-      <button class="btn btn-secondary btn-gold" id="upgradeBtn">⚡ ПРОКАЧКА</button>
-      <button class="btn btn-secondary btn-cyan" id="lbBtn">🏆 РЕЙТИНГ</button>
-      <button class="btn btn-secondary btn-purple" id="skinBtn">👾 СКИНЫ</button>
+
+    <!-- Nav menu 4 buttons -->
+    <div class="nav-menu">
+      <button class="nav-btn green" id="customBtn"><span class="nav-ico">🎨</span>СТИЛЬ</button>
+      <button class="nav-btn gold" id="upgradeBtn"><span class="nav-ico">⚡</span>ПРОКАЧКА</button>
+      <button class="nav-btn cyan" id="lbBtn"><span class="nav-ico">🏆</span>РЕЙТИНГ</button>
+      <button class="nav-btn purple" id="skinBtn"><span class="nav-ico">👾</span>СКИНЫ</button>
     </div>
+
   </div>
 </div>
 
@@ -395,39 +468,78 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
     <h1 class="screen-title green" style="font-size:22px">🎨 КАСТОМИЗАЦИЯ</h1>
     <p class="screen-sub">НАСТРОЙ КОРАБЛЬ</p>
 
+    <!-- Ship Preview -->
+    <div class="ship-preview-wrap">
+      <div class="ship-preview-lbl">Предпросмотр корабля</div>
+      <canvas id="shipPreviewCanvas" width="130" height="130"></canvas>
+    </div>
+
+    <!-- Ship Shape -->
     <div class="cust-section">
       <div class="cust-lbl">🚀 Форма корабля</div>
       <div class="shape-grid">
         <div class="shape-opt sel" data-ship-shape="fighter"><div class="shape-name">⚔️ БОЕЦ</div><div class="shape-desc">Классика</div></div>
         <div class="shape-opt" data-ship-shape="arrow"><div class="shape-name">🏹 СТРЕЛА</div><div class="shape-desc">Острый</div></div>
-        <div class="shape-opt" data-ship-shape="diamond"><div class="shape-name">💎 КРИСТАЛЛ</div><div class="shape-desc">Широкий</div></div>
+        <div class="shape-opt" data-ship-shape="diamond"><div class="shape-name">💎 РОМБ</div><div class="shape-desc">Ромбовид.</div></div>
+        <div class="shape-opt" data-ship-shape="hawk"><div class="shape-name">🦅 ЯСТРЕБ</div><div class="shape-desc">Крылья</div></div>
+        <div class="shape-opt" data-ship-shape="delta"><div class="shape-name">✈️ ДЕЛЬТА</div><div class="shape-desc">Стелс</div></div>
+        <div class="shape-opt" data-ship-shape="blade"><div class="shape-name">🗡️ КЛИНОК</div><div class="shape-desc">Острый</div></div>
+        <div class="shape-opt" data-ship-shape="hornet"><div class="shape-name">🐝 ШЕРШЕНЬ</div><div class="shape-desc">Широкий</div></div>
+        <div class="shape-opt" data-ship-shape="viper"><div class="shape-name">🐍 ВАЙПЕР</div><div class="shape-desc">Гибкий</div></div>
+        <div class="shape-opt" data-ship-shape="phoenix"><div class="shape-name">🔥 ФЕНИКС</div><div class="shape-desc">Изогнут.</div></div>
       </div>
     </div>
 
+    <!-- Ship Color -->
     <div class="cust-section">
       <div class="cust-lbl">🎨 Цвет корабля</div>
-      <div class="color-grid">
-        <div class="color-opt" data-ship-color="green" style="background:linear-gradient(135deg,#00ff88,#00d4ff)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="blue" style="background:linear-gradient(135deg,#00d4ff,#0080ff)"><i>✓</i></div>
+      <div class="color-grid" style="grid-template-columns:repeat(6,1fr)">
+        <div class="color-opt" data-ship-color="green"  style="background:linear-gradient(135deg,#00ff88,#00d4ff)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="blue"   style="background:linear-gradient(135deg,#00d4ff,#0080ff)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="purple" style="background:linear-gradient(135deg,#a855f7,#ec4899)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="orange" style="background:linear-gradient(135deg,#ff6b00,#ff9900)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="red" style="background:linear-gradient(135deg,#ff0066,#ff3366)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="red"    style="background:linear-gradient(135deg,#ff0066,#ff3366)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="yellow" style="background:linear-gradient(135deg,#ffd700,#ffed4e)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="teal"   style="background:linear-gradient(135deg,#00ffcc,#00b4aa)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="white"  style="background:linear-gradient(135deg,#e0e8ff,#a0b0ff)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="lime"   style="background:linear-gradient(135deg,#aaff00,#66ff00)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="rose"   style="background:linear-gradient(135deg,#ff4488,#ff88bb)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="indigo" style="background:linear-gradient(135deg,#6644ff,#44aaff)"><i>✓</i></div>
+        <div class="color-opt" data-ship-color="gold"   style="background:linear-gradient(135deg,#ffd700,#ff8800)"><i>✓</i></div>
       </div>
     </div>
 
+    <!-- Bullet Color -->
     <div class="cust-section">
       <div class="cust-lbl">🔵 Цвет пуль</div>
-      <div class="color-grid">
+      <div class="color-grid" style="grid-template-columns:repeat(5,1fr)">
         <div class="color-opt" data-bullet-color="yellow" style="background:linear-gradient(135deg,#ffff00,#ff9900)"><i>✓</i></div>
-        <div class="color-opt" data-bullet-color="cyan" style="background:linear-gradient(135deg,#00ffff,#00d4ff)"><i>✓</i></div>
-        <div class="color-opt" data-bullet-color="pink" style="background:linear-gradient(135deg,#ff69b4,#ff1493)"><i>✓</i></div>
-        <div class="color-opt" data-bullet-color="green" style="background:linear-gradient(135deg,#00ff88,#00ff00)"><i>✓</i></div>
-        <div class="color-opt" data-bullet-color="white" style="background:linear-gradient(135deg,#ffffff,#cccccc)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="cyan"   style="background:linear-gradient(135deg,#00ffff,#00d4ff)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="pink"   style="background:linear-gradient(135deg,#ff69b4,#ff1493)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="green"  style="background:linear-gradient(135deg,#00ff88,#00ff00)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="white"  style="background:linear-gradient(135deg,#ffffff,#cccccc)"><i>✓</i></div>
         <div class="color-opt" data-bullet-color="purple" style="background:linear-gradient(135deg,#a855f7,#8b5cf6)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="orange" style="background:linear-gradient(135deg,#ff8800,#ff4400)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="red"    style="background:linear-gradient(135deg,#ff2244,#ff0000)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="lime"   style="background:linear-gradient(135deg,#aaff00,#88ff00)"><i>✓</i></div>
+        <div class="color-opt" data-bullet-color="teal"   style="background:linear-gradient(135deg,#00ffcc,#00aaaa)"><i>✓</i></div>
       </div>
     </div>
 
+    <!-- Trail Style -->
+    <div class="cust-section">
+      <div class="cust-lbl">💨 Стиль следа</div>
+      <div class="trail-grid">
+        <div class="trail-opt sel" data-trail-style="fire">🔥 ОГОНЬ</div>
+        <div class="trail-opt" data-trail-style="ice">❄️ ЛЁД</div>
+        <div class="trail-opt" data-trail-style="plasma">⚡ ПЛАЗМА</div>
+        <div class="trail-opt" data-trail-style="green">☢️ ЯДЕРНЫЙ</div>
+        <div class="trail-opt" data-trail-style="gold">✨ ЗОЛОТО</div>
+        <div class="trail-opt" data-trail-style="red">💥 КРОВЬ</div>
+      </div>
+    </div>
+
+    <!-- Toggles -->
     <div class="cust-section">
       <div class="toggle-row"><input type="checkbox" id="particlesChk" checked><label for="particlesChk">✨ Эффекты частиц</label></div>
       <div class="toggle-row"><input type="checkbox" id="glowChk" checked><label for="glowChk">💡 Эффекты свечения</label></div>
@@ -463,7 +575,6 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 </div>
 
 <script src="game-code.js"></script>
-<script src="game-improvements.js"></script>
-<script src="telegram-integration.js"></script>
+
 </body>
 </html>
