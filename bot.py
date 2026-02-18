@@ -658,25 +658,31 @@ async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode='HTML'
         )
 
-        # Пересылаем разработчику (бот отправит сам себе в личку через getUpdates,
-        # либо настройте ADMIN_CHAT_ID в config.py)
-        try:
-            from config import ADMIN_CHAT_ID
-            admin_msg = (
-                f"📬 <b>Новое предложение по игре!</b>\n\n"
-                f"👤 От: {user.first_name}"
-                + (f" @{user.username}" if user.username else "")
-                + f" (ID: <code>{user.id}</code>)\n"
-                f"📁 Категория: {cat_label}\n\n"
-                f"💬 <b>Текст:</b>\n{suggestion_text}"
-            )
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=admin_msg,
-                parse_mode='HTML'
-            )
-        except (ImportError, Exception) as e:
-            logger.warning(f"Не удалось переслать предложение: {e}")
+        # ── Пересылаем предложение администратору ──
+        # Укажи свой Telegram ID в ADMIN_CHAT_ID ниже.
+        # Узнать свой ID: напиши боту @userinfobot
+        ADMIN_CHAT_ID = None  # ← ВСТАВЬ СВОЙ TELEGRAM ID СЮДА, например: 123456789
+
+        if ADMIN_CHAT_ID:
+            try:
+                admin_msg = (
+                    f"📬 <b>Новое предложение по игре!</b>\n\n"
+                    f"👤 От: {user.first_name}"
+                    + (f" @{user.username}" if user.username else "")
+                    + f" (ID: <code>{user.id}</code>)\n"
+                    f"📁 Категория: {cat_label}\n\n"
+                    f"💬 <b>Текст:</b>\n{suggestion_text}"
+                )
+                await context.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=admin_msg,
+                    parse_mode='HTML'
+                )
+                logger.info(f"📤 Предложение переслано администратору {ADMIN_CHAT_ID}")
+            except Exception as e:
+                logger.warning(f"Не удалось переслать предложение: {e}")
+        else:
+            logger.warning("⚠️  ADMIN_CHAT_ID не задан — предложение не переслано. Укажи свой Telegram ID в bot.py")
 
         logger.info(f"💡 Предложение от {user.id} ({user.first_name}): [{category}] {suggestion_text[:50]}...")
 

@@ -3945,6 +3945,8 @@ function startGame(){
   // Показываем кнопки навыков для тача
   updateTouchSkillBar();
 
+  // Включаем касания canvas при старте игры
+  canvas.style.pointerEvents = 'all';
   lastTime=performance.now();
   Music.play('game');
   requestAnimationFrame(loop);
@@ -3952,6 +3954,7 @@ function startGame(){
 
 function endGame(){
   gameRunning=false;
+  canvas.style.pointerEvents = 'none';
   Music.play('menu');
   if(score>bestScore){ bestScore=score; LS.set('bestScore',bestScore); updateMenuBadge(); }
 
