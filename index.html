@@ -33,16 +33,15 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .stat-val.lives{color:#ff6b88;text-shadow:0 0 8px rgba(255,107,136,.5)}
 .stat-val.level-val{color:var(--cyan);text-shadow:0 0 8px rgba(0,212,255,.5)}
 
-/* Level progress */
-#levelBar{height:3px;background:rgba(0,212,255,.1);border-radius:2px;overflow:hidden;margin-top:6px}
-#levelFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;transition:width .4s ease;box-shadow:0 0 6px var(--cyan)}
+/* Level progress - unified */
+#levelBar{height:6px;background:rgba(0,212,255,.1);border-radius:3px;overflow:hidden;margin-top:6px;position:relative}
+#levelFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green),var(--gold));border-radius:3px;transition:width .4s ease;box-shadow:0 0 8px var(--cyan)}
+#levelBarLabel{position:absolute;right:0;top:-13px;font-size:8px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;display:none}
+.stat-pill--level{min-width:80px}
+.lvl-sub{font-size:9px;color:var(--gold);font-family:'Orbitron',monospace;margin-top:1px}
 
-/* XP bar */
-#xpRow{display:flex;align-items:center;gap:8px;margin-top:5px;padding:4px 8px;background:rgba(255,215,0,.06);border-radius:8px;border:1px solid rgba(255,215,0,.1)}
-.xp-lbl{font-size:9px;color:rgba(255,215,0,.6);font-family:'Orbitron',monospace;white-space:nowrap}
-.xp-track{flex:1;height:3px;background:rgba(255,215,0,.1);border-radius:2px;overflow:hidden}
-.xp-fill-bar{height:100%;background:linear-gradient(90deg,var(--gold),#ff9900);border-radius:2px;transition:width .4s}
-.xp-lvl{font-size:10px;color:var(--gold);font-family:'Orbitron',monospace;white-space:nowrap}
+/* XP bar - hidden, replaced by unified bar */
+#xpRow{display:none}
 
 /* ── PAUSE BTN ── */
 #pauseBtn{position:absolute;top:10px;right:10px;z-index:15;pointer-events:all;width:38px;height:38px;background:rgba(8,18,35,.88);border:1px solid var(--border);border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(10px)}
@@ -84,8 +83,27 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .boss-track{height:8px;background:rgba(255,0,102,.1);border-radius:6px;border:1px solid rgba(255,0,102,.3);overflow:hidden}
 #bossFill{height:100%;background:linear-gradient(90deg,var(--pink),#ff6b00);border-radius:6px;transition:width .3s;box-shadow:0 0 8px rgba(255,0,102,.6)}
 
+/* ── TOUCH SKILL BUTTONS ── */
+#touchSkillBar{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:11;pointer-events:all;align-items:flex-end}
+.touch-skill-btn{width:52px;height:52px;background:rgba(8,18,35,.92);border:2px solid rgba(168,85,247,.4);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;gap:2px;backdrop-filter:blur(10px);position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.touch-skill-btn:active{transform:scale(.87)!important;border-color:var(--purple)}
+.touch-skill-btn.ready{border-color:var(--purple);box-shadow:0 0 14px rgba(168,85,247,.4)}
+.touch-skill-btn.on-cd{opacity:.55;border-color:rgba(168,85,247,.2)}
+.touch-skill-ico{font-size:20px;line-height:1}
+.touch-skill-name{font-size:6px;color:rgba(168,85,247,.8);font-family:'Orbitron',monospace;font-weight:700;letter-spacing:.5px}
+.touch-skill-cd{position:absolute;bottom:3px;right:5px;font-size:7px;color:var(--gold);font-family:'Orbitron',monospace}
+.touch-skill-btn .cd-sweep{position:absolute;inset:0;border-radius:12px;background:rgba(168,85,247,.15);transform-origin:center bottom;transition:transform .1s linear}
+
+/* Swipe hint */
+.swipe-hint{position:absolute;bottom:130px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(168,85,247,.6);font-family:'Orbitron',monospace;letter-spacing:2px;pointer-events:none;animation:swipeHintFade 4s forwards}
+@keyframes swipeHintFade{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
 /* ── AUTO / WEAPON BAR ── */
 #bottomBar{position:absolute;bottom:12px;left:10px;right:10px;display:flex;align-items:center;justify-content:space-between;z-index:10;pointer-events:all}
+/* На мобильных скрываем десктопный activeSkillBar - используем touchSkillBar */
+@media (hover: none) and (pointer: coarse) {
+  #activeSkillBar { display: none !important; }
+}
 .weapon-btn{width:50px;height:50px;background:rgba(8,18,35,.88);border:2px solid rgba(0,255,136,.2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;gap:1px;backdrop-filter:blur(8px)}
 .weapon-btn.active{border-color:var(--green);background:rgba(0,255,136,.12);box-shadow:0 0 16px rgba(0,255,136,.3)}
 .weapon-btn:active{transform:scale(.88)}
@@ -97,6 +115,18 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 #autoBtn.active{background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(0,255,136,.25)}
 #autoBtn:active{transform:scale(.93)}
 
+
+/* ── SHIP LEVEL BANNER IN UPGRADE SCREEN ── */
+.ship-lvl-banner{display:flex;align-items:center;justify-content:space-between;background:rgba(255,215,0,.06);border:1.5px solid rgba(255,215,0,.2);border-radius:14px;padding:12px 14px;margin-bottom:12px;gap:12px}
+.ship-lvl-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ship-lvl-ico{font-size:28px;line-height:1}
+.ship-lvl-label{font-size:7px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
+.ship-lvl-num{font-size:20px;font-weight:900;color:var(--gold);font-family:"Orbitron",monospace;text-shadow:0 0 12px rgba(255,215,0,.5);line-height:1}
+.ship-lvl-right{flex:1;min-width:0}
+.ship-xp-label{font-size:7px;color:rgba(255,215,0,.4);font-family:"Orbitron",monospace;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase}
+.ship-xp-bar-wrap{height:6px;background:rgba(255,215,0,.1);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.ship-xp-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9900);border-radius:3px;transition:width .4s ease;box-shadow:0 0 6px rgba(255,215,0,.4)}
+.ship-xp-nums{font-size:8px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;text-align:right}
 /* ── ACHIEVEMENT TOAST ── */
 #achieveToast{position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(8,18,35,.96);border:1.5px solid var(--gold);border-radius:14px;padding:10px 20px;display:none;z-index:25;text-align:center;box-shadow:0 0 30px rgba(255,215,0,.3);backdrop-filter:blur(10px);animation:slideDown .4s ease}
 @keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -106,11 +136,11 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 /* ══════════════════════════════════
    SCREENS
 ══════════════════════════════════ */
-.screen{position:absolute;inset:0;background:rgba(4,4,15,.97);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(16px);padding:12px;overflow-y:auto}
+.screen{position:absolute;inset:0;background:rgba(4,4,15,.97);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(16px);padding:12px;overflow-y:auto;pointer-events:all;touch-action:auto}
 .screen.active{display:flex}
 
 /* Common card */
-.card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 60px rgba(0,255,136,.12);max-height:94vh;overflow-y:auto}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 60px rgba(0,255,136,.12);max-height:94vh;overflow-y:auto;touch-action:auto}
 
 /* Screen titles */
 .screen-title{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;text-align:center;margin-bottom:2px;line-height:1.1}
@@ -277,12 +307,97 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .upg-item.locked-upg .upg-btn{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
 .upg-req{font-size:9px;color:rgba(255,100,100,.7);margin-top:2px}
 
+/* ── РЕЛЬСА — кнопка в перезарядке ── */
+.weapon-btn.rail-cd{border-color:rgba(0,255,204,.3)!important;background:rgba(0,255,204,.05)!important;opacity:.75}
+.weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:6px!important;letter-spacing:0}
+
+/* ── WEAPON SELECT GRID ── */
+.weapon-select-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.wpn-sel-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+.wpn-sel-opt:active{transform:scale(.94)}
+.wpn-sel-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+.wpn-sel-opt.disabled{opacity:.35;cursor:not-allowed;border-color:rgba(255,255,255,.07)}
+.wpn-sel-ico{font-size:22px;margin-bottom:3px;display:block}
+.wpn-sel-name{color:var(--green);font-size:9px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+.wpn-sel-desc{color:rgba(255,255,255,.4);font-size:8px;line-height:1.3}
+.wpn-sel-badge{position:absolute;top:4px;right:5px;width:16px;height:16px;border-radius:50%;background:var(--green);color:#04040f;font-size:9px;font-family:'Orbitron',monospace;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.wpn-sel-opt.sel .wpn-sel-badge{opacity:1}
+
+/* ── STARFIELD SCREEN ── */
+#difficultyScreen{overflow:hidden}
+
+/* ── SKILL TREE ── */
+.skill-points-banner{text-align:center;color:#00ffcc;font-size:15px;font-family:'Orbitron',monospace;margin-bottom:14px;padding:8px;background:rgba(0,255,204,.07);border-radius:10px;border:1px solid rgba(0,255,204,.25)}
+.skill-branch{margin-bottom:14px}
+.skill-branch-title{font-size:10px;font-family:'Orbitron',monospace;color:rgba(0,255,204,.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(0,255,204,.1)}
+.skill-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px}
+.skill-node{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:9px 8px;cursor:pointer;transition:all .2s;text-align:center;flex:1;min-width:80px;position:relative}
+.skill-node:active{transform:scale(.95)}
+.skill-node.unlocked{border-color:#00ffcc;background:rgba(0,255,204,.1);box-shadow:0 0 14px rgba(0,255,204,.2)}
+.skill-node.maxed{border-color:#ffd700;background:rgba(255,215,0,.08);box-shadow:0 0 14px rgba(255,215,0,.2)}
+.skill-node.locked{opacity:.35;cursor:not-allowed}
+.skill-node-ico{font-size:20px;display:block;margin-bottom:3px}
+.skill-node-name{font-size:8px;font-family:'Orbitron',monospace;color:var(--green);font-weight:700;margin-bottom:2px;letter-spacing:.5px}
+.skill-node-desc{font-size:7.5px;color:rgba(255,255,255,.4);line-height:1.3;margin-bottom:4px}
+.skill-node-lvl{font-size:8px;font-family:'Orbitron',monospace;color:#ffd700}
+.skill-node.maxed .skill-node-name{color:#ffd700}
+
+/* ── UPGRADE TABS ── */
+.upg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.upg-tab{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:6px 8px;font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.4);cursor:pointer;flex:1;min-width:40px;text-align:center;line-height:1.4;transition:all .2s}
+.upg-tab.active{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
+.upg-tab span{font-size:6.5px;letter-spacing:.5px}
+
+/* ── SKILL TYPE TAGS ── */
+.skill-type-tag{font-size:7px;font-family:'Orbitron',monospace;letter-spacing:.5px;padding:2px 6px;border-radius:6px;display:inline-block;margin:2px 0 3px}
+.passive-tag{background:rgba(168,85,247,.2);color:#a855f7;border:1px solid rgba(168,85,247,.3)}
+.active-tag{background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.25)}
+
+/* ── ACTIVE SKILL BAR (in game) ── */
+#activeSkillBar{display:flex;gap:7px;align-items:center}
+.active-skill-btn{position:relative;width:48px;height:48px;background:rgba(0,255,204,.08);border:2px solid rgba(0,255,204,.35);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s}
+.active-skill-btn:active{transform:scale(.92)}
+.active-skill-btn.sk-cd{border-color:rgba(255,255,255,.15)}
+.ask-ico{font-size:20px;line-height:1;z-index:2;position:relative}
+.ask-key{font-size:7px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.5);z-index:2;position:relative}
+.ask-cd-overlay{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.65);z-index:1;transition:height .1s}
+.ask-cd-text{position:absolute;font-size:9px;font-family:'Orbitron',monospace;color:#fff;z-index:3;top:50%;left:50%;transform:translate(-50%,-50%)}
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
 
 /* ── FLEX UTILS ── */
 .flex{display:flex}.gap2{gap:8px}.mt1{margin-top:8px}.mt2{margin-top:12px}.mt3{margin-top:16px}.w100{width:100%}.grow{flex:1}
+
+/* ── SETTINGS SCREEN ── */
+.settings-block{background:rgba(8,18,35,.6);border:1px solid rgba(0,212,255,.12);border-radius:14px;padding:14px;margin-bottom:10px}
+.settings-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.settings-lbl{font-size:11px;color:rgba(255,255,255,.7);font-family:"Orbitron",monospace;letter-spacing:.5px}
+.settings-val{font-size:12px;color:var(--cyan);font-family:"Orbitron",monospace;font-weight:700;min-width:40px;text-align:right}
+.settings-slider{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(0,212,255,.15);outline:none;cursor:pointer}
+.settings-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--green));cursor:pointer;box-shadow:0 0 8px rgba(0,212,255,.5)}
+
+.music-style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.music-style-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,212,255,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+.music-style-btn:active{transform:scale(.93)}
+.music-style-btn.active{border-color:var(--cyan);background:rgba(0,212,255,.12);box-shadow:0 0 14px rgba(0,212,255,.25)}
+.ms-ico{font-size:22px;display:block}
+.ms-name{font-size:8px;font-family:"Orbitron",monospace;font-weight:700;color:var(--cyan);letter-spacing:.5px}
+.ms-desc{font-size:7px;color:rgba(255,255,255,.4);font-family:"Rajdhani",sans-serif}
+
+/* ── SUGGEST SCREEN ── */
+.suggest-cats{display:flex;flex-wrap:wrap;gap:6px}
+.suggest-cat{background:rgba(8,18,35,.7);border:1.5px solid rgba(255,100,100,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-family:"Orbitron",monospace;color:rgba(255,100,100,.6);cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.suggest-cat:active{transform:scale(.93)}
+.suggest-cat.active{border-color:#ff6464;color:#ff6464;background:rgba(255,100,100,.1);box-shadow:0 0 10px rgba(255,100,100,.2)}
+.suggest-textarea{width:100%;min-height:120px;background:rgba(4,4,15,.8);border:1.5px solid rgba(255,100,100,.2);border-radius:10px;color:rgba(255,255,255,.85);font-family:"Rajdhani",sans-serif;font-size:13px;padding:10px;resize:none;outline:none;transition:border-color .2s;line-height:1.5}
+.suggest-textarea:focus{border-color:#ff6464}
+.suggest-counter{text-align:right;font-size:9px;color:rgba(255,255,255,.3);font-family:"Orbitron",monospace;margin-top:4px}
+.suggest-status{padding:10px 14px;border-radius:10px;font-size:11px;font-family:"Orbitron",monospace;text-align:center}
+.suggest-status.success{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:var(--green)}
+.suggest-status.error{background:rgba(255,0,102,.08);border:1px solid rgba(255,0,102,.25);color:var(--pink)}
+.suggest-status.loading{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan)}
 </style>
 </head>
 <body>
@@ -305,13 +420,19 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
   <div class="stats-row">
     <div class="stat-pill"><div class="stat-lbl">Очки</div><div class="stat-val" id="scoreVal">0</div></div>
     <div class="stat-pill"><div class="stat-lbl">❤️ Жизни</div><div class="stat-val lives" id="livesVal">3</div></div>
-    <div class="stat-pill"><div class="stat-lbl">Уровень</div><div class="stat-val level-val" id="levelVal">1</div></div>
+    <div class="stat-pill">
+      <div class="stat-lbl">⚔️ Миссия</div>
+      <div class="stat-val level-val" id="levelVal">1</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-lbl">🚀 Корабль</div>
+      <div class="stat-val" style="color:var(--gold);text-shadow:0 0 8px rgba(255,215,0,.5)" id="shipLvlHud">1</div>
+      <div class="lvl-sub" id="skillPtsDisplay" style="display:none">🔮 <span id="hudSkillPtsVal">0</span></div>
+    </div>
   </div>
-  <div id="levelBar"><div id="levelFill" style="width:0%"></div></div>
-  <div id="xpRow">
-    <div class="xp-lbl">🚀 UR.</div>
-    <div class="xp-track"><div class="xp-fill-bar" id="xpFill" style="width:0%"></div></div>
-    <div class="xp-lvl">Ур.<span id="shipLvlVal">1</span></div>
+  <div id="levelBar">
+    <div id="levelFill" style="width:0%"></div>
+    <div id="levelBarLabel"><span id="levelXpCur">0</span> / <span id="levelXpMax">0</span> XP</div>
   </div>
 </div>
 
@@ -336,15 +457,15 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
   <div class="boss-track"><div id="bossFill" style="width:100%"></div></div>
 </div>
 
+<!-- Touch skill buttons (shown during gameplay) -->
+<div id="touchSkillBar" style="display:none"></div>
+
 <!-- Bottom bar: weapons + auto -->
 <div id="bottomBar">
-  <div class="weapons-group">
-    <div class="weapon-btn active" data-weapon="laser"><div class="weapon-emoji">🔵</div><div class="weapon-lbl">LASER</div></div>
-    <div class="weapon-btn" data-weapon="rocket"><div class="weapon-emoji">🚀</div><div class="weapon-lbl">ROCKET</div></div>
-    <div class="weapon-btn" data-weapon="shotgun"><div class="weapon-emoji">💥</div><div class="weapon-lbl">SHOT</div></div>
-    <div class="weapon-btn" data-weapon="plasma"><div class="weapon-emoji">🟣</div><div class="weapon-lbl">PLASMA</div></div>
-    <div class="weapon-btn" data-weapon="lightning"><div class="weapon-emoji">⚡</div><div class="weapon-lbl">BOLT</div></div>
+  <div class="weapons-group" id="weaponsGroup">
+    <!-- Dynamically populated from selected weapons -->
   </div>
+  <div id="activeSkillBar" style="display:none"></div>
   <button id="autoBtn" class="active">⚡ АВТО</button>
 </div>
 
@@ -360,7 +481,8 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 
 <!-- DIFFICULTY / MAIN MENU -->
 <div id="difficultyScreen" class="screen active">
-  <div class="card">
+  <canvas id="starfieldCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
+  <div class="card" style="position:relative;z-index:1">
 
     <!-- Hero -->
     <div class="main-hero">
@@ -407,12 +529,19 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
       <button class="btn btn-primary" id="startBtn" disabled>▶ НАЧАТЬ ИГРУ</button>
     </div>
 
-    <!-- Nav menu 4 buttons -->
-    <div class="nav-menu">
+    <!-- Nav menu 7 buttons (3+2+2) -->
+    <div class="nav-menu" style="grid-template-columns:repeat(3,1fr)">
       <button class="nav-btn green" id="customBtn"><span class="nav-ico">🎨</span>СТИЛЬ</button>
       <button class="nav-btn gold" id="upgradeBtn"><span class="nav-ico">⚡</span>ПРОКАЧКА</button>
       <button class="nav-btn cyan" id="lbBtn"><span class="nav-ico">🏆</span>РЕЙТИНГ</button>
+    </div>
+    <div class="nav-menu" style="grid-template-columns:repeat(3,1fr);margin-top:6px">
       <button class="nav-btn purple" id="skinBtn"><span class="nav-ico">👾</span>СКИНЫ</button>
+      <button class="nav-btn" style="border-color:rgba(0,255,204,.3);color:#00ffcc" id="skillBtn"><span class="nav-ico">🌿</span>НАВЫКИ</button>
+      <button class="nav-btn" style="border-color:rgba(255,165,0,.3);color:#ffa500" id="settingsBtn"><span class="nav-ico">⚙️</span>НАСТРОЙКИ</button>
+    </div>
+    <div class="nav-menu" style="grid-template-columns:1fr;margin-top:6px">
+      <button class="nav-btn" style="border-color:rgba(255,100,100,.3);color:#ff6464;flex-direction:row;gap:8px;justify-content:center;padding:10px" id="suggestBtn"><span class="nav-ico" style="font-size:16px">💌</span>ПРЕДЛОЖИТЬ ИДЕЮ</button>
     </div>
 
   </div>
@@ -441,9 +570,30 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 <!-- UPGRADE -->
 <div id="upgradeScreen" class="screen">
   <div class="card">
-    <h1 class="screen-title gold">⚡ ПРОКАЧКА</h1>
-    <p class="screen-sub">УЛУЧШИ КОРАБЛЬ</p>
+    <h1 class="screen-title gold">⚡ ПРОКАЧКА ОРУЖИЯ</h1>
+    <p class="screen-sub">УЛУЧШИ АРСЕНАЛ</p>
     <div class="coins-banner">💰 Монеты: <span id="coinsVal">0</span></div>
+
+    <!-- Уровень корабля -->
+    <div class="ship-lvl-banner">
+      <div class="ship-lvl-left">
+        <span class="ship-lvl-ico">🚀</span>
+        <div>
+          <div class="ship-lvl-label">УРОВЕНЬ КОРАБЛЯ</div>
+          <div class="ship-lvl-num">УР. <span id="upgShipLvl">1</span></div>
+        </div>
+      </div>
+      <div class="ship-lvl-right">
+        <div class="ship-xp-label">ДО СЛЕДУЮЩЕГО</div>
+        <div class="ship-xp-bar-wrap">
+          <div class="ship-xp-bar-fill" id="upgShipXpFill" style="width:0%"></div>
+        </div>
+        <div class="ship-xp-nums"><span id="upgShipXpCur">0</span> / <span id="upgShipXpMax">0</span> XP</div>
+      </div>
+    </div>
+
+    <!-- Табы категорий -->
+    <div class="upg-tabs" id="upgTabs"></div>
     <div id="upgList"></div>
     <div class="flex gap2 mt2">
       <button class="btn btn-secondary btn-gold grow" id="backFromUpgrade">← НАЗАД</button>
@@ -539,6 +689,12 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
       </div>
     </div>
 
+    <!-- Weapon Selection -->
+    <div class="cust-section">
+      <div class="cust-lbl">🔫 Оружие для миссии <span style="color:rgba(255,215,0,.7);font-size:10px">(выбери 3)</span></div>
+      <div id="weaponSelectGrid" class="weapon-select-grid"></div>
+    </div>
+
     <!-- Toggles -->
     <div class="cust-section">
       <div class="toggle-row"><input type="checkbox" id="particlesChk" checked><label for="particlesChk">✨ Эффекты частиц</label></div>
@@ -574,7 +730,122 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
   </div>
 </div>
 
-<script src="game-code.js"></script>
+<!-- SKILL TREE SCREEN -->
+<div id="skillScreen" class="screen">
+  <div class="card" style="max-width:440px">
+    <h1 class="screen-title" style="background:linear-gradient(135deg,#00ffcc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:20px">🌿 НАВЫКИ</h1>
+    <p class="screen-sub">ОЧКИ НАВЫКОВ ЗА КАЖДЫЙ УРОВЕНЬ КОРАБЛЯ</p>
+    <div class="skill-points-banner" id="skillPointsBanner">🔮 Очков навыков: <span id="skillPtsVal">0</span></div>
+    <div id="skillTree" style="max-height:55vh;overflow-y:auto;padding-right:4px"></div>
+    <button class="btn btn-secondary w100 mt2" style="border-color:rgba(0,255,204,.4);color:#00ffcc" id="backFromSkill">← НАЗАД</button>
+  </div>
+</div>
 
+
+<div id="settingsScreen" class="screen">
+  <div class="card" style="max-width:380px">
+    <h1 class="screen-title cyan" style="font-size:24px;margin-bottom:2px">⚙️ НАСТРОЙКИ</h1>
+    <p class="screen-sub">ЗВУК И МУЗЫКА</p>
+
+    <!-- Music volume -->
+    <div class="settings-block">
+      <div class="settings-row">
+        <span class="settings-lbl">🎵 Громкость музыки</span>
+        <span class="settings-val" id="musicVolVal">70%</span>
+      </div>
+      <input type="range" class="settings-slider" id="musicVolSlider" min="0" max="100" value="70">
+    </div>
+
+    <!-- SFX volume -->
+    <div class="settings-block">
+      <div class="settings-row">
+        <span class="settings-lbl">🔫 Громкость звуков</span>
+        <span class="settings-val" id="sfxVolVal">80%</span>
+      </div>
+      <input type="range" class="settings-slider" id="sfxVolSlider" min="0" max="100" value="80">
+    </div>
+
+    <!-- Music style -->
+    <div class="settings-block">
+      <div class="settings-lbl" style="margin-bottom:10px">🎼 Стиль игровой музыки</div>
+      <div class="music-style-grid">
+        <button class="music-style-btn active" data-style="chiptune">
+          <span class="ms-ico">👾</span>
+          <span class="ms-name">ЧИПЧЮН</span>
+          <span class="ms-desc">Классик 8-bit</span>
+        </button>
+        <button class="music-style-btn" data-style="synthwave">
+          <span class="ms-ico">🌆</span>
+          <span class="ms-name">СИНТВЕЙВ</span>
+          <span class="ms-desc">Ретро-волна</span>
+        </button>
+        <button class="music-style-btn" data-style="ambient">
+          <span class="ms-ico">🌌</span>
+          <span class="ms-name">ЭМБИЕНТ</span>
+          <span class="ms-desc">Атмосферный</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- =====================================================
+         ADMIN MODE BUTTON — для тестирования
+         Чтобы убрать: удели этот блок или закомментируй
+         ===================================================== -->
+    <!-- <div class="settings-block" id="adminModeBlock" style="border-color:rgba(255,0,102,.2);background:rgba(255,0,102,.04);margin-top:4px">
+      <div class="settings-row" style="margin-bottom:6px">
+        <span class="settings-lbl" style="color:rgba(255,0,102,.7)">🔴 РЕЖИМ РАЗРАБОТЧИКА</span>
+        <span class="settings-val" id="adminStatusLabel" style="color:rgba(255,0,102,.6);font-size:9px">ВЫКЛ</span>
+      </div>
+      <div style="font-size:9px;color:rgba(255,255,255,.3);font-family:'Rajdhani',sans-serif;margin-bottom:8px">
+        ∞ монеты • ∞ навыки • макс. корабль
+      </div>
+      <button class="btn" id="adminModeBtn" style="background:rgba(255,0,102,.12);border:1.5px solid rgba(255,0,102,.35);color:rgba(255,0,102,.8);font-size:11px;padding:9px;border-radius:12px;font-family:'Orbitron',monospace;letter-spacing:1px">
+        🔴 ВКЛЮЧИТЬ РЕЖИМ РАЗРАБОТЧИКА
+      </button>
+    </div> -->
+    <!-- ===== /ADMIN MODE BUTTON ===== -->
+
+    <button class="btn btn-secondary" id="backFromSettings" style="margin-top:10px">← НАЗАД</button>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS SCREEN ═══ -->
+
+<!-- ═══ SUGGEST SCREEN ═══ -->
+<div id="suggestScreen" class="screen">
+  <div class="card" style="max-width:380px">
+    <h1 class="screen-title" style="font-size:22px;margin-bottom:2px;background:linear-gradient(135deg,#ff6464,#ffa500);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💌 ПРЕДЛОЖИТЬ ИДЕЮ</h1>
+    <p class="screen-sub">ПОМОГИ УЛУЧШИТЬ ИГРУ</p>
+
+    <!-- Category -->
+    <div class="settings-block">
+      <div class="settings-lbl" style="margin-bottom:8px">📁 Категория</div>
+      <div class="suggest-cats">
+        <button class="suggest-cat active" data-cat="gameplay">🎮 Геймплей</button>
+        <button class="suggest-cat" data-cat="balance">⚖️ Баланс</button>
+        <button class="suggest-cat" data-cat="graphics">🎨 Графика</button>
+        <button class="suggest-cat" data-cat="music">🎵 Музыка</button>
+        <button class="suggest-cat" data-cat="bug">🐛 Баг</button>
+        <button class="suggest-cat" data-cat="general">💡 Другое</button>
+      </div>
+    </div>
+
+    <!-- Text -->
+    <div class="settings-block">
+      <div class="settings-lbl" style="margin-bottom:8px">✍️ Ваше предложение</div>
+      <textarea id="suggestText" class="suggest-textarea" placeholder="Опишите свою идею или проблему... (минимум 10 символов)" maxlength="1000"></textarea>
+      <div class="suggest-counter"><span id="suggestLen">0</span>/1000</div>
+    </div>
+
+    <div id="suggestStatus" class="suggest-status" style="display:none"></div>
+
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-secondary" id="backFromSuggest" style="flex:1">← НАЗАД</button>
+      <button class="btn btn-primary" id="sendSuggestBtn" style="flex:2" disabled>📤 ОТПРАВИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<script src="game-code.js"></script>
 </body>
 </html>

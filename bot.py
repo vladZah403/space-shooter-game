@@ -608,6 +608,85 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.effective_message.reply_text(Messages.ERROR_GENERIC)
 
 
+
+
+# ===== ОБРАБОТЧИК ПРЕДЛОЖЕНИЙ ИЗ ИГРЫ =====
+
+async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик предложений по игре, отправленных через WebApp"""
+    try:
+        data = json.loads(update.effective_message.web_app_data.data)
+
+        if data.get('type') != 'suggestion':
+            # Передаём обычному обработчику результатов
+            await web_app_data_handler(update, context)
+            return
+
+        user = update.effective_user
+        suggestion_text = data.get('text', '').strip()
+        category = data.get('category', 'general')
+
+        if not suggestion_text:
+            await update.effective_message.reply_text("❌ Пустое предложение не принято.")
+            return
+
+        if len(suggestion_text) > 1000:
+            await update.effective_message.reply_text("❌ Слишком длинное предложение (макс. 1000 символов).")
+            return
+
+        category_labels = {
+            'gameplay': '🎮 Геймплей',
+            'balance': '⚖️ Баланс',
+            'graphics': '🎨 Графика',
+            'music': '🎵 Музыка',
+            'bug': '🐛 Баг-репорт',
+            'general': '💡 Общее'
+        }
+        cat_label = category_labels.get(category, '💡 Общее')
+
+        # Сохраняем предложение в БД если есть метод
+        try:
+            db.save_suggestion(user.id, suggestion_text, category)
+        except Exception:
+            pass  # БД может не иметь этой таблицы
+
+        # Отправляем подтверждение пользователю
+        await update.effective_message.reply_text(
+            f"✅ <b>Спасибо за предложение!</b>\n\n"
+            f"Категория: {cat_label}\n"
+            f"Мы рассмотрим его в ближайшее время 🚀",
+            parse_mode='HTML'
+        )
+
+        # Пересылаем разработчику (бот отправит сам себе в личку через getUpdates,
+        # либо настройте ADMIN_CHAT_ID в config.py)
+        try:
+            from config import ADMIN_CHAT_ID
+            admin_msg = (
+                f"📬 <b>Новое предложение по игре!</b>\n\n"
+                f"👤 От: {user.first_name}"
+                + (f" @{user.username}" if user.username else "")
+                + f" (ID: <code>{user.id}</code>)\n"
+                f"📁 Категория: {cat_label}\n\n"
+                f"💬 <b>Текст:</b>\n{suggestion_text}"
+            )
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=admin_msg,
+                parse_mode='HTML'
+            )
+        except (ImportError, Exception) as e:
+            logger.warning(f"Не удалось переслать предложение: {e}")
+
+        logger.info(f"💡 Предложение от {user.id} ({user.first_name}): [{category}] {suggestion_text[:50]}...")
+
+    except json.JSONDecodeError:
+        # Не JSON или обычные данные — передаём дальше
+        await web_app_data_handler(update, context)
+    except Exception as e:
+        logger.error(f"❌ Ошибка обработки предложения: {e}", exc_info=True)
+        await update.effective_message.reply_text("😔 Не удалось принять предложение. Попробуйте позже.")
+
 # ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 
 def get_achievement_progress(key: str, stats: dict) -> str:
@@ -632,7 +711,7 @@ async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "😔 Произошла непредвиденная ошибка.\n"
         "Пожалуйста, попробуйте позже или обратитесь к администратору."
     )
-    
+
     try:
         if update.callback_query:
             await update.callback_query.answer(error_text, show_alert=True)
@@ -645,10 +724,10 @@ async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Глобальный обработчик ошибок"""
     logger.error(f"❌ Exception while handling update {update}:", exc_info=context.error)
-    
+
     if isinstance(context.error, TelegramError):
         logger.error(f"Telegram Error: {context.error}")
-    
+
     await send_error_message(update, context)
 
 
@@ -673,7 +752,7 @@ def main() -> None:
             .post_init(post_init)
             .build()
         )
-        
+
         # Регистрация обработчиков команд
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("play", play))
@@ -682,28 +761,28 @@ def main() -> None:
         application.add_handler(CommandHandler("achievements", achievements_command))
         application.add_handler(CommandHandler("daily", daily_challenges))
         application.add_handler(CommandHandler("help", help_command))
-        
+
         # Обработчик кнопок
         application.add_handler(CallbackQueryHandler(button_handler))
-        
-        # Обработчик данных из Web App
+
+        # Обработчик данных из Web App (результаты игры + предложения)
         application.add_handler(
-            MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler)
+            MessageHandler(filters.StatusUpdate.WEB_APP_DATA, suggestion_handler)
         )
-        
+
         # Обработчик ошибок
         application.add_error_handler(error_handler)
-        
+
         # Запуск бота
         logger.info("🚀 Space Shooter Bot v2.0 запущен!")
         logger.info(f"📊 База данных: {db.db_name}")
         logger.info(f"🎮 URL игры: {GAME_URL}")
-        
+
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True
         )
-        
+
     except Exception as e:
         logger.error(f"❌ Критическая ошибка при запуске: {e}", exc_info=True)
         raise
