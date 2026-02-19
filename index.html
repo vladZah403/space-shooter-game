@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Space Shooter</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -23,20 +23,20 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .pause-btn:active{transform:scale(.95)}
 .pause-btn.secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:12px}
 
-/* ── UI TOP ── */
-#ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;padding:10px}
+/* ── UI TOP — Safe area for iPhone notch ── */
+#ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;padding:10px;padding-top:max(10px,env(safe-area-inset-top))}
 /* ── REDESIGNED HUD ── */
 .stats-row{display:flex;gap:5px;align-items:stretch}
 
-/* Базовый пилл */
+/* Базовый пилл — без backdrop-filter для производительности на Android */
 .stat-pill{
-  background:rgba(4,8,20,.82);
+  background:rgba(4,8,20,.92);
   border:1px solid rgba(255,255,255,.08);
   border-radius:12px;
   padding:6px 10px 5px;
-  backdrop-filter:blur(14px);
   flex:1;position:relative;overflow:hidden;
   display:flex;flex-direction:column;gap:2px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
 }
 .stat-pill::after{
   content:'';position:absolute;inset:0;border-radius:12px;
@@ -106,7 +106,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15); }
 
 /* ── COMBO ── */
-#comboDisplay{position:absolute;top:105px;right:10px;text-align:right;pointer-events:none;z-index:10;transition:opacity .3s,transform .3s}
+#comboDisplay{position:absolute;top:130px;right:10px;text-align:right;pointer-events:none;z-index:10;transition:opacity .3s,transform .3s}
 .combo-word{font-size:9px;color:rgba(255,215,0,.7);font-family:'Orbitron',monospace;letter-spacing:2px}
 .combo-num{font-size:32px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 20px rgba(255,215,0,.6);line-height:1;animation:comboPulse .3s ease}
 @keyframes comboPulse{0%{transform:scale(1.3)}100%{transform:scale(1)}}
@@ -121,7 +121,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 @keyframes notifAnim{0%{opacity:0;transform:scale(.4) translateY(0)}20%{opacity:1;transform:scale(1.1) translateY(0)}60%{opacity:1;transform:scale(1) translateY(-10px)}100%{opacity:0;transform:scale(.8) translateY(-45px)}}
 
 /* ── POWERUP BAR ── */
-#powerupBar{position:absolute;bottom:72px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
+#powerupBar{position:absolute;bottom:max(72px,calc(env(safe-area-inset-bottom)+60px));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
 .pu-chip{background:rgba(8,18,35,.88);border:1.5px solid;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;font-family:'Orbitron',monospace;display:flex;align-items:center;gap:5px}
 .pu-chip.shield{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.3)}
 .pu-chip.speed{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(255,215,0,.3)}
@@ -134,7 +134,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 @keyframes freezeFlash{from{background:rgba(136,238,255,.25)}to{background:rgba(136,238,255,.06)}}
 
 /* ── BOSS BAR ── */
-#bossBar{position:absolute;bottom:72px;left:10px;right:10px;z-index:10;display:none;pointer-events:none}
+/* #bossBar стили перенесены ниже в блок MOBILE COMBAT UX */
 .boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink);animation:bossNamePulse 1.5s infinite}
 @keyframes bossNamePulse{0%,100%{opacity:1;text-shadow:0 0 10px var(--pink)}50%{opacity:.7;text-shadow:0 0 20px var(--pink),0 0 40px var(--pink)}}
 @keyframes missionBossPulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -148,26 +148,306 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 #touchSkillBar{ display:none !important; }
 .touch-skill-btn{display:none}
 
+/* ══════════════════════════════════
+   MOBILE COMBAT UX — REDESIGN
+══════════════════════════════════ */
+
+/* ── ОРУЖИЕ — крупные кнопки снизу ── */
+.weapon-btn{
+  width:62px;height:62px;min-width:52px;
+  background:rgba(6,10,24,.95);
+  border:2px solid rgba(0,255,136,.25);
+  border-radius:16px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;gap:2px;
+  position:relative;overflow:hidden;
+  box-shadow:0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+}
+.weapon-btn::before{
+  content:'';position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(135deg,rgba(255,255,255,.04),transparent 60%);
+  pointer-events:none;
+}
+.weapon-btn.active{
+  border-color:var(--green);
+  background:rgba(0,40,20,.95);
+  box-shadow:0 0 20px rgba(0,255,136,.35),0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(0,255,136,.15);
+}
+.weapon-btn:active{transform:scale(.85);transition:transform .08s}
+.weapon-emoji{font-size:20px;line-height:1}
+.weapon-lbl{font-size:8px;color:rgba(0,255,136,.5);font-family:'Orbitron',monospace;font-weight:700;letter-spacing:.5px}
+.weapon-btn.active .weapon-lbl{color:var(--green)}
+.weapon-btn.active::after{
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:60%;height:2px;background:var(--green);border-radius:2px;
+  box-shadow:0 0 8px var(--green);
+}
+
+/* ── WEAPON GROUP ── */
+.weapons-group{display:flex;gap:7px;align-items:center}
+
+/* ── НИЖНЯЯ ПАНЕЛЬ — оружие+пассивные слева, активный навык справа ── */
+#bottomBar{
+  position:absolute;
+  bottom:max(16px,env(safe-area-inset-bottom));
+  left:10px;right:10px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  z-index:10;pointer-events:all;
+  gap:8px;
+}
+
+/* Левая группа: пассивные навыки + оружие */
+#bottomLeft{
+  display:flex;flex-direction:column;gap:6px;align-items:flex-start;
+  flex-shrink:1;min-width:0;
+}
+
+/* ask-wrap */
+.ask-wrap{
+  position:relative;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:0;
+  -webkit-tap-highlight-color:transparent;
+  animation:skillIn .3s cubic-bezier(.22,.68,0,1.2) both;
+}
+
+/* ── АКТИВНЫЕ НАВЫКИ — правый нижний угол, колонка ── */
+#activeSkillBar{
+  position:static;
+  display:flex;flex-direction:column;gap:5px;z-index:15;
+  align-items:center;pointer-events:all;
+  flex-shrink:0;
+}
+.ask-card{
+  width:58px;height:58px;
+  background:rgba(6,8,22,.92);
+  border:1.5px solid rgba(0,212,255,.35);
+  border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1px;position:relative;overflow:hidden;
+  box-shadow:0 0 16px rgba(0,212,255,.15),inset 0 1px 0 rgba(255,255,255,.06),0 4px 16px rgba(0,0,0,.5);
+  transition:border-color .2s,box-shadow .2s,transform .1s;
+}
+.ask-wrap:active .ask-card{transform:scale(.84)}
+.ask-ico{font-size:22px;line-height:1;z-index:1;position:relative;transition:filter .2s}
+
+/* ── ПАУЗА — встроена в HUD строку сверху ── */
+.stat-pill--pause{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  pointer-events:all!important;
+  min-width:44px!important;
+  flex:0 0 44px!important;
+  transition:border-color .18s,box-shadow .18s;
+  position:static!important;
+  top:auto!important;left:auto!important;transform:none!important;
+  width:auto!important;height:auto!important;
+  border-radius:10px!important;
+  background:rgba(3,6,18,.94)!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4)!important;
+  z-index:auto!important;
+}
+.stat-pill--pause:active{ transform:scale(.88)!important; }
+.stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15)!important; }
+.stat-pill--pause span{font-size:16px}
+
+/* ── HUD TOP — компактнее ── */
+#ui{
+  position:absolute;top:0;left:0;right:0;z-index:10;
+  pointer-events:none;
+  padding:max(10px,env(safe-area-inset-top)) 10px 0;
+}
+.stats-row{display:flex;gap:4px;align-items:stretch}
+.stat-pill{
+  background:rgba(3,6,18,.94);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;
+  padding:5px 8px 4px;
+  flex:1;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:1px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4);
+}
+.stat-val{font-size:14px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 8px rgba(0,255,136,.5)}
+.stat-lbl{font-size:6.5px;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:1.2px;font-family:'Orbitron',monospace;line-height:1}
+
+/* ── ПАССИВНЫЕ НАВЫКИ — горизонтально в нижней панели рядом с оружием ── */
+#passiveHud{
+  position:static;
+  display:flex;flex-direction:row;gap:5px;z-index:12;
+  align-items:center;
+  flex-wrap:nowrap;
+  flex-shrink:1;
+}
+.passive-hud-item{
+  width:38px;height:38px;
+  background:rgba(6,8,22,.94);
+  border:1px solid rgba(168,85,247,.45);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 10px rgba(168,85,247,.2),0 2px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+  animation:passiveIn .3s cubic-bezier(.22,.68,0,1.2) both;
+  position:relative;overflow:hidden;cursor:default;
+  flex-shrink:0;
+}
+.passive-hud-item::before{
+  content:'';position:absolute;inset:0;border-radius:10px;
+  background:linear-gradient(135deg,rgba(168,85,247,.1),transparent 60%);
+  pointer-events:none;
+}
+.passive-hud-ico-wrap{ display:flex;align-items:center;justify-content:center; }
+.passive-hud-ico{font-size:18px;line-height:1;filter:drop-shadow(0 0 4px rgba(168,85,247,.6))}
+.passive-hud-info{ display:none; }
+@keyframes passiveIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+
+/* ── POWERUP BAR — над нижней панелью, по центру ── */
+#powerupBar{
+  position:absolute;
+  bottom:max(86px,calc(env(safe-area-inset-bottom)+76px));
+  left:50%;transform:translateX(-50%);
+  display:flex;gap:6px;z-index:10;pointer-events:none;
+}
+.pu-chip{
+  background:rgba(6,10,24,.94);
+  border:1.5px solid;border-radius:16px;
+  padding:4px 10px;font-size:10px;font-weight:700;
+  font-family:'Orbitron',monospace;
+  display:flex;align-items:center;gap:4px;
+  box-shadow:0 2px 10px rgba(0,0,0,.4);
+}
+
+/* ── BOSS BAR — снизу над нижней панелью с оружием ── */
+#bossBar{
+  position:fixed;
+  top:70px;
+  left:10px;right:10px;
+  z-index:20;display:none;pointer-events:none;
+  background:rgba(3,6,18,.92);border-radius:12px;
+  padding:8px 12px;
+  box-shadow:0 0 20px rgba(255,0,102,.15),0 4px 16px rgba(0,0,0,.5);
+  border:1px solid rgba(255,0,102,.3);
+}
+
+/* ── COMBO — над нижней панелью, справа ── */
+#comboDisplay{
+  position:absolute;
+  bottom:max(92px,calc(env(safe-area-inset-bottom)+82px));
+  right:10px;
+  left:auto;
+  text-align:right;
+  pointer-events:none;z-index:10;
+  transition:opacity .3s,transform .3s;
+  background:rgba(3,6,18,.7);
+  border-radius:10px;padding:4px 8px;
+  border:1px solid rgba(255,215,0,.1);
+}
+.combo-num{font-size:28px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 16px rgba(255,215,0,.6);line-height:1}
+
+/* ── RAIL CD — читаемее ── */
+.weapon-btn.rail-cd{
+  border-color:rgba(0,255,204,.4)!important;
+  background:rgba(0,20,20,.95)!important;
+  opacity:.8;
+}
+.weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:7px!important}
+
+/* ── СВАЙП HINT — читаемее ── */
+.swipe-hint{
+  position:absolute;
+  bottom:max(92px,calc(env(safe-area-inset-bottom)+80px));
+  left:50%;transform:translateX(-50%);
+  font-size:9px;color:rgba(168,85,247,.55);
+  font-family:'Orbitron',monospace;letter-spacing:2px;
+  pointer-events:none;animation:swipeHintFade 4s forwards;
+  background:rgba(4,4,15,.7);border-radius:8px;padding:4px 10px;
+  white-space:nowrap;
+}
+
+/* ── DAMAGE OVERLAY — усилен ── */
+#damageOverlay{
+  position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:radial-gradient(ellipse at center,transparent 50%,rgba(255,0,60,.5) 100%);
+  opacity:0;transition:opacity 0.1s ease-out;
+}
+
+/* ── МЕДИА: телефоны в landscape ── */
+@media (orientation:landscape) and (max-height:450px){
+  .weapon-btn{width:50px;height:50px}
+  .ask-card{width:48px;height:48px}
+  .stat-val{font-size:12px}
+  #powerupBar{bottom:max(72px,calc(env(safe-area-inset-bottom)+62px))}
+  /* #bossBar top position handled globally */
+  #comboDisplay{bottom:max(74px,calc(env(safe-area-inset-bottom)+64px))}
+  .passive-hud-item{width:32px;height:32px}
+  .passive-hud-ico{font-size:15px}
+}
+
+/* ── TOUCH RIPPLE на кнопках оружия ── */
+@keyframes weaponRipple{
+  0%{transform:scale(0);opacity:.4}
+  100%{transform:scale(2.5);opacity:0}
+}
+.weapon-btn .ripple{
+  position:absolute;width:30px;height:30px;border-radius:50%;
+  background:rgba(0,255,136,.25);transform:scale(0);
+  pointer-events:none;
+  animation:weaponRipple 0.35s ease-out forwards;
+}
+.ask-wrap .ripple{
+  position:absolute;width:30px;height:30px;border-radius:50%;
+  background:rgba(0,212,255,.25);transform:scale(0);
+  pointer-events:none;
+  animation:weaponRipple 0.35s ease-out forwards;
+}
+
 /* Swipe hint */
 .swipe-hint{position:absolute;bottom:130px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(168,85,247,.6);font-family:'Orbitron',monospace;letter-spacing:2px;pointer-events:none;animation:swipeHintFade 4s forwards}
 @keyframes swipeHintFade{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
 
-/* ── AUTO / WEAPON BAR ── */
-#bottomBar{position:absolute;bottom:12px;left:10px;right:10px;display:flex;align-items:center;justify-content:space-between;z-index:10;pointer-events:all}
-/* На мобильных скрываем десктопный activeSkillBar - используем touchSkillBar */
+/* ── AUTO BTN (скрыт) ── */
+#autoBtn{display:none!important}
+/* ── AUTO / WEAPON BAR — safe area ── */
 @media (hover: none) and (pointer: coarse) {
   /* activeSkillBar always shown via JS */
 }
-.weapon-btn{width:50px;height:50px;background:rgba(8,18,35,.88);border:2px solid rgba(0,255,136,.2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;gap:1px;backdrop-filter:blur(8px)}
-.weapon-btn.active{border-color:var(--green);background:rgba(0,255,136,.12);box-shadow:0 0 16px rgba(0,255,136,.3)}
-.weapon-btn:active{transform:scale(.88)}
-.weapon-emoji{font-size:18px;line-height:1}
-.weapon-lbl{font-size:7px;color:rgba(0,255,136,.6);font-family:'Orbitron',monospace;font-weight:700}
-.weapon-btn.active .weapon-lbl{color:var(--green)}
-.weapons-group{display:flex;gap:6px}
-#autoBtn{background:rgba(8,18,35,.88);border:1.5px solid rgba(0,255,136,.3);border-radius:20px;padding:8px 14px;color:rgba(0,255,136,.6);font-size:10px;font-family:'Orbitron',monospace;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px;backdrop-filter:blur(8px)}
-#autoBtn.active{background:rgba(0,255,136,.15);border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(0,255,136,.25)}
-#autoBtn:active{transform:scale(.93)}
+
+/* ── COMBO — перенесён вправо-вниз ── */
+/* Стили уже заданы выше в MOBILE COMBAT UX block */
+
+/* ── DAMAGE OVERLAY — красный flash по краям при уроне ── */
+#damageOverlay{
+  position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(255,0,60,.4) 100%);
+  opacity:0;transition:opacity 0.08s ease-out;
+}
+#damageOverlay.flash{opacity:1}
+
+/* ── HEART BURST — анимация потери жизни ── */
+@keyframes heartBurst{
+  0%  {transform:scale(1);filter:drop-shadow(0 0 4px #ff5077)}
+  30% {transform:scale(1.7);opacity:1}
+  100%{transform:scale(0.2);opacity:0}
+}
+.heart-ico.losing{animation:heartBurst 0.35s ease-out forwards!important}
+
+/* ── COIN FLY — монеты летят вверх ── */
+@keyframes coinFly{
+  0%  {opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-65px) scale(0.7)}
+}
+
+/* ── WAVE INCOMING — индикатор пустого экрана ── */
+@keyframes waveIncoming{0%,100%{opacity:.25}50%{opacity:.7}}
+
+/* ── WEAPON SWITCH FLASH ── */
+@keyframes weaponSwitchFlash{
+  0%  {transform:scale(1.3);opacity:1}
+  100%{transform:scale(1);opacity:0}
+}
+.weapon-btn.just-switched::after{
+  content:'';position:absolute;inset:0;border-radius:11px;
+  background:rgba(0,255,136,.25);
+  animation:weaponSwitchFlash 0.3s ease-out forwards;
+  pointer-events:none;
+}
 
 
 /* ── SHIP LEVEL BANNER IN UPGRADE SCREEN ── */
@@ -498,66 +778,11 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .active-tag{background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.25)}
 
 /* ══════════════════════════════════════════
-   ПАССИВНЫЕ НАВЫКИ В БОЮ
+   ПАССИВНЫЕ НАВЫКИ В БОЮ — стили перенесены в MOBILE COMBAT UX
 ══════════════════════════════════════════ */
-/* ══════════════════════════════════════════
-   ПАССИВНЫЕ НАВЫКИ В БОЮ — новый дизайн
-══════════════════════════════════════════ */
-#passiveHud{
-  position:fixed;left:8px;bottom:76px;
-  display:flex;flex-direction:column;gap:5px;z-index:12;
-  align-items:flex-start;
-}
-.passive-hud-item{
-  width:38px;height:38px;
-  background:rgba(6,8,22,.9);
-  border:1px solid rgba(168,85,247,.45);
-  border-radius:11px;
-  display:flex;align-items:center;justify-content:center;
-  backdrop-filter:blur(12px);
-  box-shadow:0 0 12px rgba(168,85,247,.2),inset 0 1px 0 rgba(255,255,255,.05);
-  animation:passiveIn .3s cubic-bezier(.22,.68,0,1.2) both;
-  position:relative;overflow:hidden;cursor:default;
-}
-.passive-hud-item::before{
-  content:'';position:absolute;inset:0;border-radius:11px;
-  background:linear-gradient(135deg,rgba(168,85,247,.1),transparent 60%);
-  pointer-events:none;
-}
-.passive-hud-ico-wrap{ display:flex;align-items:center;justify-content:center; }
-.passive-hud-ico{font-size:18px;line-height:1;filter:drop-shadow(0 0 4px rgba(168,85,247,.6))}
-/* скрываем текстовые элементы — только иконка */
-.passive-hud-info{ display:none; }
-@keyframes passiveIn{from{opacity:0;transform:translateX(-10px) scale(.85)}to{opacity:1;transform:translateX(0) scale(1)}}
 
-/* ══════════════════════════════════════════
-   АКТИВНЫЙ НАВЫК В БОЮ — новый дизайн
-══════════════════════════════════════════ */
-#activeSkillBar{
-  position:fixed;right:10px;bottom:12px;
-  display:flex;flex-direction:column;gap:4px;z-index:15;
-  align-items:center;
-  pointer-events:all;
-}
-.ask-wrap{
-  position:relative;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:0;
-  -webkit-tap-highlight-color:transparent;
-  animation:skillIn .3s cubic-bezier(.22,.68,0,1.2) both;
-}
-/* Основная карточка */
-.ask-card{
-  width:46px;height:46px;
-  background:rgba(6,8,22,.9);
-  border:1.5px solid rgba(0,212,255,.35);
-  border-radius:12px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:1px;position:relative;overflow:hidden;
-  backdrop-filter:blur(14px);
-  box-shadow:0 0 16px rgba(0,212,255,.15),inset 0 1px 0 rgba(255,255,255,.06);
-  transition:border-color .2s,box-shadow .2s,transform .1s;
-}
-.ask-wrap:active .ask-card{transform:scale(.88)}
+/* ── АКТИВНЫЙ НАВЫК В БОЮ — стили перенесены в MOBILE COMBAT UX ── */
+/* ask-wrap и ask-card переопределены выше в MOBILE COMBAT UX */
 .ask-wrap.ask-active .ask-card{
   border-color:rgba(0,255,136,.6);
   box-shadow:0 0 24px rgba(0,255,136,.35),inset 0 1px 0 rgba(255,255,255,.08);
@@ -579,7 +804,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 .ask-ring-fill{fill:none;stroke:#00d4ff;stroke-width:2.5;stroke-linecap:round;transition:stroke-dashoffset .12s linear}
 .ask-ring-ready{fill:none;stroke:rgba(0,255,136,.5);stroke-width:2.5}
 .ask-ring-active{fill:none;stroke:rgba(0,255,136,.8);stroke-width:2.5;stroke-dasharray:4 2}
-.ask-ico{font-size:17px;line-height:1;z-index:1;position:relative;transition:filter .2s}
+/* ask-ico переопределён выше */
 .ask-wrap.ask-ready .ask-ico{filter:drop-shadow(0 0 8px rgba(0,212,255,.8))}
 .ask-wrap.ask-active .ask-ico{filter:drop-shadow(0 0 10px rgba(0,255,136,.9))}
 .ask-cd-txt{
@@ -797,6 +1022,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 <div id="notifications"></div>
 <div id="powerupBar"></div>
 <div id="freezeOverlay"></div>
+<div id="damageOverlay"></div>
 
 <!-- Boss bar -->
 <div id="bossBar">
@@ -807,15 +1033,16 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 <!-- Touch skill buttons (shown during gameplay) -->
 <div id="touchSkillBar" style="display:none"></div>
 
-<!-- Пассивные навыки в бою -->
-<div id="passiveHud" style="display:none"></div>
-
-<!-- Активный навык в бою — правый нижний угол -->
-<div id="activeSkillBar" style="display:none"></div>
-
-<!-- Bottom bar: weapons + auto -->
+<!-- Bottom bar: [passives + weapons] слева, [активный навык] справа -->
 <div id="bottomBar">
-  <div class="weapons-group" id="weaponsGroup"></div>
+  <div id="bottomLeft">
+    <!-- Пассивные навыки в бою — горизонтально над оружием -->
+    <div id="passiveHud" style="display:none"></div>
+    <!-- Оружие -->
+    <div class="weapons-group" id="weaponsGroup"></div>
+  </div>
+  <!-- Активный навык — правый нижний угол -->
+  <div id="activeSkillBar" style="display:none"></div>
   <button id="autoBtn" class="active">⚡ АВТО</button>
 </div>
 
@@ -948,6 +1175,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
     <div class="flex gap2">
       <div class="score-block grow"><div class="score-lbl">УРОВЕНЬ</div><div class="score-val" id="goLevel" style="font-size:20px">1</div></div>
       <div class="score-block grow"><div class="score-lbl">МАКС КОМБО</div><div class="score-val" id="goCombo" style="font-size:20px">x1</div></div>
+      <div class="score-block grow"><div class="score-lbl">💀 БОССЫ</div><div class="score-val" id="goBoss" style="font-size:20px">0</div></div>
     </div>
     <div class="score-block"><div class="score-lbl">🏆 РЕКОРД</div><div class="score-val record" id="goBest">0</div></div>
     <div class="coins-earned" id="goCoins">💰 Монет: 0</div>
@@ -1304,5 +1532,32 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 </div>
 
 <script src="game-code.js"></script>
+<script>
+/* ── RIPPLE EFFECT для кнопок оружия и навыков ── */
+function addRipple(el, e){
+  const r = document.createElement('span');
+  r.className = 'ripple';
+  const rect = el.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  r.style.left = (touch.clientX - rect.left - 15) + 'px';
+  r.style.top  = (touch.clientY - rect.top  - 15) + 'px';
+  el.appendChild(r);
+  r.addEventListener('animationend', () => r.remove());
+}
+
+document.addEventListener('touchstart', function(e){
+  const btn = e.target.closest('.weapon-btn, .ask-wrap');
+  if(btn) addRipple(btn, e);
+}, {passive:true});
+
+/* ── Увеличиваем hitbox паузы чтобы было удобнее ── */
+document.addEventListener('DOMContentLoaded', function(){
+  const pausePill = document.querySelector('.stat-pill--pause');
+  if(pausePill){
+    pausePill.style.minWidth = '52px';
+    pausePill.style.minHeight = '40px';
+  }
+});
+</script>
 </body>
 </html>

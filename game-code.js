@@ -663,6 +663,10 @@ let activeSkillCooldowns = {};
 let activeSkillEffects = {};
 let killCounter = 0;
 
+// ── АРМАДА — таймер появления флота ──
+let armadaTimer = 0;
+let armadaActive = false; // флаг что армада сейчас на экране
+
 function getSkillBonus(){
   return {
     vampirism:     (skillLevels.sk_vamp||0) * 0.15,
@@ -2319,17 +2323,270 @@ document.getElementById('autoChk').addEventListener('change',function(){ autoSho
 
 let currentWeapon = custom.selectedWeapons[0] || 'laser';
 
-// ════════════════════════════════════════════════════
-// WEAPONS
-// ════════════════════════════════════════════════════
-const WEAPONS = {
-  laser:     {baseCd:160, label:'ЛАЗЕР',   color:'#00d4ff', emoji:'🔵', desc:'Быстрый луч'},
-  rocket:    {baseCd:600, label:'РАКЕТА',  color:'#ff6b00', emoji:'🚀', desc:'Наводящаяся'},
-  shotgun:   {baseCd:800, label:'ДРОБЬ',   color:'#ffd700', emoji:'💥', desc:'Широкий залп'},
-  plasma:    {baseCd:450, label:'ПЛАЗМА',  color:'#a855f7', emoji:'🟣', desc:'Медленный шар'},
-  lightning: {baseCd:350, label:'МОЛНИЯ',  color:'#ffff00', emoji:'⚡', desc:'Цепная молния'},
-  rail:      {baseCd:900, label:'РЕЛЬСА',  color:'#00ffcc', emoji:'🔮', desc:'Сквозной удар'},
-};
+// ════════════════════════════════════════════════════════════════════
+// WEAPON SYSTEM — ООП. Всё оружие описывается в одном месте.
+//
+// Чтобы добавить НОВОЕ ОРУЖИЕ:
+//   1. Добавь запись в WeaponSystem.registry ниже
+//   2. Всё — shoot/update/draw подхватятся автоматически
+//
+// Структура записи:
+//   id        — строковый ключ (совпадает с ключом объекта)
+//   label     — название для UI
+//   emoji     — иконка кнопки
+//   color     — основной цвет
+//   desc      — описание
+//   baseCd    — базовый кулдаун в мс
+//   isSpecial — true если у оружия особая логика (как рельса)
+//   fire(ctx) — создаёт пули и добавляет в массив bullets
+//   update(b, dt, i) — двигает пулю, возвращает false чтобы удалить
+//   draw(b, ctx, now) — рисует пулю
+// ════════════════════════════════════════════════════════════════════
+
+class WeaponSystem {
+  constructor(){
+    // ── Реестр оружий ──────────────────────────────────────────────
+    // Порядок важен: определяет порядок в меню выбора оружия
+    this.registry = {};
+    this._registerAll();
+  }
+
+  _registerAll(){
+    const R = (id, def) => { this.registry[id] = { id, ...def }; };
+
+    // ──────────────────────────────────────────────────────────────
+    R('laser', {
+      label:'ЛАЗЕР', emoji:'🔵', color:'#00d4ff', desc:'Быстрый луч', baseCd:160,
+      fire(){
+        const bonus = getBonus();
+        const spd   = 13 * bonus.bulletSpeedMult * (activePowerups.speed>0?1.3:1);
+        const isCrit = Math.random()<bonus.critChance;
+        const dmg   = bonus.damageMult * (isCrit?bonus.critMult:1);
+        if(isCrit) notify('💥 КРИТ!','gold');
+        const bw    = Math.round(5 * bonus.laserWidthMult);
+        const ms    = bonus.multishot + (laserDoubleActive>0?1:0);
+        const offsets = [0,[-11,11],[-16,0,16],[-24,-8,8,24]][Math.min(ms,3)];
+        (Array.isArray(offsets)?offsets:[0]).forEach(ox=>{
+          bullets.push({ x:player.x+ox, y:player.y, w:bw, h:22, sp:spd, dmg,
+            type:'laser', pierce:bonus.pierceCount>0, pierced:new Set(), maxPierce:bonus.pierceCount });
+        });
+      },
+      update(b, dt){
+        b.y -= b.sp;
+        if(b.vx) b.x += b.vx;
+        return !(b.y < -80);
+      },
+      draw(b, ctx, now){
+        const wc = BULLET_COLORS[custom.bulletColor] || BULLET_COLORS.cyan;
+        if(custom.glow){ ctx.shadowBlur=12; ctx.shadowColor=wc.a; }
+        const bg = ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
+        bg.addColorStop(0,wc.a); bg.addColorStop(1,wc.b);
+        ctx.fillStyle=bg;
+        ctx.beginPath(); ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,3); ctx.fill();
+      }
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    R('rocket', {
+      label:'РАКЕТА', emoji:'🚀', color:'#ff6b00', desc:'Наводящаяся', baseCd:600,
+      fire(){
+        const bonus = getBonus();
+        const rspd  = 7 * bonus.bulletSpeedMult * bonus.rocketSpdMult;
+        const rdmg  = bonus.damageMult * 3 * bonus.rocketDmgMult;
+        let vx=0, vy=-rspd;
+        if(enemies.length>0){
+          let near=null, nd=Infinity;
+          enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} });
+          if(near){ const dx=near.x-player.x,dy=near.y-player.y,d=Math.max(Math.hypot(dx,dy),1); vx=dx/d*rspd; vy=dy/d*rspd; }
+        }
+        bullets.push({ x:player.x, y:player.y, w:10, h:18, sp:rspd, dmg:rdmg,
+          type:'rocket', angle:0, homing:true, split:bonus.rocketSplit,
+          vx, vy, homingStrength:0.08 });
+      },
+      update(b, dt){
+        if(!b.vx) b.vx=0;
+        if(!b.vy) b.vy=-b.sp;
+        if(b.homing && enemies.length>0){
+          let near=null, nd=Infinity;
+          enemies.forEach(e=>{ const d=Math.hypot(e.x-b.x,e.y-b.y); if(d<nd){nd=d;near=e;} });
+          if(near){
+            const dx=near.x-b.x, dy=near.y-b.y, dist=Math.max(nd,.1), str=b.homingStrength||0.08;
+            b.vx += (dx/dist*b.sp-b.vx)*str;
+            b.vy += (dy/dist*b.sp-b.vy)*str;
+            const s=Math.hypot(b.vx,b.vy); if(s>0){b.vx=b.vx/s*b.sp; b.vy=b.vy/s*b.sp;}
+          }
+        }
+        b.y += b.vy; b.x += b.vx;
+        b.angle = Math.atan2(b.vx,-b.vy);
+        return !(b.y<-80||b.x<-60||b.x>canvas.width+60||b.y>canvas.height+80);
+      },
+      draw(b, ctx, now){
+        const wc={a:'#ff6b00',b:'#ffaa00'};
+        if(custom.glow){ctx.shadowBlur=18; ctx.shadowColor=wc.a;}
+        const rAngle = b.vx!==undefined ? Math.atan2(b.vx,-b.vy) : (b.angle||0);
+        ctx.translate(b.x,b.y); ctx.rotate(rAngle);
+        const rg=ctx.createLinearGradient(0,-b.h/2,0,b.h/2);
+        rg.addColorStop(0,wc.a); rg.addColorStop(1,wc.b);
+        ctx.fillStyle=rg; ctx.beginPath(); ctx.roundRect(-b.w/2,-b.h/2,b.w,b.h,4); ctx.fill();
+        const fl=9+Math.random()*7;
+        ctx.fillStyle=wc.a+'66'; ctx.beginPath();
+        ctx.moveTo(-b.w/2,b.h/2); ctx.lineTo(b.w/2,b.h/2); ctx.lineTo(0,b.h/2+fl); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#fff8'; ctx.beginPath();
+        ctx.moveTo(-b.w/4,b.h/2); ctx.lineTo(b.w/4,b.h/2); ctx.lineTo(0,b.h/2+fl*.5); ctx.closePath(); ctx.fill();
+      }
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    R('shotgun', {
+      label:'ДРОБЬ', emoji:'💥', color:'#ffd700', desc:'Широкий залп', baseCd:800,
+      fire(){
+        const bonus = getBonus();
+        const s = 10 * bonus.bulletSpeedMult;
+        const dmg = bonus.damageMult;
+        const half = Math.floor(bonus.shotPellets/2);
+        for(let a=-half; a<=half; a++){
+          bullets.push({ x:player.x, y:player.y, w:6, h:14, sp:s, dmg,
+            type:'shotgun', vx:a*1.8*bonus.shotSpreadMult,
+            pierce:bonus.shotPierce, pierced:new Set() });
+        }
+      },
+      update(b, dt){
+        b.y -= b.sp;
+        if(b.vx) b.x += b.vx;
+        return !(b.y<-80||b.x<-60||b.x>canvas.width+60);
+      },
+      draw(b, ctx, now){
+        const wc={a:'#ffd700',b:'#ff9900'};
+        if(custom.glow){ctx.shadowBlur=12; ctx.shadowColor=wc.a;}
+        const bg=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
+        bg.addColorStop(0,wc.a); bg.addColorStop(1,wc.b);
+        ctx.fillStyle=bg; ctx.beginPath(); ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,3); ctx.fill();
+      }
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    R('plasma', {
+      label:'ПЛАЗМА', emoji:'🟣', color:'#a855f7', desc:'Медленный шар с взрывом', baseCd:450,
+      fire(){
+        const bonus = getBonus();
+        const pspd = 5.5 * bonus.bulletSpeedMult * bonus.plasmaSpdMult;
+        const pdmg = bonus.damageMult * 2.5 * bonus.plasmaDmgMult;
+        const aoeR = Math.round(80 * bonus.plasmaAoeMult);
+        let vx=0, vy=-pspd;
+        if(enemies.length>0){
+          let near=null, nd=Infinity;
+          enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} });
+          if(near){ const dx=near.x-player.x,dy=near.y-player.y,d=Math.max(Math.hypot(dx,dy),1); vx=dx/d*pspd; vy=dy/d*pspd; }
+        }
+        bullets.push({ x:player.x, y:player.y, w:16, h:16, sp:pspd, dmg:pdmg,
+          type:'plasma', vx, vy, aoeR, fuse:1800, fuseMax:1800 });
+      },
+      update(b, dt){
+        b.x += b.vx||0; b.y += b.vy||-b.sp;
+        b.fuse -= dt;
+        const outOfBounds = b.y<-80||b.x<-60||b.x>canvas.width+60||b.y>canvas.height+80;
+        if(b.fuse<=0 || outOfBounds){
+          const r=b.aoeR||80;
+          explode(b.x,b.y,'#a855f7',55); triggerShake(6); playSound('explode');
+          enemies.forEach(en=>{ const d=Math.hypot(en.x-b.x,en.y-b.y); if(d<r&&!en.spawnInvincible){ en.hp-=Math.ceil((b.dmg||1)*(1-d/r*0.5)); if(en.hp<=0) killEnemy(enemies.indexOf(en),DIFF[difficulty]); } });
+          particles.push({x:b.x,y:b.y,vx:0,vy:0,life:1,decay:.04,color:'#a855f7',wave:true,r:0,maxR:r,bossShot:false});
+          return false; // удалить
+        }
+        return true;
+      },
+      draw(b, ctx, now){
+        const fuseRatio = b.fuse!==undefined ? Math.max(0,b.fuse/b.fuseMax) : 1;
+        const pulse = 1+(0.12+(1-fuseRatio)*0.22)*Math.sin(now*(0.008+(1-fuseRatio)*0.035)*1000+b.x);
+        const radius = b.w*(1+(1-fuseRatio)*0.5)*pulse;
+        ctx.shadowBlur=20+15*(1-fuseRatio); ctx.shadowColor=fuseRatio<0.3?'#ffffff':'#a855f7';
+        const pg=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,radius);
+        pg.addColorStop(0,fuseRatio<0.3?'#ffffff':'#ff88ff');
+        pg.addColorStop(0.4,fuseRatio<0.3?'#ff00ff':'#a855f7');
+        pg.addColorStop(1,'#a855f700');
+        ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(b.x,b.y,radius,0,Math.PI*2); ctx.fill();
+        if(b.fuse!==undefined){
+          ctx.strokeStyle=fuseRatio<0.3?'#ffffff':fuseRatio<0.6?'#ff66ff':'#cc44ff';
+          ctx.lineWidth=2; ctx.beginPath();
+          ctx.arc(b.x,b.y,radius+4,-Math.PI/2,-Math.PI/2+Math.PI*2*fuseRatio); ctx.stroke();
+        }
+      }
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    R('lightning', {
+      label:'МОЛНИЯ', emoji:'⚡', color:'#ffff00', desc:'Цепная молния', baseCd:350,
+      fire(){
+        const bonus = getBonus();
+        const dmg = bonus.damageMult;
+        bullets.push({ x:player.x, y:player.y, w:4, h:30,
+          sp:22*bonus.bulletSpeedMult, dmg:dmg*0.8,
+          type:'lightning', chain:3+bonus.pierceCount, pierced:new Set(), pierce:true });
+      },
+      update(b, dt){
+        b.y -= b.sp;
+        return !(b.y < -80);
+      },
+      draw(b, ctx, now){
+        ctx.strokeStyle='#ffff44'; ctx.lineWidth=3;
+        ctx.shadowBlur=14; ctx.shadowColor='#ffff00';
+        ctx.beginPath();
+        ctx.moveTo(b.x,b.y+b.h);
+        ctx.lineTo(b.x+(Math.random()-.5)*6, b.y+b.h*0.5);
+        ctx.lineTo(b.x+(Math.random()-.5)*6, b.y);
+        ctx.stroke();
+        ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.5; ctx.shadowBlur=0;
+        ctx.beginPath(); ctx.moveTo(b.x,b.y+b.h); ctx.lineTo(b.x,b.y); ctx.stroke();
+      }
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    R('rail', {
+      label:'РЕЛЬСА', emoji:'🔮', color:'#00ffcc', desc:'Сквозной луч', baseCd:900,
+      isSpecial: true, // не участвует в обычном цикле shoot()
+      fire(){ fireRailgun(); },
+      // Рельса не использует bullets[] — управляется через railBeam
+      update(){ return false; },
+      draw(){ }
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    // ↑↑↑ СЮДА ДОБАВЛЯЙ НОВОЕ ОРУЖИЕ ↑↑↑
+    //
+    // Шаблон нового оружия:
+    //
+    // R('myweapon', {
+    //   label:'МОЁОРУЖИЕ', emoji:'🔥', color:'#ff0000', desc:'Описание', baseCd:500,
+    //   fire(){
+    //     const bonus = getBonus();
+    //     bullets.push({ x:player.x, y:player.y, w:8, h:20, sp:12, dmg:bonus.damageMult*2,
+    //       type:'myweapon', vx:0 });
+    //   },
+    //   update(b, dt){
+    //     b.y -= b.sp;
+    //     return !(b.y < -80); // true = оставить, false = удалить
+    //   },
+    //   draw(b, ctx, now){
+    //     ctx.fillStyle = '#ff0000';
+    //     ctx.fillRect(b.x-4, b.y, 8, 20);
+    //   }
+    // });
+    // ══════════════════════════════════════════════════════════════
+  }
+
+  // ── Получить конфиг оружия ──────────────────────────────────────
+  get(id){ return this.registry[id]; }
+
+  // ── Все id оружий ───────────────────────────────────────────────
+  ids(){ return Object.keys(this.registry); }
+
+  // ── Совместимость со старым кодом: WEAPONS.laser, WEAPONS.rocket...
+  // Этот прокси позволяет писать WEAPONS.laser.baseCd как раньше
+  toPlain(){ return this.registry; }
+}
+
+// Создаём глобальный экземпляр и даём совместимый алиас
+const _WeaponSystem = new WeaponSystem();
+const WEAPONS = _WeaponSystem.registry; // обратная совместимость
 
 function buildWeaponBar(){
   const group = document.getElementById('weaponsGroup');
@@ -2344,8 +2601,10 @@ function buildWeaponBar(){
     btn.innerHTML = `<div class="weapon-emoji">${wdef.emoji||'🔵'}</div><div class="weapon-lbl">${wdef.label}</div>`;
     btn.addEventListener('click',()=>{
       currentWeapon = wid;
-      document.querySelectorAll('[data-weapon]').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
+      document.querySelectorAll('[data-weapon]').forEach(b=>b.classList.remove('active','just-switched'));
+      btn.classList.add('active','just-switched');
+      setTimeout(()=>btn.classList.remove('just-switched'),350);
+      haptic('light');
       // Рельса стреляет сразу при нажатии на кнопку
       if(wid === 'rail' && gameRunning && !gamePaused) fireRailgun();
     });
@@ -2374,9 +2633,17 @@ document.getElementById('resumeBtn').addEventListener('click',()=>{
   requestAnimationFrame(loop);
 });
 document.getElementById('pauseRestartBtn').addEventListener('click',()=>{
-  gamePaused = false;
-  document.getElementById('pauseOverlay').style.display = 'none';
-  hideAllScreens(); startGame();
+  showConfirm({
+    icon: '↺',
+    title: 'НАЧАТЬ ЗАНОВО?',
+    text: 'Текущий прогресс уровня будет потерян',
+    okLabel: '↺ ЗАНОВО',
+    onOk: () => {
+      gamePaused = false;
+      document.getElementById('pauseOverlay').style.display = 'none';
+      hideAllScreens(); startGame();
+    }
+  });
 });
 document.getElementById('pauseMenuBtn').addEventListener('click',()=>{
   gamePaused = false; gameRunning = false;
@@ -2448,7 +2715,7 @@ const player = {x:canvas.width/2, y:canvas.height-110, targetX:canvas.width/2, w
 const playerTrail = [];
 
 const bullets=[], enemies=[], particles=[], powerups=[];
-const MAX_PARTICLES = 300;
+let MAX_PARTICLES = 300;
 
 let lastShot = 0;
 
@@ -2545,8 +2812,18 @@ const RAIL_DURATION = 3500;
 let railCooldown = 0;
 let railBeam = null; // { timer, maxTimer } пока активен — луч идёт от позиции корабля
 
+function showCoinFly(x, y, amount){
+  if(!amount) return;
+  const el = document.createElement('div');
+  el.textContent = '+' + amount + '💰';
+  el.style.cssText = `position:fixed;left:${Math.round(x)}px;top:${Math.round(y)}px;font-family:'Orbitron',monospace;font-size:13px;color:#ffd700;font-weight:900;pointer-events:none;z-index:50;text-shadow:0 0 8px #ffd700;animation:coinFly 0.8s ease-out forwards;transform-origin:center`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 850);
+}
+
 function applyPowerup(type){
   playSound('powerup');
+  haptic('medium');
   switch(type){
     case 'shield':
       activePowerups.shield=9000;
@@ -2652,86 +2929,26 @@ function updateRailUI(){
   }
 }
 
+// ════════════════════════════════════════════════════
+// SHOOT — делегирует в WeaponSystem
+// ════════════════════════════════════════════════════
 function shoot(){
+  const wpn = WEAPONS[currentWeapon];
+  if(!wpn) return;
+
+  // Рельса — особый режим, стреляет только вручную
+  if(wpn.isSpecial) return;
+
   const bonus = getBonus();
   const now = Date.now();
-  const wpn = WEAPONS[currentWeapon];
-  // Рельса стреляет только вручную (через кнопку или пробел), не авто
-  if(currentWeapon === 'rail') return;
   const cd = (activePowerups.speed>0 ? wpn.baseCd*.6 : wpn.baseCd) * bonus.firerateMult;
   if(now - lastShot < cd) return;
+
   lastShot = now;
   playSound('shoot');
 
-  const spd = 13 * bonus.bulletSpeedMult * (activePowerups.speed>0?1.3:1);
-
-  // Crit calc
-  const isCrit = Math.random() < bonus.critChance;
-  const dmg = bonus.damageMult * (isCrit ? bonus.critMult : 1);
-  if(isCrit) notify('💥 КРИТ!','gold');
-
-  if(currentWeapon==='laser'){
-    const bw = Math.round(5 * bonus.laserWidthMult);
-    const base={y:player.y, w:bw, h:22, sp:spd, dmg, type:'laser',
-      pierce: bonus.pierceCount > 0, pierced: new Set(), maxPierce: bonus.pierceCount};
-    let ms = bonus.multishot + (laserDoubleActive>0 ? 1 : 0);
-    const offsets = [0, [-11,11], [-16,0,16], [-24,-8,8,24]][Math.min(ms,3)];
-    (Array.isArray(offsets) ? offsets : [0]).forEach(ox=>{
-      bullets.push({...base, x:player.x+ox, pierced:new Set()});
-    });
-  }else if(currentWeapon==='rocket'){
-    const rspd = 7 * bonus.bulletSpeedMult * bonus.rocketSpdMult;
-    const rdmg = dmg * 3 * bonus.rocketDmgMult;
-    // Ищем ближайшего врага для начального направления
-    let tgtVx=0, tgtVy=-rspd;
-    if(enemies.length>0){
-      let nearest=null, nearDist=Infinity;
-      enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nearDist){nearDist=d;nearest=e;} });
-      if(nearest){
-        const dx=nearest.x-player.x, dy=nearest.y-player.y, d=Math.max(Math.hypot(dx,dy),1);
-        tgtVx = dx/d * rspd; tgtVy = dy/d * rspd;
-      }
-    }
-    bullets.push({x:player.x,y:player.y,w:10,h:18,sp:rspd,dmg:rdmg,
-      type:'rocket',angle:0,homing:true,split:bonus.rocketSplit,
-      vx:tgtVx, vy:tgtVy, homingStrength:0.08});
-  }else if(currentWeapon==='shotgun'){
-    const s = 10 * bonus.bulletSpeedMult;
-    const pellets = bonus.shotPellets;
-    const spread  = bonus.shotSpreadMult;
-    const half = Math.floor(pellets/2);
-    for(let a=-half; a<=half; a++){
-      bullets.push({x:player.x, y:player.y, w:6, h:14, sp:s, dmg,
-        type:'shotgun', vx:a*1.8*spread,
-        pierce:bonus.shotPierce, pierced:new Set()});
-    }
-  }else if(currentWeapon==='plasma'){
-    // Плазменный шар: летит в сторону врага, взрывается по таймеру ИЛИ при попадании
-    const pspd = 5.5 * bonus.bulletSpeedMult * bonus.plasmaSpdMult;
-    const pdmg = dmg * 2.5 * bonus.plasmaDmgMult;
-    const aoeR = Math.round(80 * bonus.plasmaAoeMult);
-    const fuseMs = 1800; // взрыв через 1.8 сек если не попал
-    let pvx=0, pvy=-pspd;
-    if(enemies.length>0){
-      let nearest=null, nearDist=Infinity;
-      enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nearDist){nearDist=d;nearest=e;} });
-      if(nearest){
-        const dx=nearest.x-player.x, dy=nearest.y-player.y, d=Math.max(Math.hypot(dx,dy),1);
-        pvx=dx/d*pspd; pvy=dy/d*pspd;
-      }
-    }
-    bullets.push({x:player.x,y:player.y,w:16,h:16,sp:pspd,dmg:pdmg,
-      type:'plasma',vx:pvx,vy:pvy,aoeR,fuse:fuseMs,fuseMax:fuseMs,spawnTime:Date.now()});
-  }else if(currentWeapon==='lightning'){
-    // New: lightning — instant chain between nearby enemies
-    const chainCount = 3 + bonus.pierceCount;
-    bullets.push({x:player.x,y:player.y,w:4,h:30,sp:22*bonus.bulletSpeedMult,
-      dmg:dmg*0.8,type:'lightning',chain:chainCount,pierced:new Set(),pierce:true});
-  }else if(currentWeapon==='rail'){
-    // Рельса — мгновенный луч, обрабатывается отдельно в fireRailgun()
-    fireRailgun();
-    return; // не через систему пуль
-  }
+  // Каждое оружие само знает как стрелять
+  wpn.fire();
 }
 
 // ════════════════════════════════════════════════════
@@ -2747,7 +2964,7 @@ const BOSS_TYPES = [
       if(!b.phase3entered && b.hp < b.maxHp*.3){ b.phase3entered=true; b.sp*=1.4; notify('⚔️ РЕЖИМ БЕРСЕРКА!','boss'); triggerShake(14); }
       b.x+=b.sp*b.dir;
       if(b.x>canvas.width-b.hw||b.x<b.hw) b.dir*=-1;
-      if(b.y<120) b.y+=1.8;
+      if(b.y<250) b.y+=1.8;
       b.shootTimer-=dt;
       if(b.shootTimer<=0){
         b.shootTimer = Math.max(600, 1800-level*45);
@@ -2784,7 +3001,7 @@ const BOSS_TYPES = [
       if(!b.phase3entered && b.hp < b.maxHp*.3){ b.phase3entered=true; notify('🎯 МУЛЬТИПРИЦЕЛ!','boss'); triggerShake(12); }
       b.x += Math.sin(Date.now()/1200)*(b.phase2entered?2.2:1.2);
       b.x = Math.max(b.hw, Math.min(canvas.width-b.hw, b.x));
-      if(b.y<100) b.y+=1.2;
+      if(b.y<230) b.y+=1.2;
       // Телепорт (фаза 3)
       if(b.phase3entered){ b.teleportTimer-=dt; if(b.teleportTimer<=0){ b.teleportTimer=3000+Math.random()*2000; b.x=b.hw+Math.random()*(canvas.width-b.hw*2); triggerShake(6); explode(b.x,b.y,'#ff9900',15); } }
       b.shootTimer-=dt;
@@ -2846,7 +3063,7 @@ const BOSS_TYPES = [
     init(b){ b.spawnTimer=0; b.shootTimer=0; b.tentacleAngle=0; b.phase=0; },
     update(b,dt){
       b.x = canvas.width/2 + Math.sin(Date.now()/900)*(canvas.width*.35);
-      if(b.y<110) b.y+=1.5;
+      if(b.y<240) b.y+=1.5;
       b.tentacleAngle += dt*.003;
       b.spawnTimer-=dt;
       if(b.spawnTimer<=0){
@@ -2898,7 +3115,7 @@ const BOSS_TYPES = [
       if(!b.phase3entered && b.hp < b.maxHp*.3){ b.phase3entered=true; notify('🛸 КРИТИЧЕСКИЙ РЕЖИМ!','boss'); triggerShake(16); }
       b.x+=b.sp*.5*b.dir*(b.phase2entered?1.5:1);
       if(b.x>canvas.width-b.hw||b.x<b.hw) b.dir*=-1;
-      if(b.y<90) b.y+=1;
+      if(b.y<220) b.y+=1;
       b.shootTimer-=dt;
       if(b.shootTimer<=0 && !b.laserFiring){
         b.shootTimer = Math.max(900, 3000-level*65);
@@ -2964,7 +3181,7 @@ const BOSS_TYPES = [
       if(!b.phase3entered && b.hp < b.maxHp*.3){ b.phase3entered=true; b.phase=3; notify('🔥 ПЛАМЯ ВЕЧНОСТИ!','boss'); triggerShake(16); b.orbits.forEach(o=>o.dist*=1.2); }
       const t=Date.now()/1500;
       b.x = canvas.width/2 + Math.sin(t)*(canvas.width*.3);
-      if(b.y<100) b.y+=1.5; else b.y=100 + Math.sin(t*1.3)*20;
+      if(b.y<230) b.y+=1.5; else b.y=230 + Math.sin(t*1.3)*20;
       b.orbAngle += dt*(b.phase3entered?.0032:b.phase2entered?.0024:.0018);
       b.orbits.forEach(o=>{
         o.angle += dt*(b.phase3entered?.0022:.0013);
@@ -3033,7 +3250,7 @@ const BOSS_TYPES = [
       if(!b.phase2entered && b.hp < b.maxHp*.6){ b.phase2entered=true; notify('👑 РОЙ УДВОЕН!','boss'); triggerShake(10); b.sp*=1.4; }
       if(!b.phase3entered && b.hp < b.maxHp*.3){ b.phase3entered=true; notify('👑 КОРОЛЕВА В ЯРОСТИ!','boss'); triggerShake(14); }
       b.x += b.sp*b.dir*0.9; if(b.x>canvas.width-b.hw||b.x<b.hw) b.dir*=-1;
-      if(b.y<100) b.y+=1.6;
+      if(b.y<230) b.y+=1.6;
       b.orbAngle += dt*.002;
       b.shootTimer-=dt;
       if(b.shootTimer<=0){
@@ -3099,7 +3316,7 @@ const BOSS_TYPES = [
     init(b){ b.dir=1; b.shootTimer=0; b.summonTimer=3000; b.phase=1; b.orbiting=[]; },
     update(b,dt){
       b.x = canvas.width/2 + Math.sin(Date.now()/1400)*(canvas.width*.28);
-      if(b.y<120) b.y+=1.4; else b.y=120+Math.sin(Date.now()/2000)*18;
+      if(b.y<250) b.y+=1.4; else b.y=250+Math.sin(Date.now()/2000)*18;
       // Снаряды-черепа в спираль
       b.shootTimer-=dt;
       if(b.shootTimer<=0){
@@ -3231,9 +3448,13 @@ function spawnBoss(){
 function spawnEnemy(){
   const cfg=DIFF[difficulty];
 
-  // Мини-босс: шанс появления от уровня 7+
-  if(level>=7 && !bossActive && Math.random() < 0.012 + level*0.0008){
-    spawnMiniBoss(); return;
+  // Мини-босс: рандомно, но не вблизи уровней кратных 10 (там армада/босс)
+  const _mod10 = level % 10;
+  const _nearBoss = (_mod10 === 0 || _mod10 === 9 || _mod10 === 1);
+  if(level>=4 && !bossActive && !armadaActive && !_nearBoss){
+    if(Math.random() < 0.013 + level*0.0005){
+      spawnMiniBoss(); return;
+    }
   }
 
   let pool=['normal'];
@@ -3330,6 +3551,66 @@ function spawnEnemy(){
 }
 
 // ════════════════════════════════════════════════════
+// АРМАДА — вражеский флот в боевых рядах
+// Выстраивается сеткой и делает синхронные залпы
+// ════════════════════════════════════════════════════
+function spawnArmada(){
+  if(armadaActive || bossActive) return;
+  armadaActive = true;
+
+  const cfg = DIFF[difficulty];
+  // Количество рядов и колонн зависит от уровня
+  const rows = Math.min(2 + Math.floor(level / 5), 4);       // 2-4 ряда
+  const cols = Math.min(3 + Math.floor(level / 4), 7);       // 3-7 колонн
+  const hw = 15, hh = 13;
+  const spacingX = Math.min((canvas.width - 40) / cols, 68);
+  const spacingY = 52;
+  const startX = (canvas.width - spacingX * (cols - 1)) / 2;
+  const startY = -hh * 2 - spacingY * (rows - 1) - 60; // начинают за экраном сверху
+
+  // Общий таймер залпа для всей армады (синхронизирован)
+  const sharedSalvo = { timer: 2800 - level * 60, fired: false };
+
+  const baseHp = Math.ceil(1.2 * (1 + Math.floor(level / 4)));
+  const spd = (0.55 + level * 0.035) * cfg.spd;
+
+  for(let row = 0; row < rows; row++){
+    for(let col = 0; col < cols; col++){
+      const e = {
+        x: startX + col * spacingX,
+        y: startY + row * spacingY,
+        hw, hh,
+        sp: spd,
+        hp: baseHp, maxHp: baseHp,
+        type: 'armada',
+        isBoss: false, isMiniBoss: false,
+        zigAngle: 0, stealthTimer: 0, stealthAlpha: 1,
+        splitDone: false, swarmOffset: 0,
+        shootTimer: 0,
+        dashTimer: 0, dashVx: 0, dashing: false, dashDuration: 0,
+        shieldHp: 0, teleportTimer: 0, bomberArmed: false,
+        leeched: false, leechSide: 0,
+        mirrorDir: 1, phantomAlpha: 1, phantomTimer: 0,
+        assassinDashing: false, assassinDashVx: 0, assassinDashVy: 0, assassinTimer: 0,
+        score: 15, coin: 2,
+        // Армада-специфичные поля
+        armadaRow: row,
+        armadaCol: col,
+        armadaSalvo: sharedSalvo,    // общий объект для синхронизации
+        armadaDir: 1,                // направление горизонтального движения
+        armadaTargetY: 60 + row * spacingY + 20, // конечная Y позиция формирования
+        armadaFormed: false,         // флаг — занял место в строю
+        armadaMoveTimer: 0,          // таймер горизонтального движения
+      };
+      enemies.push(e);
+    }
+  }
+
+  notify('⚔️ АРМАДА АТАКУЕТ!', 'boss');
+  playSound('boss');
+}
+
+// ════════════════════════════════════════════════════
 // МИНИ-БОСС
 // ════════════════════════════════════════════════════
 const MINI_BOSS_TYPES = [
@@ -3418,8 +3699,25 @@ function addCombo(){
 }
 
 // ════════════════════════════════════════════════════
-// UPDATE
+// HAPTIC — тактильный отклик (Telegram WebApp)
 // ════════════════════════════════════════════════════
+const haptic = (type = 'light') => {
+  try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(type); } catch(e){}
+};
+const hapticNotify = (type = 'success') => {
+  try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred(type); } catch(e){}
+};
+
+// ════════════════════════════════════════════════════
+// AUTO-PAUSE при уходе из приложения
+// ════════════════════════════════════════════════════
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden && gameRunning && !gamePaused){
+    gamePaused = true;
+    Music.pause?.();
+    document.getElementById('pauseOverlay').style.display = 'flex';
+  }
+});
 
 // ════════════════════════════════════════════════════
 let touching=false;
@@ -3427,21 +3725,35 @@ let touchStartX=0, touchStartY=0, touchStartTime=0;
 let lastTapTime=0, tapCount=0;
 const SWIPE_THRESHOLD = 60; // px вверх для навыка
 const DOUBLE_TAP_MS = 300;
+const TOUCH_OFFSET_Y = 70; // px — корабль выше пальца
 
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
   if(!gameRunning) return;
+  // Второй палец = активация навыка
+  if(e.touches.length >= 2){
+    const actives = getActiveSkills();
+    const ready = actives.find(id => (activeSkillCooldowns[id]||0) <= 0);
+    if(ready){ activateSkill(ready); triggerShake(3); haptic('medium'); }
+    return;
+  }
   touching=true;
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
   player.targetX = e.touches[0].clientX;
+  // Корабль смещается выше пальца для лучшей видимости
+  const newY = Math.min(canvas.height - 110, e.touches[0].clientY - TOUCH_OFFSET_Y);
+  if(newY > 60) player.y = newY;
 },{passive:false});
 
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
-  if(!gameRunning) return;
+  if(!gameRunning || e.touches.length > 1) return;
   player.targetX = e.touches[0].clientX;
+  // Корабль следует за пальцем но выше него
+  const newY = Math.min(canvas.height - 110, e.touches[0].clientY - TOUCH_OFFSET_Y);
+  if(newY > 60) player.y = newY;
 },{passive:false});
 
 canvas.addEventListener('touchend',e=>{
@@ -3550,6 +3862,24 @@ function useBomb(){
 }
 
 // Функция нанесения урона игроку — с учётом уклонения
+function flashDamageOverlay(){
+  const ov = document.getElementById('damageOverlay');
+  if(!ov) return;
+  ov.classList.add('flash');
+  setTimeout(()=>ov.classList.remove('flash'), 220);
+}
+
+function animateHeartLoss(){
+  const heartsEl = document.getElementById('livesHearts');
+  if(!heartsEl) return;
+  // Находим последнее активное сердце и взрываем его
+  const hearts = heartsEl.querySelectorAll('.heart-ico:not(.empty)');
+  if(hearts.length){
+    const last = hearts[hearts.length-1];
+    last.classList.add('losing');
+  }
+}
+
 function damagePlayer(sourceX, sourceY){
   if(invincibleTimer > 0) return;
   // Шанс уклонения (из прокачки)
@@ -3557,6 +3887,7 @@ function damagePlayer(sourceX, sourceY){
   if(bonus.dodgeChance > 0 && Math.random() < bonus.dodgeChance){
     notify('💨 УКЛОНЕНИЕ!');
     explode(player.x, player.y, '#88eeff', 8);
+    haptic('light');
     return;
   }
   if(activePowerups.shield > 0){
@@ -3565,12 +3896,17 @@ function damagePlayer(sourceX, sourceY){
     updatePowerupBar();
     explode(player.x, player.y, '#00d4ff', 15);
     invincibleTimer = (INVINCIBLE_DURATION + bonus.invincibleBonus) * 0.5;
+    haptic('medium');
+    flashDamageOverlay();
     return;
   }
+  animateHeartLoss();
   lives--;
   updateHUD();
   playSound('hit');
   triggerShake(12);
+  haptic('heavy');
+  flashDamageOverlay();
   explode(player.x, player.y, (SKIN_COLORS[activeSkin]||SKIN_COLORS.default).a, 20);
   invincibleTimer = INVINCIBLE_DURATION + bonus.invincibleBonus;
   if(lives <= 0) endGame();
@@ -3668,65 +4004,28 @@ function update(dt){
   planets.forEach(p=>{p.y+=p.sp;if(p.y>canvas.height+p.r+50){p.y=-p.r-50;p.x=Math.random()*canvas.width;}});
   asteroids.forEach(a=>{a.y+=a.sp;a.angle+=a.rot;if(a.y>canvas.height+30){a.y=-30;a.x=Math.random()*canvas.width;}});
 
-  // Bullets
+  // Bullets — update через WeaponSystem
   for(let i=bullets.length-1;i>=0;i--){
-    const b=bullets[i];
-    // Плазма двигается по своему вектору скорости (не по дефолтному b.y-=b.sp)
-    if(b.type==='plasma'){
-      b.x += b.vx||0;
-      b.y += b.vy||-b.sp;
-      // Fuse-таймер: взрыв через N мс
-      if(b.fuse !== undefined){
-        b.fuse -= dt;
-        if(b.fuse<=0){
-          // Взрыв по таймеру
-          explode(b.x,b.y,'#a855f7',55); triggerShake(6); playSound('explode');
-          const r=b.aoeR||80;
-          enemies.forEach(en=>{ const dist=Math.hypot(en.x-b.x,en.y-b.y); if(dist<r && !en.spawnInvincible){ en.hp-=Math.ceil((b.dmg||1)*(1-dist/r*0.5)); if(en.hp<=0) killEnemy(enemies.indexOf(en),DIFF[difficulty]); } });
-          // Доп. частицы волна
-          particles.push({x:b.x,y:b.y,vx:0,vy:0,life:1,decay:.04,color:'#a855f7',wave:true,r:0,maxR:r,bossShot:false});
-          bullets.splice(i,1); continue;
-        }
-      }
-    } else {
-    b.y-=b.sp;
-    if(b.vx) b.x+=b.vx;
-    }
-    if(b.type==='rocket'){
-      // Плавное наведение через velocity вектор
-      if(!b.vx) b.vx=0;
-      if(!b.vy) b.vy=-b.sp;
-      if(b.homing && enemies.length>0){
-        let nearest=null, nearDist=Infinity;
-        enemies.forEach(e=>{ const d=Math.hypot(e.x-b.x,e.y-b.y); if(d<nearDist){nearDist=d;nearest=e;} });
-        if(nearest){
-          const dx=nearest.x-b.x, dy=nearest.y-b.y, dist=Math.max(nearDist,.1);
-          const strength = b.homingStrength||0.08;
-          // Плавно поворачиваем вектор скорости к цели
-          b.vx += (dx/dist*b.sp - b.vx)*strength;
-          b.vy += (dy/dist*b.sp - b.vy)*strength;
-          // Нормализуем скорость
-          const spd=Math.hypot(b.vx,b.vy); if(spd>0){b.vx=b.vx/spd*b.sp;b.vy=b.vy/spd*b.sp;}
-        }
-      }
-      // Двигаемся по velocity (отменяем дефолтный b.y -= b.sp выше)
-      b.y += b.vy + b.sp; // b.vy уже содержит нужное смещение; +b.sp компенсирует b.y-=b.sp выше
-      b.x += b.vx;
-      b.angle = Math.atan2(b.vx, -b.vy);
-    }
-    // Рикошет от краёв (навык sk_ricochet)
+    const b = bullets[i];
+    const wpn = WEAPONS[b.type];
+
+    // Рикошет от краёв (навык sk_ricochet) — до update
     if(getBonus().ricochet && !b.ricocheted){
-      if(b.x<0||b.x>canvas.width){ b.vx = b.vx ? -b.vx : (b.x<0?2:-2); b.x=Math.max(1,Math.min(canvas.width-1,b.x)); b.ricocheted=true; }
+      if(b.x<0||b.x>canvas.width){ b.vx=b.vx?-b.vx:(b.x<0?2:-2); b.x=Math.max(1,Math.min(canvas.width-1,b.x)); b.ricocheted=true; }
     }
-    if(b.y<-80||b.x<-60||b.x>canvas.width+60||b.y>canvas.height+80){
-      // Плазма при выходе за экран - детонирует
-      if(b.type==='plasma' && b.fuse!==undefined && b.fuse>0){
-        const r=b.aoeR||80;
-        explode(b.x,b.y,'#a855f7',40); playSound('explode');
-        enemies.forEach(en=>{ const dist=Math.hypot(en.x-b.x,en.y-b.y); if(dist<r && !en.spawnInvincible){ en.hp-=Math.ceil(b.dmg*(1-dist/r*0.4)); } });
-      }
-      bullets.splice(i,1);
+
+    // Делегируем движение в оружие; false = удалить пулю
+    let alive;
+    if(wpn && wpn.update){
+      alive = wpn.update(b, dt, i);
+    } else {
+      // Дефолтное движение для неизвестных типов
+      b.y -= b.sp;
+      if(b.vx) b.x += b.vx;
+      alive = !(b.y<-80||b.x<-60||b.x>canvas.width+60);
     }
+
+    if(!alive){ bullets.splice(i,1); }
   }
 
   // Powerup objects
@@ -3961,6 +4260,55 @@ function update(dt){
               e.x+=dx/d*e.sp*0.3; e.y+=dy/d*e.sp*0.3;
             }
             break;
+
+          case 'armada':
+          { // Фаза 1 — занять позицию в строю
+            if(!e.armadaFormed){
+              // Движемся вниз к целевой Y
+              if(e.y < e.armadaTargetY){
+                e.y += e.sp * 1.4;
+              } else {
+                e.y = e.armadaTargetY;
+                e.armadaFormed = true;
+              }
+            } else {
+              // Фаза 2 — маятниковое движение всего строя
+              e.armadaMoveTimer = (e.armadaMoveTimer||0) + dt;
+              // Всё движение синхронизировано через armadaRow/Col offset
+              const wave = Math.sin(e.armadaMoveTimer * 0.0008 + e.armadaRow * 0.3);
+              e.x += wave * 1.8;
+
+              // Плавное покачивание вниз — строй медленно наступает
+              e.y += e.sp * 0.15;
+
+              // ── ЗАЛП ── синхронизирован через общий объект salvo
+              const salvo = e.armadaSalvo;
+              salvo.timer -= dt;
+              // Стреляет только нижний ряд каждой колонны (armadaRow === самый большой в колонне)
+              // Определяем: является ли этот враг "передовым" в своей колонне
+              const isVanguard = !enemies.some(other =>
+                other !== e &&
+                other.type === 'armada' &&
+                other.armadaCol === e.armadaCol &&
+                other.armadaRow > e.armadaRow &&
+                !other._dead
+              );
+
+              if(isVanguard && salvo.timer <= 0){
+                salvo.timer = Math.max(1200, 2800 - level * 55);
+                // Залп: 3 снаряда — один прямо вниз, два под углом
+                const spread = 0.35;
+                spawnBossShot(e.x, e.y + e.hh, -spread, 3.2, '#ff3366', 7);
+                spawnBossShot(e.x, e.y + e.hh, 0,       3.8, '#ff3366', 8);
+                spawnBossShot(e.x, e.y + e.hh,  spread, 3.2, '#ff3366', 7);
+                // Вспышка заряда
+                particles.push({x:e.x,y:e.y+e.hh,vx:0,vy:0,life:1,decay:.08,color:'#ff3366',size:12,wave:false,bossShot:false});
+              }
+            }
+            // Удерживаем в границах экрана
+            e.x = Math.max(e.hw, Math.min(canvas.width - e.hw, e.x));
+          }
+          break;
         }
         e.x=Math.max(e.hw, Math.min(canvas.width-e.hw, e.x));
         } // end non-miniboss
@@ -4076,7 +4424,13 @@ function update(dt){
   }
 
   // Spawn enemies
-  if(!bossActive && Math.random()<cfg.spawn+level*.0015) spawnEnemy();
+  if(!bossActive && !armadaActive && Math.random()<cfg.spawn+level*.0015) spawnEnemy();
+
+  // Армада спавнится по уровням (каждые 10, нечётные десятки) — логика в killEnemy/levelUp
+  // Сбрасываем флаг армады если все её юниты уничтожены
+  if(armadaActive && !enemies.some(e => e.type === 'armada')){
+    armadaActive = false;
+  }
 }
 
 function killEnemy(j, cfg){
@@ -4128,7 +4482,8 @@ function killEnemy(j, cfg){
                e.type==='shielder'?'#00aaff':e.type==='teleporter'?'#cc88ff':
                e.type==='leech'?'#ff4488':e.type==='mirror'?'#44ffcc':
                e.type==='kamikaze'?'#ff4400':e.type==='phantom'?'#aa44ff':
-               e.type==='titan'?'#ff8800':e.type==='assassin'?'#ff0088':'#ff6b00';
+               e.type==='titan'?'#ff8800':e.type==='assassin'?'#ff0088':
+               e.type==='armada'?'#ff3366':'#ff6b00';
     explode(e.x,e.y,col); triggerShake(e.type==='tank'?6:4);
   }
   enemies.splice(j,1);
@@ -4174,6 +4529,13 @@ function killEnemy(j, cfg){
   let earnedCoins = Math.floor((e.isBoss?8:e.isMiniBoss?5:0.5)*level*(combo>5?2:1)*bns.coinMult);
   if(doubleCoinActive>0) earnedCoins*=2;
   coins+=earnedCoins;
+  // Анимация монет летящих вверх
+  if(earnedCoins > 0) showCoinFly(e.x, e.y, earnedCoins);
+
+  // Haptic при убийстве
+  if(e.isBoss) hapticNotify('success');
+  else if(e.isMiniBoss) haptic('heavy');
+  else haptic('light');
 
   // Вампиризм — восстановление HP при убийстве
   const vamp = getBonus().vampirism||0;
@@ -4205,8 +4567,17 @@ function killEnemy(j, cfg){
     levelProgress = 0;
     notify('⚔️ УРОВЕНЬ МИССИИ ' + level, 'levelup');
     playSound('levelup');
+    haptic('medium');
     updateHUD();
-    if(level % 5 === 0 && !bossActive) spawnBoss();
+    if(level % 10 === 0 && !bossActive && !armadaActive){
+      // Чётные десятки (20,40,60...) → обычный БОСС
+      // Нечётные десятки (10,30,50...) → АРМАДА ФЛОТА
+      if((level / 10) % 2 === 0){
+        spawnBoss();
+      } else {
+        spawnArmada();
+      }
+    }
   }
 }
 
@@ -4501,69 +4872,13 @@ function draw(){
     ctx.restore();
   }
 
-  // Bullets
+  // Bullets — draw через WeaponSystem
   const _now = Date.now();
   bullets.forEach(b=>{
+    const wpn = WEAPONS[b.type];
+    if(!wpn || !wpn.draw) return;
     ctx.save();
-    if(b.type==='plasma'){
-      // Плазменный шар — пульсирует быстрее перед взрывом
-      const fuseRatio = b.fuse!==undefined ? Math.max(0,b.fuse/b.fuseMax) : 1;
-      const pulseSpeed = 0.008 + (1-fuseRatio)*0.035; // ускоряется при fuse
-      const pulseAmp   = 0.12 + (1-fuseRatio)*0.22;
-      const pulse = 1 + pulseAmp*Math.sin(_now*pulseSpeed*1000 + b.x);
-      const radius = b.w*(1+(1-fuseRatio)*0.5)*pulse; // растёт перед взрывом
-      ctx.shadowBlur = 20+15*(1-fuseRatio); ctx.shadowColor = fuseRatio<0.3?'#ffffff':'#a855f7';
-      const pg = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,radius);
-      const innerCol = fuseRatio<0.3?'#ffffff':fuseRatio<0.6?'#ff88ff':'#ff88ff';
-      pg.addColorStop(0,innerCol);
-      pg.addColorStop(0.4,fuseRatio<0.3?'#ff00ff':'#a855f7');
-      pg.addColorStop(1,'#a855f700');
-      ctx.fillStyle = pg;
-      ctx.beginPath(); ctx.arc(b.x, b.y, radius, 0, Math.PI*2); ctx.fill();
-      // Дуга таймера вокруг шара
-      if(b.fuse!==undefined){
-        ctx.strokeStyle = fuseRatio<0.3?'#ffffff':fuseRatio<0.6?'#ff66ff':'#cc44ff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(b.x,b.y,radius+4, -Math.PI/2, -Math.PI/2 + Math.PI*2*fuseRatio);
-        ctx.stroke();
-      }
-    } else if(b.type==='lightning'){
-      // Lightning bolt — jagged line upward
-      ctx.strokeStyle = '#ffff44'; ctx.lineWidth = 3;
-      ctx.shadowBlur = 14; ctx.shadowColor = '#ffff00';
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y+b.h);
-      ctx.lineTo(b.x + (Math.random()-.5)*6, b.y + b.h*0.5);
-      ctx.lineTo(b.x + (Math.random()-.5)*6, b.y);
-      ctx.stroke();
-      // Core white
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
-      ctx.beginPath(); ctx.moveTo(b.x, b.y+b.h); ctx.lineTo(b.x, b.y); ctx.stroke();
-    } else {
-      const wc = b.type==='rocket'?{a:'#ff6b00',b:'#ffaa00'}
-               : b.type==='shotgun'?{a:'#ffd700',b:'#ff9900'}
-               : BULLET_COLORS[custom.bulletColor];
-      if(custom.glow){ ctx.shadowBlur=b.type==='rocket'?18:12; ctx.shadowColor=wc.a; }
-      if(b.type==='rocket'){
-        // Ракета рисуется по направлению vx/vy
-        const rAngle = b.vx!==undefined ? Math.atan2(b.vx,-b.vy) : (b.angle||0);
-        ctx.translate(b.x,b.y); ctx.rotate(rAngle);
-        const rg=ctx.createLinearGradient(0,-b.h/2,0,b.h/2);
-        rg.addColorStop(0,wc.a); rg.addColorStop(1,wc.b);
-        ctx.fillStyle=rg; ctx.beginPath(); ctx.roundRect(-b.w/2,-b.h/2,b.w,b.h,4); ctx.fill();
-        // Пламя сзади (в направлении противоположном движению)
-        const flameLen=9+Math.random()*7;
-        ctx.fillStyle=wc.a+'66'; ctx.beginPath();
-        ctx.moveTo(-b.w/2,b.h/2); ctx.lineTo(b.w/2,b.h/2); ctx.lineTo(0,b.h/2+flameLen); ctx.closePath(); ctx.fill();
-        ctx.fillStyle='#fff8'; ctx.beginPath();
-        ctx.moveTo(-b.w/4,b.h/2); ctx.lineTo(b.w/4,b.h/2); ctx.lineTo(0,b.h/2+flameLen*.5); ctx.closePath(); ctx.fill();
-      }else{
-        const bg2=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
-        bg2.addColorStop(0,wc.a); bg2.addColorStop(1,wc.b);
-        ctx.fillStyle=bg2; ctx.beginPath(); ctx.roundRect(b.x-b.w/2,b.y,b.w,b.h,3); ctx.fill();
-      }
-    }
+    wpn.draw(b, ctx, _now);
     ctx.restore();
   });
 
@@ -4804,6 +5119,47 @@ function draw(){
             ctx.beginPath(); ctx.arc(e.hw*.28,-e.hh*.2,2,0,Math.PI*2); ctx.fill();
           }
           break;
+
+        case 'armada':{
+          // Боевой истребитель армады — острый силуэт с крыльями
+          const acAlpha = e.armadaFormed ? 1.0 : 0.6;
+          const ag = ctx.createRadialGradient(0,-e.hh*.3,0,0,0,e.hw);
+          ag.addColorStop(0, col+'ff'); ag.addColorStop(.5, col+(Math.round(0xcc*acAlpha).toString(16).padStart(2,'0'))); ag.addColorStop(1, col+'22');
+          ctx.fillStyle = ag;
+          // Корпус
+          ctx.moveTo(0, -e.hh);
+          ctx.lineTo(e.hw * .45, -e.hh * .1);
+          ctx.lineTo(e.hw, e.hh * .55);
+          ctx.lineTo(e.hw * .35, e.hh * .25);
+          ctx.lineTo(0, e.hh);
+          ctx.lineTo(-e.hw * .35, e.hh * .25);
+          ctx.lineTo(-e.hw, e.hh * .55);
+          ctx.lineTo(-e.hw * .45, -e.hh * .1);
+          ctx.closePath(); ctx.fill();
+          // Светящееся ядро
+          ctx.fillStyle = '#fff9';
+          ctx.beginPath(); ctx.arc(0, -e.hh * .1, e.hw * .22, 0, Math.PI*2); ctx.fill();
+          // Двигатели — два огонька снизу
+          [-e.hw*.38, e.hw*.38].forEach(ox => {
+            const thrustLen = 6 + 5 * Math.sin(animT * 8 + ox);
+            const tg = ctx.createLinearGradient(ox, e.hh*.5, ox, e.hh*.5 + thrustLen);
+            tg.addColorStop(0, col+'ff'); tg.addColorStop(1, col+'00');
+            ctx.fillStyle = tg;
+            ctx.beginPath(); ctx.ellipse(ox, e.hh * .55, 3, thrustLen * .5, 0, 0, Math.PI*2); ctx.fill();
+          });
+          // Пульсирующий контур перед залпом
+          const salvo = e.armadaSalvo;
+          if(salvo && salvo.timer < 600 && e.armadaFormed){
+            const pulse = (600 - salvo.timer) / 600;
+            ctx.save();
+            ctx.globalAlpha = pulse * 0.7;
+            ctx.strokeStyle = '#ff3366';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 14; ctx.shadowColor = '#ff3366';
+            ctx.beginPath(); ctx.arc(0, e.hh * .3, e.hw * .5 + pulse * 4, 0, Math.PI*2); ctx.stroke();
+            ctx.restore();
+          }
+          break;}
       }
 
       // HP бар
@@ -4846,6 +5202,19 @@ function draw(){
   vignette.addColorStop(0,'transparent');
   vignette.addColorStop(1,'rgba(0,0,8,.7)');
   ctx.fillStyle=vignette; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // ── Индикатор "Волна надвигается" при пустом экране ──
+  if(gameRunning && !gamePaused && enemies.length === 0 && !bossActive){
+    const wAlpha = 0.25 + 0.22*Math.sin(Date.now()*.0035);
+    ctx.save();
+    ctx.globalAlpha = wAlpha;
+    ctx.fillStyle = '#00d4ff';
+    ctx.font = "bold 12px 'Orbitron', monospace";
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 16; ctx.shadowColor = '#00d4ff';
+    ctx.fillText('⚡ ВОЛНА НАДВИГАЕТСЯ...', canvas.width/2, canvas.height/2);
+    ctx.restore();
+  }
 
   ctx.restore();
 }
@@ -4904,11 +5273,33 @@ function updateHUD(){
 }
 
 // ════════════════════════════════════════════════════
+// AUTO QUALITY — адаптация под мощность устройства
+// ════════════════════════════════════════════════════
+let _fpsHistory = [], _qualitySet = false;
+function checkAutoQuality(fps){
+  if(_qualitySet) return;
+  _fpsHistory.push(fps);
+  if(_fpsHistory.length < 90) return; // 1.5 секунды
+  const avg = _fpsHistory.reduce((a,b)=>a+b,0)/_fpsHistory.length;
+  _fpsHistory = [];
+  if(avg < 40){
+    _qualitySet = true;
+    MAX_PARTICLES = Math.min(MAX_PARTICLES, 120);
+    // Убираем дальние звёзды (layer 0) — их не видно на малом экране
+    for(let i=stars.length-1;i>=0;i--){ if(stars[i].layer===0 && stars.length>80) stars.splice(i,1); }
+    custom.particles = false;
+    notify('⚡ Авто-оптимизация графики','gold');
+  }
+}
+
+// ════════════════════════════════════════════════════
 // GAME LOOP
 // ════════════════════════════════════════════════════
 function loop(ts){
   if(!gameRunning || gamePaused) return;
   const dt = Math.min(ts - lastTime, 50);
+  const fps = dt > 0 ? 1000/dt : 60;
+  checkAutoQuality(fps);
   lastTime = ts;
   update(dt);
   draw();
@@ -4952,6 +5343,8 @@ function startGame(){
   invincibleTimer = 0;
   bombsInStock = bonus.startBombs;
   bombCooldown = 0;
+  armadaTimer = 18000 + Math.random() * 10000; // первая армада через 18-28 сек
+  armadaActive = false;
   updateBombUI();
   bullets.length=0; enemies.length=0; particles.length=0; powerups.length=0;
   playerTrail.length=0;
@@ -4962,17 +5355,30 @@ function startGame(){
   document.getElementById('bossBar').style.display='none';
   if(activePowerups.shield>0) updatePowerupBar();
 
+  // Подсказка жестов — только для новых игроков
   const old=document.querySelector('.touch-hint');if(old)old.remove();
-  const hint=document.createElement('div');
-  const hasSkills = getActiveSkills().length > 0;
-  hint.className='touch-hint';
-  hint.textContent = hasSkills
-    ? '☝️ Ведите пальцем • ↑ свайп = навык • 2x тап = бомба'
-    : '☝️ Ведите пальцем • 2x тап = бомба';
-  document.body.appendChild(hint); setTimeout(()=>hint.remove(),5000);
+  if(!LS.get('everPlayed')){
+    LS.set('everPlayed','1');
+    const hint=document.createElement('div');
+    const hasSkills = getActiveSkills().length > 0;
+    hint.className='touch-hint';
+    hint.textContent = hasSkills
+      ? '☝️ Ведите пальцем • 2 пальца / ↑ свайп = навык • 2x тап = бомба'
+      : '☝️ Ведите пальцем • 2x тап = бомба';
+    document.body.appendChild(hint); setTimeout(()=>hint.remove(),6000);
+  }
 
   // Показываем кнопки навыков для тача
   updateTouchSkillBar();
+  // Сбрасываем и сразу отображаем активный навык
+  activeSkillCooldowns = {};
+  activeSkillEffects   = {};
+  const _bar = document.getElementById('activeSkillBar');
+  if(_bar) { _bar.dataset.builtFor = ''; } // принудительный ребилд DOM
+  updateSkillBar();
+
+  // Сброс авто-качества для новой игры
+  _fpsHistory = []; _qualitySet = false;
 
   // Включаем касания canvas при старте игры
   canvas.style.pointerEvents = 'all';
@@ -4986,6 +5392,10 @@ function endGame(){
   canvas.style.pointerEvents = 'none';
   Music.play('menu');
   if(score>bestScore){ bestScore=score; LS.set('bestScore',bestScore); updateMenuBadge(); }
+
+  // Тактильный отклик — вибрация смерти
+  haptic('heavy');
+  setTimeout(()=>hapticNotify('error'), 150);
 
   const myName=tg?.initDataUnsafe?.user?.first_name||'Игрок';
   const myId=tg?.initDataUnsafe?.user?.id||0;
@@ -5011,7 +5421,16 @@ function endGame(){
   // Убираем bomb chip из DOM
   const bc = document.getElementById('bombChip');
   if(bc) bc.style.display='none';
-  showScreen('gameOverScreen');
+
+  // Плавный fade-in Game Over с задержкой для ощущения смерти
+  setTimeout(()=>{
+    const goScreen = document.getElementById('gameOverScreen');
+    goScreen.style.opacity = '0';
+    goScreen.style.transition = 'opacity 0.5s ease';
+    showScreen('gameOverScreen');
+    requestAnimationFrame(()=>{ goScreen.style.opacity='1'; });
+  }, 500);
+
   if(tg?.initDataUnsafe?.user) tg.sendData(JSON.stringify({score,level,difficulty,maxCombo,coins,shipLvl,userId:tg.initDataUnsafe.user.id}));
 }
 
