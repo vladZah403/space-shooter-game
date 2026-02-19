@@ -661,7 +661,7 @@ async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # ── Пересылаем предложение администратору ──
         # Укажи свой Telegram ID в ADMIN_CHAT_ID ниже.
         # Узнать свой ID: напиши боту @userinfobot
-        ADMIN_CHAT_ID = None  # ← ВСТАВЬ СВОЙ TELEGRAM ID СЮДА, например: 123456789
+        ADMIN_CHAT_ID = 307592252  # ← ВСТАВЬ СВОЙ TELEGRAM ID СЮДА, например: 123456789
 
         if ADMIN_CHAT_ID:
             try:
