@@ -140,7 +140,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Вычисляем средние показатели
     avg_score = stats['total_score'] // stats['games_played'] if stats['games_played'] > 0 else 0
-    
+    total_dur = stats.get('total_duration', 0)
+    avg_dur   = total_dur // stats['games_played'] if stats['games_played'] > 0 else 0
+    avg_dur_str = f"{avg_dur // 60}м {avg_dur % 60}с" if avg_dur > 0 else "—"
+
     stats_text = f"""
 📊 <b>Статистика игрока {user.first_name}</b>
 
@@ -149,10 +152,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 • Игр сыграно: <code>{stats['games_played']}</code>
 • Средний счет: <code>{avg_score}</code>
 • Макс. уровень: <code>{stats['max_level']}</code>
+• Среднее время забега: <code>{avg_dur_str}</code>
 • Место в рейтинге: <code>#{rank}</code>
 
 <b>🎯 Боевая статистика:</b>
 • Врагов убито: <code>{stats['total_enemies_killed']}</code>
+• Боссов побеждено: <code>{stats.get('total_bosses_killed', 0)}</code>
 • Средняя точность: <code>{stats['avg_accuracy']:.1f}%</code>
 • Текущая серия побед: <code>{stats['win_streak']}</code>
 • Лучшая серия: <code>{stats['best_win_streak']}</code>
@@ -163,14 +168,14 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 {DIFFICULTIES['hard'].emoji} Сложно: {stats['hard_games']} игр
 {DIFFICULTIES['nightmare'].emoji} Кошмар: {stats['nightmare_games']} игр
 """
-    
+
     if recent_games:
         stats_text += "\n<b>📝 Последние игры:</b>\n"
         for game in recent_games:
             diff = DIFFICULTIES.get(game['difficulty'])
             emoji = diff.emoji if diff else '🎮'
             stats_text += f"{emoji} {game['score']} очков (ур. {game['level']}) • {game['enemies_killed']} 💀\n"
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 Играть снова", web_app=WebAppInfo(url=GAME_URL))],
         [
@@ -180,7 +185,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton("« Назад", callback_data="back_to_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(
             stats_text,
@@ -201,9 +206,9 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     """Обработчик команды /leaderboard - таблица лидеров"""
     top_players = db.get_top_players(limit=LEADERBOARD_SIZE)
     global_stats = db.get_global_stats()
-    
+
     leaderboard_text = "🏆 <b>ТАБЛИЦА ЛИДЕРОВ</b>\n\n"
-    
+
     medals = ["🥇", "🥈", "🥉"]
     for i, player in enumerate(top_players, 1):
         medal = medals[i-1] if i <= 3 else f"{i}."
@@ -213,10 +218,10 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f"   └ <code>{player['score']}</code> очков "
             f"({player['games_played']} игр)\n"
         )
-    
+
     if not top_players:
         leaderboard_text += "Пока никто не играл. Будьте первым! 🚀\n"
-    
+
     leaderboard_text += f"""
 \n<b>📊 Глобальная статистика:</b>
 👥 Всего игроков: {global_stats.get('total_users', 0)}
@@ -224,7 +229,7 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 🏆 Рекорд сервера: {global_stats.get('max_score', 0)}
 📈 Средний счет: {global_stats.get('avg_score', 0)}
 """
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 Играть", web_app=WebAppInfo(url=GAME_URL))],
         [
@@ -233,7 +238,7 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(
             leaderboard_text,
@@ -253,30 +258,30 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def achievements_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /achievements - достижения"""
     user = update.effective_user
-    
+
     unlocked = db.get_user_achievements(user.id)
     stats = db.get_user_stats(user.id) or {}
     stats['rank'] = db.get_user_rank(user.id) or 999
-    
+
     achievements_text = f"🎯 <b>Достижения {user.first_name}</b>\n\n"
     achievements_text += f"Разблокировано: {len(unlocked)}/{len(ACHIEVEMENTS)}\n\n"
-    
+
     for key, achievement in ACHIEVEMENTS.items():
         is_unlocked = key in unlocked
         status = "✅" if is_unlocked else "🔒"
         emoji = achievement['emoji'] if is_unlocked else "⬜"
-        
+
         achievements_text += f"{status} {emoji} <b>{achievement['name']}</b>\n"
         achievements_text += f"   {achievement['description']}\n"
-        
+
         # Показываем прогресс для незаконченных достижений
         if not is_unlocked:
             progress = get_achievement_progress(key, stats)
             if progress:
                 achievements_text += f"   <i>{progress}</i>\n"
-        
+
         achievements_text += "\n"
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 Играть", web_app=WebAppInfo(url=GAME_URL))],
         [
@@ -285,7 +290,7 @@ async def achievements_command(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(
             achievements_text,
@@ -306,9 +311,9 @@ async def daily_challenges(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Обработчик команды /daily - ежедневные задания"""
     user = update.effective_user
     challenges = db.get_daily_challenges(user.id)
-    
+
     challenges_text = "📅 <b>Ежедневные задания</b>\n\n"
-    
+
     if not challenges:
         challenges_text += "Сегодня у вас пока нет активных заданий.\n"
         challenges_text += "Начните играть, чтобы получить задания! 🎮"
@@ -322,20 +327,20 @@ async def daily_challenges(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 desc = f"Уничтожьте {challenge['target']} врагов за день"
             else:
                 continue
-            
+
             progress = min(100, (challenge['current'] / challenge['target']) * 100)
             status = "✅ Выполнено" if challenge['completed'] else f"{progress:.0f}%"
-            
+
             challenges_text += f"{name}\n"
             challenges_text += f"└ {desc}\n"
             challenges_text += f"└ Прогресс: {challenge['current']}/{challenge['target']} ({status})\n\n"
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 Играть", web_app=WebAppInfo(url=GAME_URL))],
         [InlineKeyboardButton("« Назад", callback_data="back_to_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(
             challenges_text,
@@ -371,10 +376,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 <b>🎯 Уровни сложности:</b>
 """
-    
+
     for key, diff in DIFFICULTIES.items():
         help_text += f"{diff.emoji} {diff.name} - {diff.description}\n"
-    
+
     help_text += """
 <b>🎊 Система достижений:</b>
 • Разблокируйте достижения за игровые успехи
@@ -401,13 +406,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 /daily - Ежедневные задания
 /help - Эта справка
 """
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 Играть", web_app=WebAppInfo(url=GAME_URL))],
         [InlineKeyboardButton("« Назад", callback_data="back_to_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(
             help_text,
@@ -428,7 +433,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Обработчик нажатий на кнопки"""
     query = update.callback_query
     await query.answer()
-    
+
     handlers = {
         "stats": stats,
         "leaderboard": leaderboard,
@@ -437,7 +442,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "help": help_command,
         "back_to_menu": back_to_menu
     }
-    
+
     handler = handlers.get(query.data)
     if handler:
         await handler(update, context)
@@ -447,10 +452,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Возврат в главное меню"""
     user = update.effective_user
-    
+
     stats = db.get_user_stats(user.id) or {'best_score': 0, 'games_played': 0}
     rank = db.get_user_rank(user.id) or '—'
-    
+
     welcome_text = f"""
 🚀 <b>Space Shooter - Главное меню</b>
 
@@ -461,13 +466,13 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 🎯 Игр сыграно: <code>{stats['games_played']}</code>
 🏅 Место в рейтинге: <code>#{rank}</code>
 """
-    
+
     # Проверяем незавершенные задания
     challenges = db.get_daily_challenges(user.id)
     uncompleted = [c for c in challenges if not c['completed']]
     if uncompleted:
         welcome_text += f"\n📅 Активных заданий: {len(uncompleted)}"
-    
+
     keyboard = [
         [InlineKeyboardButton("🎮 ИГРАТЬ", web_app=WebAppInfo(url=GAME_URL))],
         [
@@ -481,7 +486,7 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         [InlineKeyboardButton("ℹ️ Помощь", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.callback_query.edit_message_text(
         welcome_text,
         parse_mode='HTML',
@@ -498,31 +503,46 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         data = json.loads(update.effective_message.web_app_data.data)
         user_id = update.effective_user.id
         user = update.effective_user
-        
+
         score = data.get('score', 0)
         level = data.get('level', 1)
         difficulty = data.get('difficulty', 'normal')
         duration = data.get('duration_seconds', 0)
         enemies_killed = data.get('enemies_killed', 0)
         accuracy = data.get('accuracy_percent', 0.0)
-        
+        # Новые поля аналитики
+        bosses_killed = data.get('bosses_killed', 0)
+        level_deltas  = data.get('level_deltas', [])   # секунды между уровнями
+
+        # Вычисляем агрегаты из дельт уровней
+        avg_level_time = round(sum(level_deltas) / len(level_deltas), 1) if level_deltas else 0
+
+        # Расширенное логирование каждой сессии
+        logger.info(
+            f"📊 СЕССИЯ: user={user_id}({user.first_name}) "
+            f"score={score} lvl={level} diff={difficulty} "
+            f"dur={duration}s kills={enemies_killed} bosses={bosses_killed} "
+            f"acc={accuracy:.1f}% avg_lvl_time={avg_level_time}s "
+            f"deltas={level_deltas}"
+        )
+
         # Получаем старый ранг
         old_rank = db.get_user_rank(user_id)
-        
+
         # Сохраняем результат в БД
         success, result_info = db.save_game(
             user_id, score, level, difficulty,
             duration, enemies_killed, accuracy
         )
-        
+
         if not success:
             await update.effective_message.reply_text(Messages.ERROR_SAVE_GAME)
             return
-        
+
         # Получаем обновленную статистику
         stats = db.get_user_stats(user_id, use_cache=False)
         new_rank = db.get_user_rank(user_id)
-        
+
         # Определяем изменение ранга
         rank_change = ""
         if old_rank and new_rank:
@@ -530,17 +550,17 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 rank_change = f"⬆️ (+{old_rank - new_rank})"
             elif new_rank > old_rank:
                 rank_change = f"⬇️ (-{new_rank - old_rank})"
-        
+
         # Формируем текст достижений
         achievements_text = ""
         if result_info.get('new_achievements'):
             achievements_text = "\n🎊 <b>Новые достижения:</b>\n"
             for ach in result_info['new_achievements']:
                 achievements_text += f"{ach['emoji']} {ach['name']}\n"
-        
+
         # Получаем конфигурацию сложности
         diff_config = DIFFICULTIES.get(difficulty, DIFFICULTIES['normal'])
-        
+
         # Формируем сообщение
         if result_info.get('is_new_record'):
             message = Messages.GAME_OVER_NEW_RECORD.format(
@@ -566,13 +586,17 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 games_played=stats['games_played'],
                 achievements_text=achievements_text
             )
-        
-        # Добавляем дополнительную статистику
+
+        # Добавляем расширенную статистику сессии
+        avg_lvl_str = f"{avg_level_time}с" if avg_level_time > 0 else "—"
+        bosses_str  = f"{bosses_killed} 👾" if bosses_killed > 0 else "нет"
         message += f"""
 \n<b>🎯 Детали игры:</b>
-• Время игры: {duration // 60}м {duration % 60}с
+• Время забега: {duration // 60}м {duration % 60}с
 • Врагов убито: {enemies_killed} 💀
+• Боссов: {bosses_str}
 • Точность: {accuracy:.1f}%
+• Среднее время на уровень: {avg_lvl_str}
 • Серия побед: {result_info.get('win_streak', 0)} 🔥
 """
         

@@ -31,6 +31,36 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// ── Инжект CSS для новых классов ─────────────────────────────────────
+// ask-pressed: тач-фидбек на кнопках навыков (вместо :active который не
+//   работает при preventDefault)
+// upg-lvl-max: яркий значок MAX в экране апгрейдов
+(function injectStyles(){
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Тач-фидбек на кнопках активных навыков */
+    .ask-wrap.ask-pressed .ask-card {
+      transform: scale(0.88);
+      filter: brightness(1.35);
+      transition: transform 0.07s, filter 0.07s;
+    }
+
+    /* MAX значок в экране апгрейдов */
+    .upg-lvl-badge.upg-lvl-max {
+      background: linear-gradient(135deg, #ffd700, #ff9900);
+      color: #000;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      animation: maxPulse 2s ease-in-out infinite;
+    }
+    @keyframes maxPulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(255,215,0,0.4); }
+      50%       { box-shadow: 0 0 10px rgba(255,215,0,0.9); }
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 // ════════════════════════════════════════════════════
 // AUDIO (Web Audio API)
 // ════════════════════════════════════════════════════
@@ -40,6 +70,10 @@ function getAC(){ if(!audioCtx) audioCtx = new AC(); return audioCtx; }
 
 function playSound(type){
   if(_activeSoundNodes >= MAX_SOUND_NODES) return;
+  // Проверяем тип ДО инкремента счётчика — иначе неизвестный тип
+  // увеличивает счётчик и никогда его не сбрасывает.
+  const KNOWN_TYPES = ['shoot','explode','hit','powerup','boss','levelup'];
+  if(!KNOWN_TYPES.includes(type)) return;
   try{
     const ac = getAC();
     const sfxVol = (typeof Settings !== 'undefined') ? Settings.sfxVol / 100 : 1;
@@ -95,8 +129,6 @@ function playSound(type){
         oo.onended=()=>{ if(--remaining===0) onEnd(); };
       });
       return;
-    }else{
-      _activeSoundNodes--;
     }
   }catch(e){ _activeSoundNodes=Math.max(0,_activeSoundNodes-1); }
 }
@@ -285,22 +317,32 @@ const Music = {
     };
     setTimeout(playArp, 200);
 
-    // Hi-hat
+    // Hi-hat — буфер создаётся ОДИН РАЗ и переиспользуется
+    // (раньше создавался заново каждый такт — лишняя нагрузка на CPU и GC)
+    const hatBuf = (() => {
+      const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.04), ac.sampleRate);
+      const d   = buf.getChannelData(0);
+      for(let k = 0; k < d.length; k++) d[k] = (Math.random()*2-1) * Math.exp(-k/d.length*22);
+      return buf;
+    })();
+    // Фильтр тоже создаём один раз и держим подключённым
+    const hatFilter = ac.createBiquadFilter();
+    hatFilter.type = 'highpass'; hatFilter.frequency.value = 7000;
+    const hatGain = ac.createGain();
+    hatGain.gain.value = 0.022;
+    hatFilter.connect(hatGain); hatGain.connect(out);
+    this._nodes.push(hatFilter, hatGain);
+
     let hi = 0;
     const playHat = () => {
       if(!this._running || this._mode !== 'game') return;
       if(hi % 2 === 0){
-        const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.04), ac.sampleRate);
-        const d   = buf.getChannelData(0);
-        for(let k=0;k<d.length;k++) d[k] = (Math.random()*2-1)*Math.exp(-k/d.length*22);
+        // Переиспользуем буфер — только новый BufferSource (это дёшево)
         const src = ac.createBufferSource();
-        const hg  = ac.createGain();
-        const hf  = ac.createBiquadFilter();
-        hf.type = 'highpass'; hf.frequency.value = 7000;
-        src.buffer = buf;
-        src.connect(hf); hf.connect(hg); hg.connect(out);
-        hg.gain.value = 0.022;
-        src.start(); this._nodes.push(src, hg, hf);
+        src.buffer = hatBuf;
+        src.connect(hatFilter);
+        src.start();
+        this._nodes.push(src);
       }
       hi++;
       setTimeout(playHat, beat * 500);
@@ -557,6 +599,11 @@ function savePersistent(){
   LS.setJ('skillLevels', skillLevels);
 }
 
+// Автосохранение: при закрытии вкладки и каждые 30 секунд
+// Защищает от потери монет/апгрейдов если вкладку закроют внезапно
+window.addEventListener('beforeunload', savePersistent);
+setInterval(savePersistent, 30_000);
+
 // Считает сумму bonuses[0..lvl-1] для ключа k
 function upgTotalBonus(k, lvl){
   const u = UPGRADES[k]; if(!u || !u.bonuses) return 0;
@@ -653,8 +700,8 @@ function invalidateBonus(){ cachedBonus = null; }
 // ════════════════════════════════════════════════════
 const SKILL_DEFS = {
   // ── ПАССИВНЫЕ ──
-  sk_vamp:       { ico:'🧛', name:'ВАМПИР',      type:'passive', desc:'15% шанс восстановить жизнь при убийстве', max:1, cost:2, req:null },
-  sk_regen:      { ico:'💚', name:'РЕГЕНЕРАЦИЯ', type:'passive', desc:'Жизнь восстанавливается раз в 45 секунд',   max:1, cost:2, req:null },
+  sk_vamp:       { ico:'🧛', name:'ВАМПИР',      type:'passive', desc:'25% убийство → +1HP, ещё 35% → мини-щит 2.5с', max:1, cost:2, req:null },
+  sk_regen:      { ico:'💚', name:'РЕГЕНЕРАЦИЯ', type:'passive', desc:'+1HP каждые 30с. При малом HP — ускоряется до 10с', max:1, cost:2, req:null },
   sk_ghost:      { ico:'👻', name:'ПРИЗРАК',     type:'passive', desc:'25% шанс уклониться от любого урона',       max:1, cost:3, req:null },
   sk_berserker:  { ico:'😤', name:'БЕРСЕРК',     type:'passive', desc:'Чем меньше жизней — тем выше урон (до +60%)', max:1, cost:3, req:'sk_vamp' },
   sk_magnet:     { ico:'🧲', name:'СУПЕРМАГНИТ', type:'passive', desc:'Монеты и бонусы притягиваются со всего экрана', max:1, cost:2, req:null },
@@ -697,6 +744,14 @@ function getActiveSkills(){
   return Object.keys(SKILL_DEFS).filter(id => SKILL_DEFS[id].type==='active' && (skillLevels[id]||0)>=1);
 }
 
+// ── Длительности активных навыков (мс) ──────────────────────────────
+// Вынесено из тела activateSkill, чтобы не было магических чисел
+const SKILL_BARRIER_DURATION_MS  = 4000;  // Барьер держится 4 сек
+const SKILL_TIMEWARP_DURATION_MS = 3000;  // Замедление держится 3 сек
+const SKILL_OVERCLOCK_DURATION_MS = 4000; // Разгон держится 4 сек
+const SKILL_AIRSTRIKE_RADIUS_PX  = 100;   // Радиус урона каждого удара авиаудара
+const SKILL_AIRSTRIKE_DELAY_MS   = 300;   // Интервал между бомбами авиаудара
+
 function activateSkill(id){
   if(!gameRunning || gamePaused) return;
   if((skillLevels[id]||0)<1) return;
@@ -716,14 +771,14 @@ function activateSkill(id){
     particles.push({x:canvas.width/2,y:canvas.height*.6,r:0,maxR:Math.max(canvas.width,canvas.height)*0.9,life:1,decay:.02,color:'#aaddff',wave:true,bossShot:false,vx:0,vy:0});
   }
   else if(id==='sk_barrier'){
-    activeSkillEffects[id] = 4000;
-    activePowerups.shield = Math.max(activePowerups.shield, 4000);
+    activeSkillEffects[id] = SKILL_BARRIER_DURATION_MS;
+    activePowerups.shield = Math.max(activePowerups.shield, SKILL_BARRIER_DURATION_MS);
     notify('🔵 БАРЬЕР АКТИВИРОВАН!','gold'); playSound('powerup');
     triggerShake(5);
   }
   else if(id==='sk_timewarp'){
-    timeFreezeActive = Math.max(timeFreezeActive, 3000);
-    activeSkillEffects[id] = 3000;
+    timeFreezeActive = Math.max(timeFreezeActive, SKILL_TIMEWARP_DURATION_MS);
+    activeSkillEffects[id] = SKILL_TIMEWARP_DURATION_MS;
     notify('⏳ ЗАМЕДЛЕНИЕ ВРЕМЕНИ!','gold'); playSound('powerup'); triggerShake(6);
   }
   else if(id==='sk_airstrike'){
@@ -735,12 +790,12 @@ function activateSkill(id){
       if(!gameRunning||gamePaused) return;
       explode(pos.x,pos.y,'#ff6b00',50); triggerShake(8); playSound('explode');
       for(let j=enemies.length-1;j>=0;j--){
-        if(!enemies[j].isBoss && Math.hypot(enemies[j].x-pos.x,enemies[j].y-pos.y)<100) killEnemy(j,DIFF[difficulty]);
+        if(!enemies[j].isBoss && Math.hypot(enemies[j].x-pos.x,enemies[j].y-pos.y)<SKILL_AIRSTRIKE_RADIUS_PX) killEnemy(j,DIFF[difficulty]);
       }
-    }, i*300));
+    }, i*SKILL_AIRSTRIKE_DELAY_MS));
   }
   else if(id==='sk_overclock'){
-    activeSkillEffects[id] = 4000;
+    activeSkillEffects[id] = SKILL_OVERCLOCK_DURATION_MS;
     notify('⚡ РАЗГОН РЕАКТОРОВ!','gold'); playSound('powerup');
   }
   updateSkillBar();
@@ -806,8 +861,17 @@ function updateSkillBar(){
           <div class="ask-key-badge">${sk.actionKey}</div>
         </div>
         <div class="ask-label">${sk.name}</div>`;
-      wrap.addEventListener('touchstart', ev=>{ev.preventDefault();ev.stopPropagation();},{passive:false});
-      wrap.addEventListener('touchend', ev=>{ev.preventDefault();ev.stopPropagation();activateSkill(id);},{passive:false});
+      wrap.addEventListener('touchstart', ev=>{
+        ev.preventDefault(); ev.stopPropagation();
+        // :active не срабатывает при preventDefault — добавляем класс вручную
+        wrap.classList.add('ask-pressed');
+      },{passive:false});
+      wrap.addEventListener('touchend', ev=>{
+        ev.preventDefault(); ev.stopPropagation();
+        wrap.classList.remove('ask-pressed');
+        activateSkill(id);
+      },{passive:false});
+      wrap.addEventListener('touchcancel', ()=>{ wrap.classList.remove('ask-pressed'); },{passive:true});
       wrap.addEventListener('click',()=>activateSkill(id));
       bar.appendChild(wrap);
     });
@@ -1118,7 +1182,7 @@ function renderUpgradeScreen(){
       <div class="upg-icon">${u.icon}</div>
       <div class="grow">
         <div class="upg-name">${u.label}
-          <span class="upg-lvl-badge">${lvl}/${u.max}</span>
+          <span class="upg-lvl-badge${maxed?' upg-lvl-max':''}">${maxed ? '✦ MAX' : `${lvl}/${u.max}`}</span>
         </div>
         <div class="upg-bonus-line">${bonusLine}</div>
         <div class="upg-segs">${segments}</div>
@@ -1883,7 +1947,15 @@ document.getElementById('diffModal').addEventListener('click', function(e){
   if(e.target === this) closeDiffModal();
 });
 
-document.getElementById('restartBtn').addEventListener('click',()=>{ hideAllScreens(); startGame(); });
+document.getElementById('restartBtn').addEventListener('click',()=>{
+  hideAllScreens();
+  // Интро при рестарте тоже показываем — игрок уже знает кнопку "пропустить"
+  if(window.IntroAnimation){
+    IntroAnimation.show(()=>{ startGame(); });
+  } else {
+    startGame();
+  }
+});
 // ════════════════════════════════════════════════════
 // SETTINGS — громкость и стиль музыки
 // ════════════════════════════════════════════════════
@@ -2392,29 +2464,34 @@ class WeaponSystem {
 
     // ──────────────────────────────────────────────────────────────
     R('rocket', {
-      label:'РАКЕТА', emoji:'🚀', color:'#ff6b00', desc:'Наводящаяся', baseCd:600,
+      label:'РАКЕТА', emoji:'🚀', color:'#ff6b00', desc:'Наводящаяся', baseCd:480,
+      // РЕБАЛАНС v4: кд 600→480мс, скорость 7→9, урон 3→4.5x, наводка 0.08→0.14
       fire(){
         const bonus = getBonus();
-        const rspd  = 7 * bonus.bulletSpeedMult * bonus.rocketSpdMult;
-        const rdmg  = bonus.damageMult * 3 * bonus.rocketDmgMult;
+        const rspd  = 9 * bonus.bulletSpeedMult * bonus.rocketSpdMult;
+        const rdmg  = bonus.damageMult * 4.5 * bonus.rocketDmgMult;
         let vx=0, vy=-rspd;
         if(enemies.length>0){
           let near=null, nd=Infinity;
-          enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} });
+          for(let _hi=0;_hi<enemies.length;_hi++){ const e=enemies[_hi]; const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} }
           if(near){ const dx=near.x-player.x,dy=near.y-player.y,d=Math.max(Math.hypot(dx,dy),1); vx=dx/d*rspd; vy=dy/d*rspd; }
         }
         bullets.push({ x:player.x, y:player.y, w:10, h:18, sp:rspd, dmg:rdmg,
           type:'rocket', angle:0, homing:true, split:bonus.rocketSplit,
-          vx, vy, homingStrength:0.08 });
+          vx, vy, homingStrength:0.14,
+          trail:[] // огненный след
+        });
       },
       update(b, dt){
         if(!b.vx) b.vx=0;
         if(!b.vy) b.vy=-b.sp;
+        // Обновляем огненный след
+        if(b.trail){ b.trail.push({x:b.x, y:b.y}); if(b.trail.length>10) b.trail.shift(); }
         if(b.homing && enemies.length>0){
           let near=null, nd=Infinity;
-          enemies.forEach(e=>{ const d=Math.hypot(e.x-b.x,e.y-b.y); if(d<nd){nd=d;near=e;} });
+          for(let _hi2=0;_hi2<enemies.length;_hi2++){ const e=enemies[_hi2]; const d=Math.hypot(e.x-b.x,e.y-b.y); if(d<nd){nd=d;near=e;} }
           if(near){
-            const dx=near.x-b.x, dy=near.y-b.y, dist=Math.max(nd,.1), str=b.homingStrength||0.08;
+            const dx=near.x-b.x, dy=near.y-b.y, dist=Math.max(nd,.1), str=b.homingStrength||0.14;
             b.vx += (dx/dist*b.sp-b.vx)*str;
             b.vy += (dy/dist*b.sp-b.vy)*str;
             const s=Math.hypot(b.vx,b.vy); if(s>0){b.vx=b.vx/s*b.sp; b.vy=b.vy/s*b.sp;}
@@ -2422,11 +2499,27 @@ class WeaponSystem {
         }
         b.y += b.vy; b.x += b.vx;
         b.angle = Math.atan2(b.vx,-b.vy);
-        return !(b.y<-80||b.x<-60||b.x>canvas.width+60||b.y>canvas.height+80);
+        return !(b.y<-100||b.x<-80||b.x>canvas.width+80||b.y>canvas.height+100);
       },
       draw(b, ctx, now){
         const wc={a:'#ff6b00',b:'#ffaa00'};
-        if(custom.glow){ctx.shadowBlur=18; ctx.shadowColor=wc.a;}
+        // Огненный след
+        if(b.trail && b.trail.length>1){
+          for(let ti=1;ti<b.trail.length;ti++){
+            const pct = ti/b.trail.length;
+            ctx.save();
+            ctx.globalAlpha = pct * 0.55;
+            ctx.strokeStyle = pct > 0.55 ? '#ff9900' : '#ff4400';
+            ctx.lineWidth = pct * 5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(b.trail[ti-1].x, b.trail[ti-1].y);
+            ctx.lineTo(b.trail[ti].x, b.trail[ti].y);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+        if(custom.glow){ctx.shadowBlur=20; ctx.shadowColor=wc.a;}
         const rAngle = b.vx!==undefined ? Math.atan2(b.vx,-b.vy) : (b.angle||0);
         ctx.translate(b.x,b.y); ctx.rotate(rAngle);
         const rg=ctx.createLinearGradient(0,-b.h/2,0,b.h/2);
@@ -2479,7 +2572,7 @@ class WeaponSystem {
         let vx=0, vy=-pspd;
         if(enemies.length>0){
           let near=null, nd=Infinity;
-          enemies.forEach(e=>{ const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} });
+          for(let _hi=0;_hi<enemies.length;_hi++){ const e=enemies[_hi]; const d=Math.hypot(e.x-player.x,e.y-player.y); if(d<nd){nd=d;near=e;} } // [OPT]
           if(near){ const dx=near.x-player.x,dy=near.y-player.y,d=Math.max(Math.hypot(dx,dy),1); vx=dx/d*pspd; vy=dy/d*pspd; }
         }
         bullets.push({ x:player.x, y:player.y, w:16, h:16, sp:pspd, dmg:pdmg,
@@ -2492,7 +2585,7 @@ class WeaponSystem {
         if(b.fuse<=0 || outOfBounds){
           const r=b.aoeR||80;
           explode(b.x,b.y,'#a855f7',55); triggerShake(6); playSound('explode');
-          enemies.forEach(en=>{ const d=Math.hypot(en.x-b.x,en.y-b.y); if(d<r&&!en.spawnInvincible){ en.hp-=Math.ceil((b.dmg||1)*(1-d/r*0.5)); if(en.hp<=0) killEnemy(enemies.indexOf(en),DIFF[difficulty]); } });
+          for(let _ai=enemies.length-1;_ai>=0;_ai--){ const en=enemies[_ai]; const d=Math.hypot(en.x-b.x,en.y-b.y); if(d<r&&!en.spawnInvincible){ en.hp-=Math.ceil((b.dmg||1)*(1-d/r*0.5)); if(en.hp<=0) killEnemy(_ai,DIFF[difficulty]); } } // [OPT] reverse for+direct index
           particles.push({x:b.x,y:b.y,vx:0,vy:0,life:1,decay:.04,color:'#a855f7',wave:true,r:0,maxR:r,bossShot:false});
           return false; // удалить
         }
@@ -2682,7 +2775,7 @@ function checkBulletEnemyCollisions(cfg) {
           }
           if (b.type === 'rocket') {
             explode(b.x, b.y, '#ff6b00', 45); triggerShake(12); playSound('explode');
-            enemies.forEach((en) => { if (Math.hypot(en.x - b.x, en.y - b.y) < 80 && !en.spawnInvincible) en.hp -= Math.ceil((b.dmg || 1) * 1.5); });
+            for(let _ri=0;_ri<enemies.length;_ri++){ const en=enemies[_ri]; if(Math.hypot(en.x-b.x,en.y-b.y)<80&&!en.spawnInvincible) en.hp-=Math.ceil((b.dmg||1)*1.5); } // [OPT]
             if (b.split > 0) {
               for (let s = 0; s < 2; s++) {
                 const ang = s === 0 ? -0.5 : 0.5;
@@ -2694,7 +2787,7 @@ function checkBulletEnemyCollisions(cfg) {
             const r = b.aoeR || 80;
             explode(b.x, b.y, '#a855f7', 55); triggerShake(8); playSound('explode');
             particles.push(Pool.acquire('particle', { x: b.x, y: b.y, vx: 0, vy: 0, life: 1, decay: .04, color: '#a855f7', wave: true, r: 0, maxR: r, bossShot: false }));
-            enemies.forEach(en => { const dist = Math.hypot(en.x - b.x, en.y - b.y); if (dist < r && !en.spawnInvincible) en.hp -= Math.ceil(b.dmg * (1 - dist / r * .4)); });
+            for(let _pi=0;_pi<enemies.length;_pi++){ const en=enemies[_pi]; const dist=Math.hypot(en.x-b.x,en.y-b.y); if(dist<r&&!en.spawnInvincible) en.hp-=Math.ceil(b.dmg*(1-dist/r*.4)); } // [OPT]
             bullets.splice(i, 1); hit = true;
           } else if (b.pierce) {
             b.pierced.add(j);
@@ -2824,27 +2917,140 @@ for(let i=0;i<12;i++) asteroids.push({
 // ════════════════════════════════════════════════════
 // GAME STATE
 // ════════════════════════════════════════════════════
-let gameRunning=false;
-let score=0, lives=0, level=1, levelProgress=0, pendingLevelProgress=0;
-let combo=1, maxCombo=1, comboTimer=0;
-let bossActive=false, bossEnemy=null;
-let killedEnemies=0, bossesKilled=0;
-let sessionAch=[];
-let activePowerups={shield:0, speed:0};
-let shakeAmount=0, shakeX=0, shakeY=0;
-let lastTime=0;
+// Все переменные состояния игры собраны в один объект.
+// Это упрощает сброс при startGame(), сохранение/загрузку
+// и исключает случайные конфликты имён в глобальной области.
+const GameState = {
+  // ── Управление циклом ──
+  running:  false,
+  lastTime: 0,
 
-// Кулдаун неуязвимости после получения урона (мс)
-let invincibleTimer = 0;
-const INVINCIBLE_DURATION = 1200; // 1.2 секунды
+  // ── Счётчики ──
+  score:               0,
+  lives:               0,
+  level:               1,
+  levelProgress:       0,
+  pendingLevelProgress:0,
+  combo:               1,
+  maxCombo:            1,
+  comboTimer:          0,
+  killedEnemies:       0,
+  bossesKilled:        0,
 
-const player = {x:canvas.width/2, y:canvas.height-110, targetX:canvas.width/2, w:44, h:44};
-const playerTrail = [];
+  // ── Босс ──
+  bossActive: false,
+  bossEnemy:  null,
 
-const bullets=[], enemies=[], particles=[], powerups=[];
-let MAX_PARTICLES = 300;
+  // ── Прочее ──
+  sessionAch:    [],
+  activePowerups: { shield: 0, speed: 0 },
+  shakeAmount:   0,
+  shakeX:        0,
+  shakeY:        0,
+  invincibleTimer: 0,
+  lastShot:      0,
 
-let lastShot = 0;
+  // ── Игровые объекты ──
+  bullets:     [],
+  enemies:     [],
+  particles:   [],
+  powerups:    [],
+  playerTrail: [],
+
+  // ── Константы ──
+  MAX_PARTICLES:      300,
+  INVINCIBLE_DURATION: 1200,
+
+  // ── Игрок ──
+  player: { x: 0, y: 0, targetX: 0, w: 44, h: 44 },
+
+  /** Сбрасывает всё в начальное состояние перед новой игрой */
+  reset(canvasW, canvasH) {
+    this.running   = false;
+    this.lastTime  = 0;
+    this.score     = 0;
+    this.level     = 1;
+    this.levelProgress        = 0;
+    this.pendingLevelProgress = 0;
+    this.combo     = 1;
+    this.maxCombo  = 1;
+    this.comboTimer = 0;
+    this.killedEnemies  = 0;
+    this.bossesKilled   = 0;
+    this.bossActive = false;
+    this.bossEnemy  = null;
+    this.sessionAch = [];
+    this.activePowerups = { shield: 0, speed: 0 };
+    this.shakeAmount = 0;
+    this.shakeX = 0;
+    this.shakeY = 0;
+    this.invincibleTimer = 0;
+    this.lastShot  = 0;
+    this.bullets.length     = 0;
+    this.enemies.length     = 0;
+    this.particles.length   = 0;
+    this.powerups.length    = 0;
+    this.playerTrail.length = 0;
+    this.player.x       = canvasW / 2;
+    this.player.y       = canvasH - 110;
+    this.player.targetX = canvasW / 2;
+  }
+};
+
+// ── Короткие алиасы для обратной совместимости со старым кодом ──
+// Все эти переменные теперь указывают на свойства GameState,
+// поэтому существующий код продолжает работать без изменений.
+// В будущем их можно постепенно заменять на GS.xxx напрямую.
+const GS = GameState; // удобное короткое имя
+
+// Геттеры/сеттеры через Object.defineProperty чтобы запись в
+// алиас = запись в GameState и наоборот.
+(function bindAliases() {
+  const bind = (name, key) => Object.defineProperty(window, name, {
+    get() { return GS[key]; },
+    set(v) { GS[key] = v; },
+    configurable: true,
+  });
+  bind('gameRunning',          'running');
+  bind('lastTime',             'lastTime');
+  bind('score',                'score');
+  bind('lives',                'lives');
+  bind('level',                'level');
+  bind('levelProgress',        'levelProgress');
+  bind('pendingLevelProgress', 'pendingLevelProgress');
+  bind('combo',                'combo');
+  bind('maxCombo',             'maxCombo');
+  bind('comboTimer',           'comboTimer');
+  bind('killedEnemies',        'killedEnemies');
+  bind('bossesKilled',         'bossesKilled');
+  bind('bossActive',           'bossActive');
+  bind('bossEnemy',            'bossEnemy');
+  bind('sessionAch',           'sessionAch');
+  bind('activePowerups',       'activePowerups');
+  bind('shakeAmount',          'shakeAmount');
+  bind('shakeX',               'shakeX');
+  bind('shakeY',               'shakeY');
+  bind('invincibleTimer',      'invincibleTimer');
+  bind('lastShot',             'lastShot');
+  bind('MAX_PARTICLES',        'MAX_PARTICLES');
+})();
+
+// Массивы и объекты — прямые ссылки (не нужны defineProperty,
+// потому что мы не переприсваиваем их, только мутируем содержимое)
+const bullets     = GS.bullets;
+const enemies     = GS.enemies;
+const particles   = GS.particles;
+const powerups    = GS.powerups;
+const playerTrail = GS.playerTrail;
+const player      = GS.player;
+
+// Инициализируем позицию игрока
+player.x       = canvas.width  / 2;
+player.y       = canvas.height - 110;
+player.targetX = canvas.width  / 2;
+
+// INVINCIBLE_DURATION оставляем как константу для читабельности
+const INVINCIBLE_DURATION = GS.INVINCIBLE_DURATION;
 
 // ════════════════════════════════════════════════════
 // NOTIFICATIONS
@@ -2887,9 +3093,12 @@ function triggerShake(s=8){ shakeAmount=s; }
 
 function explode(x,y,color,count=28){
   if(!custom.particles) return;
-  const cap = Math.min(count, MAX_PARTICLES - particles.length);
-  for(let i=0;i<cap;i++) particles.push(Pool.acquire('particle',{x,y,vx:(Math.random()-.5)*11,vy:(Math.random()-.5)*11,life:1,decay:.014+Math.random()*.01,color,size:2+Math.random()*3,wave:false,bossShot:false}));
-  if(particles.length < MAX_PARTICLES)
+  // [OPT] во время боса — меньше частиц, чтобы не тормозить
+  const maxP = bossActive ? Math.min(MAX_PARTICLES, 150) : MAX_PARTICLES;
+  const effectiveCnt = bossActive ? Math.min(count, 12) : count;
+  const cap = Math.min(effectiveCnt, maxP - particles.length);
+  for(let i=0;i<cap;i++) particles.push(Pool.acquire('particle',{x,y,vx:(Math.random()-.5)*11,vy:(Math.random()-.5)*11,life:1,decay:.018+Math.random()*.012,color,size:2+Math.random()*3,wave:false,bossShot:false}));
+  if(particles.length < maxP && !bossActive)
     particles.push(Pool.acquire('particle',{x,y,vx:0,vy:0,life:1,decay:.04,color,wave:true,r:0,maxR:60+count,bossShot:false}));
 }
 
@@ -2974,9 +3183,12 @@ function applyPowerup(type){
       notify('⚡ УСКОРЕНИЕ!');
       break;
     case 'bomb':{
-      const n=enemies.filter(e=>!e.isBoss).length;
+      let n=0; for(let _ni=0;_ni<enemies.length;_ni++) if(!enemies[_ni].isBoss) n++; // [OPT]
       enemies.forEach(e=>{ if(!e.isBoss){explode(e.x,e.y,'#ff6b00',20);} });
-      enemies.splice(0, enemies.length, ...enemies.filter(e=>e.isBoss));
+      // [OPT] без filter+spread — in-place удаление
+      for(let _bi=enemies.length-1;_bi>=0;_bi--){
+        if(!enemies[_bi].isBoss){ enemies[_bi]=enemies[enemies.length-1]; enemies.pop(); }
+      }
       score+=n*25; updateHUD();
       notify('💣 БОМБА! +'+n*25,'gold');
       triggerShake(16); playSound('explode');
@@ -3125,6 +3337,7 @@ function shoot(){
 
   lastShot = now;
   playSound('shoot');
+  if(window._shotsFired !== undefined) window._shotsFired++;
 
   // Каждое оружие само знает как стрелять
   wpn.fire();
@@ -3158,13 +3371,13 @@ const BOSS_TYPES = [
     },
     draw(b,ctx,animT){
       const col='#ff0066';
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
-      ctx.fillStyle=eg; ctx.beginPath();
+      // [OPT] без createRadialGradient — плоский цвет + stroke
+      ctx.fillStyle=col+'cc'; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath();
       ctx.moveTo(0,-b.hh); ctx.lineTo(-b.hw*.7,-b.hh*.3); ctx.lineTo(-b.hw,b.hh);
       ctx.lineTo(-b.hw*.3,b.hh*.4); ctx.lineTo(0,b.hh*.7);
       ctx.lineTo(b.hw*.3,b.hh*.4); ctx.lineTo(b.hw,b.hh); ctx.lineTo(b.hw*.7,-b.hh*.3);
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-b.hw*.3,-b.hh*.1,4,0,Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(b.hw*.3,-b.hh*.1,4,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#f00'; ctx.beginPath(); ctx.arc(-b.hw*.3,-b.hh*.1,2,0,Math.PI*2); ctx.fill();
@@ -3209,15 +3422,14 @@ const BOSS_TYPES = [
     },
     draw(b,ctx,animT){
       const col='#ff9900';
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.5,col+'99'); eg.addColorStop(1,col+'11');
-      ctx.fillStyle=eg;
+      // [OPT] без createRadialGradient
+      ctx.fillStyle=col+'cc'; ctx.strokeStyle=col; ctx.lineWidth=2;
       ctx.beginPath();
       ctx.moveTo(0,-b.hh); ctx.lineTo(-b.hw*.4,-b.hh*.2);
       ctx.lineTo(-b.hw,0); ctx.lineTo(-b.hw*.4,b.hh*.3);
       ctx.lineTo(0,b.hh); ctx.lineTo(b.hw*.4,b.hh*.3);
       ctx.lineTo(b.hw,0); ctx.lineTo(b.hw*.4,-b.hh*.2);
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
       const eyeR = b.charging ? 10+5*Math.sin(animT*8) : 7;
       ctx.fillStyle = b.charging ? '#ffffff' : col+'99';
       ctx.beginPath(); ctx.arc(0,0,eyeR,0,Math.PI*2); ctx.fill();
@@ -3225,8 +3437,8 @@ const BOSS_TYPES = [
       ctx.beginPath(); ctx.arc(0,0,eyeR+4,0,Math.PI*2); ctx.stroke();
       if(b.charging){
         ctx.save(); ctx.globalAlpha=.5;
+        // [OPT] без setLineDash — просто сплошная тонкая линия
         ctx.strokeStyle='#ff9900'; ctx.lineWidth=1;
-        ctx.setLineDash([4,6]);
         ctx.beginPath(); ctx.moveTo(0,b.hh); ctx.lineTo(b.aimX-b.x, b.aimY-b.y); ctx.stroke();
         ctx.setLineDash([]); ctx.restore();
       }
@@ -3247,7 +3459,7 @@ const BOSS_TYPES = [
       b.spawnTimer-=dt;
       if(b.spawnTimer<=0){
         b.spawnTimer = Math.max(2000, 4500-level*80);
-        if(enemies.filter(e=>!e.isBoss).length < 8){
+        let _ec=0; for(let _efi=0;_efi<enemies.length;_efi++) if(!enemies[_efi].isBoss) _ec++; if(_ec < 8){ // [OPT]
           enemies.push({x:b.x+(Math.random()-.5)*80,y:b.y+20,hw:10,hh:10,sp:1.5,hp:1,maxHp:1,type:'fast',zigAngle:0,isBoss:false,shootTimer:0,stealthTimer:0,stealthAlpha:1,splitDone:false,swarmOffset:0});
         }
       }
@@ -3262,10 +3474,9 @@ const BOSS_TYPES = [
     },
     draw(b,ctx,animT){
       const col='#a855f7';
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'bb'); eg.addColorStop(1,col+'11');
-      ctx.fillStyle=eg;
-      ctx.beginPath(); ctx.arc(0,0,b.hw*.7,0,Math.PI*2); ctx.fill();
+      // [OPT] без createRadialGradient
+      ctx.fillStyle=col+'cc'; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,b.hw*.7,0,Math.PI*2); ctx.fill(); ctx.stroke();
       for(let i=0;i<8;i++){
         const ang = (i/8)*Math.PI*2 + b.tentacleAngle;
         const len = b.hw*.9 + 10*Math.sin(animT*3+i);
@@ -3319,26 +3530,30 @@ const BOSS_TYPES = [
     },
     draw(b,ctx,animT){
       const col='#00d4ff';
+      // [OPT] без createLinearGradient/createRadialGradient
       ctx.fillStyle='#001122';
       ctx.beginPath(); ctx.roundRect(-b.hw,-b.hh,b.hw*2,b.hh*2,10); ctx.fill();
-      const eg=ctx.createLinearGradient(-b.hw,-b.hh,b.hw,b.hh);
-      eg.addColorStop(0,col+'66'); eg.addColorStop(.5,col+'33'); eg.addColorStop(1,col+'66');
-      ctx.fillStyle=eg;
-      ctx.beginPath(); ctx.roundRect(-b.hw,-b.hh,b.hw*2,b.hh*2,10); ctx.fill();
+      ctx.fillStyle=col+'33'; ctx.strokeStyle=col+'88'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.roundRect(-b.hw,-b.hh,b.hw*2,b.hh*2,10); ctx.fill(); ctx.stroke();
       ctx.strokeStyle=col+'55'; ctx.lineWidth=1.5;
       for(let i=-2;i<=2;i++){
         ctx.beginPath(); ctx.moveTo(i*b.hw*.35,-b.hh); ctx.lineTo(i*b.hw*.35,b.hh); ctx.stroke();
       }
+      ctx.fillStyle=col+'ff';
       [-b.hw*.6,-b.hw*.2,b.hw*.2,b.hw*.6].forEach(ox=>{
-        const glow=ctx.createRadialGradient(ox,b.hh,0,ox,b.hh,10);
-        glow.addColorStop(0,col+'ff'); glow.addColorStop(1,'transparent');
-        ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(ox,b.hh,10+3*Math.sin(animT*5+ox),0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ox,b.hh,8+3*Math.sin(animT*5+ox),0,Math.PI*2); ctx.fill();
       });
       ctx.fillStyle=b.laserChargeTimer>0||b.laserFiring?'#ffffff':col+'88';
       ctx.beginPath(); ctx.arc(0,b.hh*.4,8,0,Math.PI*2); ctx.fill();
       if(b.laserFiring){
         const beamXs=b.phase3entered?[b.laserX,b.laserX2||b.laserX+80]:[b.laserX];
-        beamXs.forEach(beamX=>{ const lx=beamX-b.x; ctx.save(); ctx.globalAlpha=.7+.3*Math.sin(animT*20); const lg=ctx.createLinearGradient(lx,b.hh*.4,lx,canvas.height); lg.addColorStop(0,'#ffffff'); lg.addColorStop(.1,col); lg.addColorStop(1,col+'00'); ctx.fillStyle=lg; ctx.fillRect(lx-6, b.hh*.4, 12, canvas.height); ctx.restore(); });
+        // [OPT] лазер без createLinearGradient — просто fillRect с alpha
+        ctx.globalAlpha=.65+.3*Math.sin(animT*20);
+        ctx.fillStyle=col+'cc';
+        beamXs.forEach(beamX=>{ const lx=beamX-b.x; ctx.fillRect(lx-6, b.hh*.4, 12, canvas.height); });
+        ctx.fillStyle='#ffffffaa';
+        beamXs.forEach(beamX=>{ const lx=beamX-b.x; ctx.fillRect(lx-2, b.hh*.4, 4, canvas.height); });
+        ctx.globalAlpha=1;
       }
       if(b.laserChargeTimer>0){
         const lx=b.laserX-b.x;
@@ -3396,24 +3611,18 @@ const BOSS_TYPES = [
         ctx.quadraticCurveTo(side*b.hw*.7, b.hh*.5, 0,b.hh*.3);
         ctx.closePath(); ctx.fill(); ctx.restore();
       }
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw*.55);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.5,col+'cc'); eg.addColorStop(1,col+'22');
-      ctx.fillStyle=eg;
-      ctx.beginPath(); ctx.arc(0,0,b.hw*.55,0,Math.PI*2); ctx.fill();
+      // [OPT] без createRadialGradient/LinearGradient/shadowBlur
+      ctx.fillStyle=col+'dd'; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,b.hw*.55,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=col+'99';
       for(let i=-2;i<=2;i++){
-        ctx.save(); ctx.translate(i*10, b.hh*.4);
-        const fl=ctx.createLinearGradient(0,0,0,25+10*Math.sin(animT*4+i));
-        fl.addColorStop(0,col+'cc'); fl.addColorStop(1,'transparent');
-        ctx.fillStyle=fl;
-        ctx.beginPath(); ctx.moveTo(-4,0); ctx.lineTo(4,0); ctx.lineTo(0,25+10*Math.sin(animT*4+i)); ctx.closePath(); ctx.fill();
-        ctx.restore();
+        const fh=20+8*Math.sin(animT*4+i);
+        ctx.beginPath(); ctx.moveTo(i*10-4,b.hh*.4); ctx.lineTo(i*10+4,b.hh*.4); ctx.lineTo(i*10,b.hh*.4+fh); ctx.closePath(); ctx.fill();
       }
+      ctx.fillStyle=col;
       b.orbits.forEach(o=>{
         const ox=Math.cos(o.angle)*o.dist, oy=Math.sin(o.angle)*o.dist;
-        ctx.save();
-        ctx.shadowBlur=15; ctx.shadowColor=col;
-        ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ox,oy,7,0,Math.PI*2); ctx.fill();
-        ctx.restore();
+        ctx.beginPath(); ctx.arc(ox,oy,7,0,Math.PI*2); ctx.fill();
       });
       ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,-8,7,0,Math.PI*2); ctx.fill();
       ctx.fillStyle=b.phase===2?'#ff8800':'#cc2200';
@@ -3460,12 +3669,11 @@ const BOSS_TYPES = [
     },
     draw(b,ctx,animT){
       const col='#44ff88';
-      // Тело — большой шестиугольник
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'cc'); eg.addColorStop(1,col+'11');
-      ctx.fillStyle=eg; ctx.beginPath();
+      // [OPT] без createRadialGradient
+      ctx.fillStyle=col+'cc'; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath();
       for(let i=0;i<6;i++){ const a=i/6*Math.PI*2-Math.PI/6; ctx.lineTo(Math.cos(a)*b.hw,Math.sin(a)*b.hh); }
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
       // Крылья
       for(let side of [-1,1]){
         ctx.save(); ctx.fillStyle=col+'55';
@@ -3539,10 +3747,9 @@ const BOSS_TYPES = [
       ctx.lineTo(-b.hw*.6,b.hh); ctx.lineTo(0,b.hh*.7);
       ctx.lineTo(b.hw*.6,b.hh); ctx.lineTo(b.hw*.4,b.hh*.4);
       ctx.lineTo(b.hw,b.hh*.6); ctx.closePath(); ctx.fill();
-      // Тело
-      const eg=ctx.createRadialGradient(0,0,0,0,0,b.hw*.55);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'bb'); eg.addColorStop(1,col+'22');
-      ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(0,-b.hh*.1,b.hw*.55,0,Math.PI*2); ctx.fill();
+      // [OPT] без createRadialGradient
+      ctx.fillStyle=col+'dd'; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,-b.hh*.1,b.hw*.55,0,Math.PI*2); ctx.fill(); ctx.stroke();
       // Череп
       ctx.fillStyle='#fff9'; ctx.beginPath(); ctx.arc(0,-b.hh*.15,b.hw*.35,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-10,-b.hh*.2,6,0,Math.PI*2); ctx.fill();
@@ -3553,15 +3760,20 @@ const BOSS_TYPES = [
       ctx.fillStyle='#ffdd44';
       const orb=8+4*Math.sin(animT*4);
       ctx.beginPath(); ctx.arc(b.hw*.6,-b.hh*.9,orb,0,Math.PI*2); ctx.fill();
-      ctx.shadowBlur=20; ctx.shadowColor='#ffdd44';
+      ctx.shadowBlur=0;
       ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(b.hw*.6,-b.hh*.9,orb*.4,0,Math.PI*2); ctx.fill();
     }
   },
 ];
 
+// [OPT] Boss shots — отдельный массив + пул, не смешиваем с particles
+const bossShots = [];
+const _bossShotPool = [];
 function spawnBossShot(x, y, vx, vy, color, size){
-  if(particles.length >= MAX_PARTICLES) return;
-  particles.push({x,y,vx,vy,life:1,decay:.005,color,bossShot:true,wave:false,size});
+  if(bossShots.length >= 200) return; // жёсткий лимит
+  const s = _bossShotPool.pop() || {};
+  s.x=x; s.y=y; s.vx=vx; s.vy=vy; s.life=1; s.decay=.005; s.color=color; s.size=size;
+  bossShots.push(s);
 }
 
 function getBossType(){
@@ -3618,6 +3830,9 @@ function spawnBoss(){
   notify(btype.name+' ПОЯВИЛСЯ!','boss');
   playSound('boss');
   triggerShake(14);
+  // Игрок неуязвим всё время пока идёт анимация появления (2.7с = 2200+500мс)
+  // Чтобы не получить урон пока смотришь на заставку босса
+  invincibleTimer = Math.max(invincibleTimer, 2700);
   if(window.BossAnimation) window.BossAnimation.show('🔥 ' + btype.name);
 }
 
@@ -3977,7 +4192,8 @@ function updateTouchSkillBar(){
 const keys={};
 document.addEventListener('keydown',e=>{
   keys[e.key]=true;
-  if(e.key===' ') e.preventDefault();
+  // Предотвращаем скролл страницы стрелками и пробелом
+  if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
   if(e.key==='b'||e.key==='B') useBomb();
   // Активные навыки по клавишам Q/E/R/F/W
   if(gameRunning && !gamePaused){
@@ -3987,7 +4203,27 @@ document.addEventListener('keydown',e=>{
   }
   if(e.key==='Escape'&&gameRunning){ if(!gamePaused){gamePaused=true;document.getElementById('pauseOverlay').style.display='flex';}else{document.getElementById('resumeBtn').click();} }
 });
-document.addEventListener('keyup',  e=>keys[e.key]=false);
+document.addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+// ── УПРАВЛЕНИЕ МЫШЬЮ (десктоп) ───────────────────────────────────────
+// Мышь двигает корабль плавно (как touch targetX/Y), ЛКМ = стрельба, ПКМ = бомба
+let _mouseX = null, _mouseY = null;
+
+canvas.addEventListener('mousemove', e=>{
+  if(!gameRunning || gamePaused) return;
+  _mouseX = e.clientX;
+  _mouseY = e.clientY;
+});
+canvas.addEventListener('mouseleave', ()=>{ _mouseX = null; _mouseY = null; });
+canvas.addEventListener('mousedown', e=>{
+  if(!gameRunning || gamePaused) return;
+  if(e.button === 0){ // ЛКМ — ручной выстрел (дублирует пробел)
+    if(currentWeapon === 'rail') fireRailgun(); else shoot();
+  } else if(e.button === 2){ // ПКМ — бомба
+    useBomb();
+  }
+});
+canvas.addEventListener('contextmenu', e=>e.preventDefault()); // убираем меню ПКМ
 
 // ── BOMB UI ──
 // [OPT] updateBombUI — без innerHTML каждый тик, только textContent
@@ -4108,10 +4344,22 @@ function update(dt){
   // Таймер неуязвимости
   if(invincibleTimer > 0) invincibleTimer -= dt;
 
-  // Player movement
+  // Player movement — touch + мышь + клавиатура
+  // Мышь: плавно следуем за курсором (горизонталь + вертикаль)
+  if(_mouseX !== null){ const dx=_mouseX-player.x; player.x+=dx*.18; }
+  if(_mouseY !== null){
+    const minY=60, maxY=canvas.height-80;
+    const targetY = Math.min(maxY, Math.max(minY, _mouseY - 30));
+    player.y += (targetY - player.y) * 0.18;
+  }
+  // Touch — горизонталь
   if(touching){ const dx=player.targetX-player.x; player.x+=dx*.2; }
-  if(keys['ArrowLeft']||keys['a']||keys['A']) player.x -= moveSpd;
+  // Клавиатура — горизонталь
+  if(keys['ArrowLeft'] ||keys['a']||keys['A']) player.x -= moveSpd;
   if(keys['ArrowRight']||keys['d']||keys['D']) player.x += moveSpd;
+  // Клавиатура — вертикаль (новое)
+  if(keys['ArrowUp']   ||keys['i']||keys['I']) player.y = Math.max(60,              player.y - moveSpd);
+  if(keys['ArrowDown'] ||keys['k']||keys['K']) player.y = Math.min(canvas.height-80, player.y + moveSpd);
   if(keys[' ']&&!autoShoot) { if(currentWeapon==='rail') fireRailgun(); else shoot(); }
   player.x = Math.max(player.w/2, Math.min(canvas.width-player.w/2, player.x));
   if(autoShoot) shoot();
@@ -4145,13 +4393,27 @@ function update(dt){
     if(activeSkillEffects[id]>0){ activeSkillEffects[id]-=dt; if(activeSkillEffects[id]<0){ activeSkillEffects[id]=0; invalidateBonus(); } skillBarNeedsUpdate=true; }
   });
   if(skillBarNeedsUpdate) updateSkillBar();
-  // Регенерация от навыка
-  if(!window._regenTimer) window._regenTimer=0;
-  window._regenTimer-=dt;
-  if(window._regenTimer<=0){
-    const regenLvl=getBonus().regenLvl||0;
-    window._regenTimer = regenLvl>0 ? 60000/regenLvl : 99999;
-    if(regenLvl>0 && lives < 9){ lives++; updateHUD(); notify('💚 РЕГЕНЕРАЦИЯ','gold'); }
+  // Регенерация — адаптивный интервал:
+  //   Полные HP → каждые 30с
+  //   1 HP → каждые 10с (в 3 раза быстрее, экстренное восстановление)
+  if(!window._regenTimer) window._regenTimer = 0;
+  window._regenTimer -= dt;
+  if(window._regenTimer <= 0){
+    const regenLvl = getBonus().regenLvl||0;
+    if(regenLvl > 0){
+      const maxLvs = DIFF[difficulty].lives + (getBonus().extraLife||0);
+      const hpRatio = Math.max(0, Math.min(1, lives / Math.max(maxLvs, 1)));
+      // 30с при полном HP, 10с при 0 HP (линейная интерполяция)
+      const intervalMs = 10000 + hpRatio * 20000;
+      window._regenTimer = intervalMs;
+      if(lives < 9 && lives < maxLvs + 2){
+        lives++; updateHUD();
+        if(hpRatio < 0.35) notify('💚 ЭКСТРЕННАЯ РЕГЕНЕРАЦИЯ!','gold');
+        else               notify('💚 РЕГЕНЕРАЦИЯ','gold');
+      }
+    } else {
+      window._regenTimer = 99999;
+    }
   }
   // Рельса: тик кулдауна и активный луч
   if(railCooldown>0){ railCooldown-=dt; if(railCooldown<0)railCooldown=0; updateRailUI(); }
@@ -4244,7 +4506,7 @@ function update(dt){
       if(e.minionTimer !== undefined){
         e.minionTimer -= dt;
         if(e.minionTimer <= 0){
-          const minionCount = enemies.filter(en=>!en.isBoss).length;
+          let minionCount=0; for(let _mi=0;_mi<enemies.length;_mi++) if(!enemies[_mi].isBoss) minionCount++; // [OPT] без filter
           if(minionCount < 4 + Math.floor(level/3)){
             const spawnCount = 1 + Math.floor(level/8);
             for(let m=0;m<spawnCount;m++){
@@ -4330,9 +4592,9 @@ function update(dt){
               e.x+=dx/d*e.sp*0.6;
               if(e.bomberArmed && d<60){
                 explode(e.x,e.y,'#ff8800',50); triggerShake(10);
-                enemies.forEach(en=>{if(Math.hypot(en.x-e.x,en.y-e.y)<70 && en!==e) en.hp-=2;});
+                for(let _bai=0;_bai<enemies.length;_bai++){ const en=enemies[_bai]; if(en!==e&&Math.hypot(en.x-e.x,en.y-e.y)<70) en.hp-=2; } // [OPT]
                 damagePlayer(e.x,e.y);
-                enemies.splice(enemies.indexOf(e),1);
+                { const _bi=enemies.indexOf(e); if(_bi!==-1){ enemies[_bi]=enemies[enemies.length-1]; enemies.pop(); } } // [OPT] swapPop
               }
             }
             break;
@@ -4522,13 +4784,15 @@ function update(dt){
   // ── Bullet ↔ Enemy collisions ── [OPT: spatial grid]
   checkBulletEnemyCollisions(cfg);
 
-  // ── Boss shots ↔ player ──
-  // ИЗМЕНЕНИЕ: урон от снарядов босса через centralized damagePlayer()
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i];
-    if(!p.bossShot) continue;
-    if(Math.abs(p.x-player.x)<player.w/2&&Math.abs(p.y-player.y)<player.h/2){
-      particles.splice(i,1);
+  // ── Boss shots update + ↔ player ── [OPT: отдельный массив]
+  for(let i=bossShots.length-1;i>=0;i--){
+    const p=bossShots[i];
+    p.x+=p.vx; p.y+=p.vy; p.life-=p.decay;
+    if(p.life<=0||p.y>canvas.height+20||p.x<-20||p.x>canvas.width+20){
+      _bossShotPool.push(bossShots[i]); bossShots.splice(i,1); continue;
+    }
+    if(invincibleTimer<=0&&Math.abs(p.x-player.x)<player.w/2&&Math.abs(p.y-player.y)<player.h/2){
+      _bossShotPool.push(bossShots[i]); bossShots.splice(i,1);
       damagePlayer(p.x, p.y);
     }
   }
@@ -4561,9 +4825,9 @@ function update(dt){
 
   // Армада спавнится по уровням (каждые 10, нечётные десятки) — логика в killEnemy/levelUp
   // Сбрасываем флаг армады если все её юниты уничтожены
-  if(armadaActive && !enemies.some(e => e.type === 'armada')){
+  if(armadaActive){ let _hasArmada=false; for(let _ai=0;_ai<enemies.length;_ai++) if(enemies[_ai].type==='armada'){_hasArmada=true;break;} if(!_hasArmada){ // [OPT]
     armadaActive = false;
-  }
+  }}
 }
 
 function killEnemy(j, cfg){
@@ -4619,8 +4883,12 @@ function killEnemy(j, cfg){
                e.type==='armada'?'#ff3366':'#ff6b00';
     explode(e.x,e.y,col); triggerShake(e.type==='tank'?6:4);
   }
-  enemies.splice(j,1);
+  // [OPT] swap-and-pop — O(1) вместо O(n) splice
+  const _last = enemies[enemies.length-1];
+  enemies[j] = _last;
+  enemies.pop();
   killedEnemies++;
+  if(window._shotsHit !== undefined) window._shotsHit++;
   LS.set('totalKills',(+LS.get('totalKills',0))+1);
   if(killedEnemies===1) checkAch('first_kill');
 
@@ -4645,9 +4913,15 @@ function killEnemy(j, cfg){
   if(getBonus().detonator && !e.isBoss){
     killCounter = (killCounter||0) + 1;
     if(killCounter % 5 === 0){
-      explode(e.x, e.y, '#ff8800', 30); triggerShake(8);
-      for(let j=enemies.length-1;j>=0;j--){
-        if(!enemies[j].isBoss && Math.hypot(enemies[j].x-e.x,enemies[j].y-e.y)<80 && j!==j) enemies[j].hp -= 5;
+      // Сохраняем позицию до сплайса, потому что enemies[j] уже swap-and-pop'нут выше
+      const detX = e.x, detY = e.y;
+      explode(detX, detY, '#ff8800', 30); triggerShake(8);
+      for(let di=enemies.length-1;di>=0;di--){
+        // Раньше было j!==j — это всегда false (баг), взрыв никогда не наносил урон.
+        // Теперь используем сохранённые координаты мёртвого врага как эпицентр.
+        if(!enemies[di].isBoss && Math.hypot(enemies[di].x-detX,enemies[di].y-detY)<80){
+          enemies[di].hp -= 5;
+        }
       }
     }
   }
@@ -4670,9 +4944,20 @@ function killEnemy(j, cfg){
   else if(e.isMiniBoss) haptic('heavy');
   else haptic('light');
 
-  // Вампиризм — восстановление HP при убийстве
+  // Вампиризм — переработан:
+  //   25% → +1 HP (было 15%)
+  //   ещё 35% → мини-щит 2.5с (новое — утешительная награда за убийство)
   const vamp = getBonus().vampirism||0;
-  if(vamp>0 && Math.random()<vamp){ lives=Math.min(lives+1,9); updateHUD(); notify('🧛 +1 ЖИЗНЬ','gold'); }
+  if(vamp>0 && !e.isBoss){
+    const roll = Math.random();
+    const maxLvs = DIFF[difficulty].lives + (getBonus().extraLife||0) + 2;
+    if(roll < 0.25){
+      if(lives < maxLvs){ lives++; updateHUD(); notify('🧛 +1 HP','gold'); }
+    } else if(roll < 0.60){
+      activePowerups.shield = Math.max(activePowerups.shield, 2500);
+      notify('🧛 ЩИТ','gold'); updatePowerupBar();
+    }
+  }
 
   // Ship XP only via upgrade purchases — not during combat
   throttledSave(); // [OPT: throttled, не каждый kill]
@@ -4698,6 +4983,7 @@ function killEnemy(j, cfg){
   if(levelProgress >= threshold){
     level++;
     levelProgress = 0;
+    if(window._levelTimestamps) window._levelTimestamps.push(Date.now()); // дельта уровней
     notify('⚔️ УРОВЕНЬ МИССИИ ' + level, 'levelup');
     playSound('levelup');
     haptic('medium');
@@ -4734,17 +5020,22 @@ function draw(){
   else if(bgTheme==='cosmic')bgColors=['#000a14','#001428','#001a1a','#000a10']; // космический океан (zen)
   else bgColors=['#020108','#06011a','#020314','#030108'];
 
-  const bg=ctx.createLinearGradient(0,0,0,canvas.height);
-  bg.addColorStop(0,bgColors[0]); bg.addColorStop(.35,bgColors[1]); bg.addColorStop(.65,bgColors[2]); bg.addColorStop(1,bgColors[3]);
-  ctx.fillStyle=bg; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  // В режиме ада/кошмара — добавляем красноватую дымку по краям
-  if(bgTheme==='hell'||bgTheme==='void'){
-    const edgeGrad=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*.3,canvas.width/2,canvas.height/2,canvas.height);
-    edgeGrad.addColorStop(0,'transparent');
-    edgeGrad.addColorStop(1,bgTheme==='hell'?'rgba(180,0,0,.18)':'rgba(60,0,120,.15)');
-    ctx.fillStyle=edgeGrad; ctx.fillRect(0,0,canvas.width,canvas.height);
+  // [OPT] bg + edge gradients — кэш, не создаём каждый кадр
+  const _bgKey = bgTheme + canvas.height;
+  if(!draw._bgFill || draw._bgFillKey !== _bgKey){
+    draw._bgFillKey = _bgKey;
+    const _bg=ctx.createLinearGradient(0,0,0,canvas.height);
+    _bg.addColorStop(0,bgColors[0]); _bg.addColorStop(.35,bgColors[1]); _bg.addColorStop(.65,bgColors[2]); _bg.addColorStop(1,bgColors[3]);
+    draw._bgFill = _bg;
+    if(bgTheme==='hell'||bgTheme==='void'){
+      const _eg=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*.3,canvas.width/2,canvas.height/2,canvas.height);
+      _eg.addColorStop(0,'transparent');
+      _eg.addColorStop(1,bgTheme==='hell'?'rgba(180,0,0,.18)':'rgba(60,0,120,.15)');
+      draw._edgeFill = _eg;
+    } else { draw._edgeFill = null; }
   }
+  ctx.fillStyle=draw._bgFill; ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(draw._edgeFill){ ctx.fillStyle=draw._edgeFill; ctx.fillRect(0,0,canvas.width,canvas.height); }
 
   // Туманности + Планеты — offscreen canvas, перерисовка раз в 6 кадров
   if(!draw._bgCanvas || draw._bgCanvas.width !== canvas.width || draw._bgCanvas.height !== canvas.height){
@@ -4869,7 +5160,7 @@ function draw(){
   // След корабля [OPT: нет createRadialGradient на каждую точку]
   { const trailStyles = TRAIL_STYLES[custom.trailStyle] || TRAIL_STYLES.fire;
     const col1 = trailStyles.colors[0];
-    ctx.shadowBlur = 10; ctx.shadowColor = col1;
+    ctx.shadowBlur = 6; ctx.shadowColor = col1; // [OPT]
     for(let ti=0;ti<playerTrail.length;ti++){
       const pt=playerTrail[ti];
       if(pt.life<=0) continue;
@@ -5033,7 +5324,8 @@ function draw(){
       const col=e.bossType.color;
       const pulse=1+.05*Math.sin(animT*2);
       ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
-      if(custom.glow){ ctx.shadowBlur=30; ctx.shadowColor=col; }
+      // [OPT] shadowBlur=30 убран — слишком дорого на мобиле
+      // Вместо него stroke-контур ниже
       e.bossType.draw(e,ctx,animT);
       // Визуальный щит неуязвимости при появлении
       if(e.spawnInvincible){
@@ -5070,11 +5362,11 @@ function draw(){
       const col = e.isMiniBoss ? e.miniType.color : (ECOLS[e.type]||'#ff2080');
       const pulse=1+.03*Math.sin(animT+e.x*.01);
       ctx.translate(e.x,e.y); ctx.scale(pulse,pulse);
-      if(custom.glow&&alpha>0.3){ ctx.shadowBlur=e.isMiniBoss?22:14; ctx.shadowColor=col; }
+      if(custom.glow&&alpha>0.3){ ctx.shadowBlur=e.isMiniBoss?16:8; ctx.shadowColor=col; } // [OPT] снижено
 
-      const eg=ctx.createRadialGradient(0,0,0,0,0,e.hw);
-      eg.addColorStop(0,col+'ff'); eg.addColorStop(.6,col+'aa'); eg.addColorStop(1,col+'22');
-      ctx.fillStyle=eg; ctx.beginPath();
+      // [OPT] без createRadialGradient на каждого врага
+      ctx.fillStyle=col+'cc'; ctx.strokeStyle=col+'66'; ctx.lineWidth=1;
+      ctx.beginPath();
 
       switch(e.type){
         case 'normal':{
@@ -5330,30 +5622,33 @@ function draw(){
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r||0,0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
-  // Boss shots
-  ctx.shadowBlur=12;
-  for(let i=0;i<particles.length;i++){
-    const p=particles[i]; if(!p.bossShot) continue;
-    ctx.save(); ctx.shadowColor=p.color;
-    ctx.fillStyle=p.color+'aa';
-    ctx.beginPath(); ctx.arc(p.x,p.y,(p.size||8)/2,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=p.color+'ff';
-    ctx.beginPath(); ctx.arc(p.x,p.y,(p.size||8)/4,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
   ctx.shadowBlur=0;
-  // Обычные частицы — без save/restore
+  // Обычные частицы — без save/restore, без bossShot
   for(let i=0;i<particles.length;i++){
-    const p=particles[i]; if(p.wave||p.bossShot) continue;
+    const p=particles[i]; if(p.wave) continue;
     const a=Math.floor(p.life*255).toString(16).padStart(2,'0');
     ctx.fillStyle=p.color+a; ctx.fillRect(p.x,p.y,p.size||4,p.size||4);
   }
+  // Boss shots — отдельный проход из bossShots[]
+  if(bossShots.length > 0){
+    ctx.shadowBlur = 0; // без shadowBlur на мобиле — быстрее
+    for(let i=0;i<bossShots.length;i++){
+      const p=bossShots[i];
+      const a=Math.floor(p.life*255).toString(16).padStart(2,'0');
+      const r=(p.size||8)/2;
+      ctx.fillStyle=p.color+'cc'; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffffff'+a; ctx.beginPath(); ctx.arc(p.x,p.y,r*.4,0,Math.PI*2); ctx.fill();
+    }
+  }
 
-  // ── Виньетка — красивое затемнение краёв ──
-  const vignette=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*.28,canvas.width/2,canvas.height/2,canvas.height*.82);
-  vignette.addColorStop(0,'transparent');
-  vignette.addColorStop(1,'rgba(0,0,8,.7)');
-  ctx.fillStyle=vignette; ctx.fillRect(0,0,canvas.width,canvas.height);
+  // ── Виньетка [OPT: кэш, не создаём каждый кадр] ──
+  if(!draw._vignette || draw._vigW!==canvas.width || draw._vigH!==canvas.height){
+    draw._vignette=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*.28,canvas.width/2,canvas.height/2,canvas.height*.82);
+    draw._vignette.addColorStop(0,'transparent');
+    draw._vignette.addColorStop(1,'rgba(0,0,8,.7)');
+    draw._vigW=canvas.width; draw._vigH=canvas.height;
+  }
+  ctx.fillStyle=draw._vignette; ctx.fillRect(0,0,canvas.width,canvas.height);
 
   // ── Индикатор "Волна надвигается" при пустом экране ──
   if(gameRunning && !gamePaused && enemies.length === 0 && !bossActive){
@@ -5493,25 +5788,22 @@ function startGame(){
 
   const cfg = DIFF[difficulty];
   const bonus = getBonus();
-  score=0; lives=cfg.lives + bonus.extraLife; level=1; levelProgress=0; pendingLevelProgress=0;
-  combo=1; maxCombo=1; comboTimer=0;
-  killedEnemies=0; bossesKilled=0;
-  bossActive=false; bossEnemy=null;
-  sessionAch=[];
-  activePowerups = {shield: bonus.hasStartShield?9999:0, speed:0};
+
+  // Централизованный сброс всего игрового состояния через GameState
+  GS.reset(canvas.width, canvas.height);
+  GS.running = true;
+  GS.lives   = cfg.lives + bonus.extraLife;
+  GS.activePowerups = { shield: bonus.hasStartShield ? 9999 : 0, speed: 0 };
+
   doubleCoinActive=0; laserDoubleActive=0; timeFreezeActive=0;
   railCooldown=0; railBeam=null;
-  invincibleTimer = 0;
   bombsInStock = bonus.startBombs;
   bombCooldown = 0;
   armadaTimer = 18000 + Math.random() * 10000; // первая армада через 18-28 сек
   armadaActive = false;
+  bossShots.length = 0;
   updateBombUI();
-  bullets.length=0; enemies.length=0; particles.length=0; powerups.length=0;
-  playerTrail.length=0;
-  player.x=player.targetX=canvas.width/2;
   gamePaused=false;
-  gameRunning=true;
   updateHUD(); renderXPBar();
   document.getElementById('bossBar').style.display='none';
   if(activePowerups.shield>0) updatePowerupBar();
@@ -5544,12 +5836,18 @@ function startGame(){
   // Включаем касания canvas при старте игры
   canvas.style.pointerEvents = 'all';
   lastTime=performance.now();
+
+  // ── Трекинг сессии для аналитики ─────────────────────────────────
+  window._sessionStartTime  = Date.now();
+  window._levelTimestamps   = [Date.now()]; // индекс 0 = старт, [1] = время достижения ур.2 ...
+  window._shotsFired        = 0;            // для точности
+  window._shotsHit          = 0;
   Music.play('game');
   requestAnimationFrame(loop);
 }
 
 function endGame(){
-  gameRunning=false;
+  GS.running=false;
   canvas.style.pointerEvents = 'none';
   Music.play('menu');
   if(score>bestScore){ bestScore=score; LS.set('bestScore',bestScore); updateMenuBadge(); }
@@ -5592,7 +5890,27 @@ function endGame(){
     requestAnimationFrame(()=>{ goScreen.style.opacity='1'; });
   }, 500);
 
-  if(tg?.initDataUnsafe?.user) tg.sendData(JSON.stringify({score,level,difficulty,maxCombo,coins,shipLvl,userId:tg.initDataUnsafe.user.id}));
+  if(tg?.initDataUnsafe?.user){
+    // Собираем аналитику сессии
+    const _dur  = Math.floor((Date.now() - (window._sessionStartTime||Date.now())) / 1000);
+    const _ts   = window._levelTimestamps || [];
+    // Дельты: сколько секунд между достижением каждого уровня
+    const _deltas = _ts.slice(1).map((t,i) => Math.round((t - _ts[i]) / 1000));
+    const _shots  = window._shotsFired || 0;
+    const _hits   = window._shotsHit  || 0;
+    const _acc    = _shots > 0 ? Math.round(_hits / _shots * 100) : 0;
+
+    tg.sendData(JSON.stringify({
+      score, level, difficulty, maxCombo,
+      coins, shipLvl,
+      userId:          tg.initDataUnsafe.user.id,
+      duration_seconds: _dur,
+      enemies_killed:   killedEnemies,
+      accuracy_percent: _acc,
+      bosses_killed:    bossesKilled,
+      level_deltas:     _deltas,        // массив секунд между уровнями
+    }));
+  }
 }
 
 // ════════════════════════════════════════════════════
@@ -5782,12 +6100,13 @@ window.BossAnimation = {
 };
 
 // ── ESC/Space пропускает интро ──
+// Важно: вместо ручного active=false + remove() — имитируем click на оверлее.
+// Это гарантирует что коллбэк (startGame) будет вызван в любом случае.
 document.addEventListener('keydown', (e) => {
   if ((e.key === 'Escape' || e.key === ' ') && window.IntroAnimation?.active) {
     e.preventDefault();
-    window.IntroAnimation.active = false;
     const ol = document.getElementById('introOverlay');
-    if (ol) ol.remove();
+    if(ol) ol.click(); // click вызывает _clearTimers + active=false + callback()
   }
 });
 
