@@ -57,7 +57,7 @@ def register_user(func):
             first_name=user.first_name,
             last_name=user.last_name,
             language_code=user.language_code,
-            is_premium=user.is_premium if hasattr(user, 'is_premium') else False
+            is_premium=bool(user.is_premium) if user.is_premium is not None else False
         )
         return await func(update, context)
     return wrapper
@@ -140,7 +140,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Вычисляем средние показатели
     avg_score = stats['total_score'] // stats['games_played'] if stats['games_played'] > 0 else 0
-    total_dur = stats.get('total_duration', 0)
+    total_dur = stats.get('total_playtime_seconds', 0)
     avg_dur   = total_dur // stats['games_played'] if stats['games_played'] > 0 else 0
     avg_dur_str = f"{avg_dur // 60}м {avg_dur % 60}с" if avg_dur > 0 else "—"
 

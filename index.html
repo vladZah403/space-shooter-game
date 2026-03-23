@@ -1,925 +1,955 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Space Shooter</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{
-  --green:#00ff88;--cyan:#00d4ff;--pink:#ff0066;--gold:#ffd700;--purple:#a855f7;
-  --bg:#04040f;--card:rgba(8,18,35,.95);--border:rgba(0,255,136,.25);
-}
-body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touch-action:none;user-select:none}
-#gameCanvas{display:block;touch-action:none;position:absolute;inset:0}
-
-/* ── PAUSE OVERLAY ── */
-#pauseOverlay{position:absolute;inset:0;background:rgba(4,4,15,.85);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(16px)}
-.pause-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:32px 28px;text-align:center;min-width:240px;box-shadow:0 0 60px rgba(0,255,136,.15)}
-.pause-title{font-family:'Orbitron',monospace;font-size:28px;color:var(--green);text-shadow:0 0 20px var(--green);margin-bottom:24px;letter-spacing:4px}
-.pause-btn{display:block;width:100%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;color:#04040f;font-family:'Orbitron',monospace;font-weight:700;font-size:13px;padding:12px;border-radius:40px;cursor:pointer;letter-spacing:2px;margin-bottom:10px;transition:all .2s}
-.pause-btn:active{transform:scale(.95)}
-.pause-btn.secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:12px}
-
-/* ── UI TOP — Safe area for iPhone notch ── */
-#ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;padding:10px;padding-top:max(10px,env(safe-area-inset-top))}
-/* ── REDESIGNED HUD ── */
-.stats-row{display:flex;gap:5px;align-items:stretch}
-
-/* Базовый пилл — без backdrop-filter для производительности на Android */
-.stat-pill{
-  background:rgba(4,8,20,.92);
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;
-  padding:6px 10px 5px;
-  flex:1;position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:2px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
-}
-.stat-pill::after{
-  content:'';position:absolute;inset:0;border-radius:12px;
-  background:linear-gradient(135deg,rgba(255,255,255,.03),transparent 60%);
-  pointer-events:none;
-}
-
-/* Лейблы — маленькие капслок */
-.stat-lbl{font-size:7px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1.5px;font-family:'Orbitron',monospace;line-height:1}
-
-/* ── ОЧКИ ── */
-.stat-pill--score{border-color:rgba(0,255,136,.2);}
-.stat-pill--score::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 0% 100%,rgba(0,255,136,.08),transparent 70%);pointer-events:none}
-.stat-val{font-size:16px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 10px rgba(0,255,136,.6);letter-spacing:-.5px}
-
-/* ── ЖИЗНИ — сердечки ── */
-.stat-pill--lives{border-color:rgba(255,80,120,.2);}
-.stat-pill--lives::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(255,80,120,.08),transparent 70%);pointer-events:none}
-.lives-hearts{display:flex;gap:2px;flex-wrap:wrap;align-items:center;min-height:20px}
-.heart-ico{font-size:13px;line-height:1;transition:all .2s;filter:drop-shadow(0 0 4px rgba(255,80,120,.7))}
-.heart-ico.empty{opacity:.2;filter:none}
-
-/* ── МИССИЯ — прогресс-кольцо ── */
-.stat-pill--mission{border-color:rgba(0,212,255,.2);}
-.stat-pill--mission::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 100% 0%,rgba(0,212,255,.08),transparent 70%);pointer-events:none}
-.mission-row{display:flex;align-items:center;gap:6px}
-.mission-ring-wrap{position:relative;width:32px;height:32px;flex-shrink:0}
-.mission-ring-svg{width:32px;height:32px;transform:rotate(-90deg)}
-.mission-ring-bg{fill:none;stroke:rgba(0,212,255,.15);stroke-width:3}
-.mission-ring-fill{fill:none;stroke:url(#missionGrad);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .4s ease}
-.mission-ring-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:9px;font-weight:900;color:var(--cyan);text-shadow:0 0 6px rgba(0,212,255,.8)}
-.mission-label{font-family:'Orbitron',monospace;font-size:8px;color:rgba(0,212,255,.5);letter-spacing:.5px}
-
-/* ── КОРАБЛЬ — уровень+полоска ── */
-.stat-pill--ship{border-color:rgba(255,215,0,.2);}
-.stat-pill--ship::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 100% 100%,rgba(255,215,0,.08),transparent 70%);pointer-events:none}
-.ship-lvl-row{display:flex;align-items:baseline;gap:3px}
-.ship-lvl-num{font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:var(--gold);text-shadow:0 0 10px rgba(255,215,0,.6);line-height:1}
-.ship-lvl-tag{font-size:7px;color:rgba(255,215,0,.45);font-family:'Orbitron',monospace;letter-spacing:.5px}
-.ship-xp-micro{height:3px;background:rgba(255,215,0,.1);border-radius:2px;overflow:hidden;margin-top:3px}
-.ship-xp-micro-fill{height:100%;background:linear-gradient(90deg,#ffd700,#ff9900);border-radius:2px;transition:width .4s ease;box-shadow:0 0 4px rgba(255,215,0,.5)}
-
-/* Убираем старые ненужные стили */
-.stat-val.lives{color:#ff6b88;text-shadow:0 0 8px rgba(255,107,136,.5)}
-.stat-val.level-val{color:var(--cyan);text-shadow:0 0 8px rgba(0,212,255,.5)}
-
-/* Level progress - unified */
-#levelBar{height:6px;background:rgba(0,212,255,.1);border-radius:3px;overflow:hidden;margin-top:6px;position:relative}
-#levelFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green),var(--gold));border-radius:3px;transition:width .4s ease;box-shadow:0 0 8px var(--cyan)}
-#levelBarLabel{position:absolute;right:0;top:-13px;font-size:8px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;display:none}
-.stat-pill--level{min-width:80px}
-.lvl-sub{font-size:9px;color:var(--gold);font-family:'Orbitron',monospace;margin-top:1px}
-
-/* XP bar - hidden, replaced by unified bar */
-#xpRow{display:none}
-
-/* ── PAUSE BTN ── */
-#pauseBtn{
-  display:none !important; /* скрыт — используем pauseBtnPill в stats-row */
-}
-.stat-pill--pause{
-  display:flex;align-items:center;justify-content:center;
-  transition:border-color .18s,box-shadow .18s;
-  pointer-events:all;
-}
-.stat-pill--pause:active{ transform:scale(.88); }
-.stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15); }
-
-/* ── COMBO ── */
-#comboDisplay{position:absolute;top:130px;right:10px;text-align:right;pointer-events:none;z-index:10;transition:opacity .3s,transform .3s}
-.combo-word{font-size:9px;color:rgba(255,215,0,.7);font-family:'Orbitron',monospace;letter-spacing:2px}
-.combo-num{font-size:32px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 20px rgba(255,215,0,.6);line-height:1;animation:comboPulse .3s ease}
-@keyframes comboPulse{0%{transform:scale(1.3)}100%{transform:scale(1)}}
-.combo-hidden{opacity:0;transform:translateX(20px)}
-
-/* ── NOTIFICATIONS ── */
-#notifications{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;text-align:center}
-.notif{font-size:20px;font-weight:700;font-family:'Orbitron',monospace;color:var(--green);text-shadow:0 0 15px var(--green);animation:notifAnim .9s forwards;white-space:nowrap}
-.notif.boss{font-size:28px;color:var(--pink);text-shadow:0 0 30px var(--pink)}
-.notif.gold{color:var(--gold);text-shadow:0 0 15px var(--gold);font-size:16px}
-.notif.levelup{font-size:26px;color:var(--cyan);text-shadow:0 0 25px var(--cyan)}
-@keyframes notifAnim{0%{opacity:0;transform:scale(.4) translateY(0)}20%{opacity:1;transform:scale(1.1) translateY(0)}60%{opacity:1;transform:scale(1) translateY(-10px)}100%{opacity:0;transform:scale(.8) translateY(-45px)}}
-
-/* ── POWERUP BAR ── */
-#powerupBar{position:absolute;bottom:max(72px,calc(env(safe-area-inset-bottom)+60px));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
-.pu-chip{background:rgba(8,18,35,.88);border:1.5px solid;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;font-family:'Orbitron',monospace;display:flex;align-items:center;gap:5px}
-.pu-chip.shield{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.3)}
-.pu-chip.speed{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(255,215,0,.3)}
-.pu-chip.coin{border-color:#ffdd00;color:#ffdd00;box-shadow:0 0 12px rgba(255,220,0,.3)}
-.pu-chip.laser{border-color:#00ffff;color:#00ffff;box-shadow:0 0 12px rgba(0,255,255,.3)}
-.pu-chip.freeze{border-color:#88eeff;color:#88eeff;box-shadow:0 0 12px rgba(136,238,255,.4);animation:freezePulse .8s infinite}
-@keyframes freezePulse{0%,100%{box-shadow:0 0 12px rgba(136,238,255,.4)}50%{box-shadow:0 0 22px rgba(136,238,255,.8)}}
-/* Freeze screen overlay */
-#freezeOverlay{position:absolute;inset:0;background:rgba(136,238,255,.06);pointer-events:none;z-index:8;display:none;animation:freezeFlash .3s ease}
-@keyframes freezeFlash{from{background:rgba(136,238,255,.25)}to{background:rgba(136,238,255,.06)}}
-
-/* ── BOSS BAR ── */
-/* #bossBar стили перенесены ниже в блок MOBILE COMBAT UX */
-.boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink);animation:bossNamePulse 1.5s infinite}
-@keyframes bossNamePulse{0%,100%{opacity:1;text-shadow:0 0 10px var(--pink)}50%{opacity:.7;text-shadow:0 0 20px var(--pink),0 0 40px var(--pink)}}
-@keyframes missionBossPulse{0%,100%{opacity:1}50%{opacity:.5}}
-.stat-pill--mission.boss-mode{border-color:rgba(255,0,102,.4);background:rgba(40,0,15,.85)}
-.stat-pill--mission.boss-mode .mission-ring-num{color:var(--pink);animation:missionBossPulse .8s infinite}
-.stat-pill--mission.boss-mode .mission-label{color:rgba(255,0,102,.7)}
-.boss-track{height:8px;background:rgba(255,0,102,.1);border-radius:6px;border:1px solid rgba(255,0,102,.3);overflow:hidden}
-#bossFill{height:100%;background:linear-gradient(90deg,var(--pink),#ff6b00);border-radius:6px;transition:width .3s;box-shadow:0 0 8px rgba(255,0,102,.6)}
-
-/* ── TOUCH SKILL BUTTONS ── */
-#touchSkillBar{ display:none !important; }
-.touch-skill-btn{display:none}
-
-/* ══════════════════════════════════
-   MOBILE COMBAT UX — REDESIGN
-══════════════════════════════════ */
-
-/* ── ОРУЖИЕ — крупные кнопки снизу ── */
-.weapon-btn{
-  width:62px;height:62px;min-width:52px;
-  background:rgba(6,10,24,.95);
-  border:2px solid rgba(0,255,136,.25);
-  border-radius:16px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;gap:2px;
-  position:relative;overflow:hidden;
-  box-shadow:0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
-}
-.weapon-btn::before{
-  content:'';position:absolute;inset:0;border-radius:14px;
-  background:linear-gradient(135deg,rgba(255,255,255,.04),transparent 60%);
-  pointer-events:none;
-}
-.weapon-btn.active{
-  border-color:var(--green);
-  background:rgba(0,40,20,.95);
-  box-shadow:0 0 20px rgba(0,255,136,.35),0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(0,255,136,.15);
-}
-.weapon-btn:active{transform:scale(.85);transition:transform .08s}
-.weapon-emoji{font-size:20px;line-height:1}
-.weapon-lbl{font-size:8px;color:rgba(0,255,136,.5);font-family:'Orbitron',monospace;font-weight:700;letter-spacing:.5px}
-.weapon-btn.active .weapon-lbl{color:var(--green)}
-.weapon-btn.active::after{
-  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-  width:60%;height:2px;background:var(--green);border-radius:2px;
-  box-shadow:0 0 8px var(--green);
-}
-
-/* ── WEAPON GROUP ── */
-.weapons-group{display:flex;gap:7px;align-items:center}
-
-/* ── НИЖНЯЯ ПАНЕЛЬ — оружие+пассивные слева, активный навык справа ── */
-#bottomBar{
-  position:absolute;
-  bottom:max(16px,env(safe-area-inset-bottom));
-  left:10px;right:10px;
-  display:flex;align-items:flex-end;justify-content:space-between;
-  z-index:10;pointer-events:all;
-  gap:8px;
-}
-
-/* Левая группа: пассивные навыки + оружие */
-#bottomLeft{
-  display:flex;flex-direction:column;gap:6px;align-items:flex-start;
-  flex-shrink:1;min-width:0;
-}
-
-/* ask-wrap */
-.ask-wrap{
-  position:relative;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:0;
-  -webkit-tap-highlight-color:transparent;
-  animation:skillIn .3s cubic-bezier(.22,.68,0,1.2) both;
-}
-
-/* ── АКТИВНЫЕ НАВЫКИ — правый нижний угол, колонка ── */
-#activeSkillBar{
-  position:static;
-  display:flex;flex-direction:column;gap:5px;z-index:15;
-  align-items:center;pointer-events:all;
-  flex-shrink:0;
-}
-.ask-card{
-  width:58px;height:58px;
-  background:rgba(6,8,22,.92);
-  border:1.5px solid rgba(0,212,255,.35);
-  border-radius:14px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:1px;position:relative;overflow:hidden;
-  box-shadow:0 0 16px rgba(0,212,255,.15),inset 0 1px 0 rgba(255,255,255,.06),0 4px 16px rgba(0,0,0,.5);
-  transition:border-color .2s,box-shadow .2s,transform .1s;
-}
-.ask-wrap:active .ask-card{transform:scale(.84)}
-.ask-ico{font-size:22px;line-height:1;z-index:1;position:relative;transition:filter .2s}
-
-/* ── ПАУЗА — встроена в HUD строку сверху ── */
-.stat-pill--pause{
-  display:flex!important;align-items:center!important;justify-content:center!important;
-  pointer-events:all!important;
-  min-width:44px!important;
-  flex:0 0 44px!important;
-  transition:border-color .18s,box-shadow .18s;
-  position:static!important;
-  top:auto!important;left:auto!important;transform:none!important;
-  width:auto!important;height:auto!important;
-  border-radius:10px!important;
-  background:rgba(3,6,18,.94)!important;
-  border:1px solid rgba(255,255,255,.12)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4)!important;
-  z-index:auto!important;
-}
-.stat-pill--pause:active{ transform:scale(.88)!important; }
-.stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15)!important; }
-.stat-pill--pause span{font-size:16px}
-
-/* ── HUD TOP — компактнее ── */
-#ui{
-  position:absolute;top:0;left:0;right:0;z-index:10;
-  pointer-events:none;
-  padding:max(10px,env(safe-area-inset-top)) 10px 0;
-}
-.stats-row{display:flex;gap:4px;align-items:stretch}
-.stat-pill{
-  background:rgba(3,6,18,.94);
-  border:1px solid rgba(255,255,255,.07);
-  border-radius:10px;
-  padding:5px 8px 4px;
-  flex:1;position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:1px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4);
-}
-.stat-val{font-size:14px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 8px rgba(0,255,136,.5)}
-.stat-lbl{font-size:6.5px;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:1.2px;font-family:'Orbitron',monospace;line-height:1}
-
-/* ── ПАССИВНЫЕ НАВЫКИ — горизонтально в нижней панели рядом с оружием ── */
-#passiveHud{
-  position:static;
-  display:flex;flex-direction:row;gap:5px;z-index:12;
-  align-items:center;
-  flex-wrap:nowrap;
-  flex-shrink:1;
-}
-.passive-hud-item{
-  width:38px;height:38px;
-  background:rgba(6,8,22,.94);
-  border:1px solid rgba(168,85,247,.45);
-  border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 10px rgba(168,85,247,.2),0 2px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
-  animation:passiveIn .3s cubic-bezier(.22,.68,0,1.2) both;
-  position:relative;overflow:hidden;cursor:default;
-  flex-shrink:0;
-}
-.passive-hud-item::before{
-  content:'';position:absolute;inset:0;border-radius:10px;
-  background:linear-gradient(135deg,rgba(168,85,247,.1),transparent 60%);
-  pointer-events:none;
-}
-.passive-hud-ico-wrap{ display:flex;align-items:center;justify-content:center; }
-.passive-hud-ico{font-size:18px;line-height:1;filter:drop-shadow(0 0 4px rgba(168,85,247,.6))}
-.passive-hud-info{ display:none; }
-@keyframes passiveIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
-
-/* ── POWERUP BAR — над нижней панелью, по центру ── */
-#powerupBar{
-  position:absolute;
-  bottom:max(86px,calc(env(safe-area-inset-bottom)+76px));
-  left:50%;transform:translateX(-50%);
-  display:flex;gap:6px;z-index:10;pointer-events:none;
-}
-.pu-chip{
-  background:rgba(6,10,24,.94);
-  border:1.5px solid;border-radius:16px;
-  padding:4px 10px;font-size:10px;font-weight:700;
-  font-family:'Orbitron',monospace;
-  display:flex;align-items:center;gap:4px;
-  box-shadow:0 2px 10px rgba(0,0,0,.4);
-}
-
-/* ── BOSS BAR — снизу над нижней панелью с оружием ── */
-#bossBar{
-  position:fixed;
-  top:70px;
-  left:10px;right:10px;
-  z-index:20;display:none;pointer-events:none;
-  background:rgba(3,6,18,.92);border-radius:12px;
-  padding:8px 12px;
-  box-shadow:0 0 20px rgba(255,0,102,.15),0 4px 16px rgba(0,0,0,.5);
-  border:1px solid rgba(255,0,102,.3);
-}
-
-/* ── COMBO — над нижней панелью, справа ── */
-#comboDisplay{
-  position:absolute;
-  bottom:max(92px,calc(env(safe-area-inset-bottom)+82px));
-  right:10px;
-  left:auto;
-  text-align:right;
-  pointer-events:none;z-index:10;
-  transition:opacity .3s,transform .3s;
-  background:rgba(3,6,18,.7);
-  border-radius:10px;padding:4px 8px;
-  border:1px solid rgba(255,215,0,.1);
-}
-.combo-num{font-size:28px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 16px rgba(255,215,0,.6);line-height:1}
-
-/* ── RAIL CD — читаемее ── */
-.weapon-btn.rail-cd{
-  border-color:rgba(0,255,204,.4)!important;
-  background:rgba(0,20,20,.95)!important;
-  opacity:.8;
-}
-.weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:7px!important}
-
-/* ── СВАЙП HINT — читаемее ── */
-.swipe-hint{
-  position:absolute;
-  bottom:max(92px,calc(env(safe-area-inset-bottom)+80px));
-  left:50%;transform:translateX(-50%);
-  font-size:9px;color:rgba(168,85,247,.55);
-  font-family:'Orbitron',monospace;letter-spacing:2px;
-  pointer-events:none;animation:swipeHintFade 4s forwards;
-  background:rgba(4,4,15,.7);border-radius:8px;padding:4px 10px;
-  white-space:nowrap;
-}
-
-/* ── DAMAGE OVERLAY — усилен ── */
-#damageOverlay{
-  position:fixed;inset:0;pointer-events:none;z-index:9;
-  background:radial-gradient(ellipse at center,transparent 50%,rgba(255,0,60,.5) 100%);
-  opacity:0;transition:opacity 0.1s ease-out;
-}
-
-/* ── МЕДИА: телефоны в landscape ── */
-@media (orientation:landscape) and (max-height:450px){
-  .weapon-btn{width:50px;height:50px}
-  .ask-card{width:48px;height:48px}
-  .stat-val{font-size:12px}
-  #powerupBar{bottom:max(72px,calc(env(safe-area-inset-bottom)+62px))}
-  /* #bossBar top position handled globally */
-  #comboDisplay{bottom:max(74px,calc(env(safe-area-inset-bottom)+64px))}
-  .passive-hud-item{width:32px;height:32px}
-  .passive-hud-ico{font-size:15px}
-}
-
-/* ── TOUCH RIPPLE на кнопках оружия ── */
-@keyframes weaponRipple{
-  0%{transform:scale(0);opacity:.4}
-  100%{transform:scale(2.5);opacity:0}
-}
-.weapon-btn .ripple{
-  position:absolute;width:30px;height:30px;border-radius:50%;
-  background:rgba(0,255,136,.25);transform:scale(0);
-  pointer-events:none;
-  animation:weaponRipple 0.35s ease-out forwards;
-}
-.ask-wrap .ripple{
-  position:absolute;width:30px;height:30px;border-radius:50%;
-  background:rgba(0,212,255,.25);transform:scale(0);
-  pointer-events:none;
-  animation:weaponRipple 0.35s ease-out forwards;
-}
-
-/* Swipe hint */
-.swipe-hint{position:absolute;bottom:130px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(168,85,247,.6);font-family:'Orbitron',monospace;letter-spacing:2px;pointer-events:none;animation:swipeHintFade 4s forwards}
-@keyframes swipeHintFade{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
-
-/* ── AUTO BTN (скрыт) ── */
-#autoBtn{display:none!important}
-/* ── AUTO / WEAPON BAR — safe area ── */
-@media (hover: none) and (pointer: coarse) {
-  /* activeSkillBar always shown via JS */
-}
-
-/* ── COMBO — перенесён вправо-вниз ── */
-/* Стили уже заданы выше в MOBILE COMBAT UX block */
-
-/* ── DAMAGE OVERLAY — красный flash по краям при уроне ── */
-#damageOverlay{
-  position:fixed;inset:0;pointer-events:none;z-index:9;
-  background:radial-gradient(ellipse at center,transparent 40%,rgba(255,0,60,.4) 100%);
-  opacity:0;transition:opacity 0.08s ease-out;
-}
-#damageOverlay.flash{opacity:1}
-
-/* ── HEART BURST — анимация потери жизни ── */
-@keyframes heartBurst{
-  0%  {transform:scale(1);filter:drop-shadow(0 0 4px #ff5077)}
-  30% {transform:scale(1.7);opacity:1}
-  100%{transform:scale(0.2);opacity:0}
-}
-.heart-ico.losing{animation:heartBurst 0.35s ease-out forwards!important}
-
-/* ── COIN FLY — монеты летят вверх ── */
-@keyframes coinFly{
-  0%  {opacity:1;transform:translateY(0) scale(1)}
-  100%{opacity:0;transform:translateY(-65px) scale(0.7)}
-}
-
-/* ── WAVE INCOMING — индикатор пустого экрана ── */
-@keyframes waveIncoming{0%,100%{opacity:.25}50%{opacity:.7}}
-
-/* ── WEAPON SWITCH FLASH ── */
-@keyframes weaponSwitchFlash{
-  0%  {transform:scale(1.3);opacity:1}
-  100%{transform:scale(1);opacity:0}
-}
-.weapon-btn.just-switched::after{
-  content:'';position:absolute;inset:0;border-radius:11px;
-  background:rgba(0,255,136,.25);
-  animation:weaponSwitchFlash 0.3s ease-out forwards;
-  pointer-events:none;
-}
-
-
-/* ── SHIP LEVEL BANNER IN UPGRADE SCREEN ── */
-.ship-lvl-banner{display:flex;align-items:center;justify-content:space-between;background:rgba(255,215,0,.06);border:1.5px solid rgba(255,215,0,.2);border-radius:14px;padding:12px 14px;margin-bottom:12px;gap:12px}
-.ship-lvl-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.ship-lvl-ico{font-size:28px;line-height:1}
-.ship-lvl-label{font-size:7px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
-.ship-lvl-num{font-size:20px;font-weight:900;color:var(--gold);font-family:"Orbitron",monospace;text-shadow:0 0 12px rgba(255,215,0,.5);line-height:1}
-.ship-lvl-right{flex:1;min-width:0}
-.ship-xp-label{font-size:7px;color:rgba(255,215,0,.4);font-family:"Orbitron",monospace;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase}
-.ship-xp-bar-wrap{height:6px;background:rgba(255,215,0,.1);border-radius:3px;overflow:hidden;margin-bottom:4px}
-.ship-xp-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9900);border-radius:3px;transition:width .4s ease;box-shadow:0 0 6px rgba(255,215,0,.4)}
-.ship-xp-nums{font-size:8px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;text-align:right}
-/* ── ACHIEVEMENT TOAST ── */
-#achieveToast{position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(8,18,35,.96);border:1.5px solid var(--gold);border-radius:14px;padding:10px 20px;display:none;z-index:25;text-align:center;box-shadow:0 0 30px rgba(255,215,0,.3);backdrop-filter:blur(10px);animation:slideDown .4s ease}
-@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.ach-lbl{font-size:8px;color:rgba(255,215,0,.6);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:2px}
-.ach-name{font-size:14px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace}
-
-/* ══════════════════════════════════
-   SCREENS
-══════════════════════════════════ */
-.screen{position:absolute;inset:0;background:rgba(4,4,15,.97);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(16px);padding:12px;overflow-y:auto;pointer-events:all;touch-action:auto}
-.screen.active{display:flex}
-
-/* Common card */
-.card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 60px rgba(0,255,136,.12);max-height:94vh;overflow-y:auto;touch-action:auto}
-
-/* Screen titles */
-.screen-title{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;text-align:center;margin-bottom:2px;line-height:1.1}
-.screen-title.green{background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.screen-title.gold{background:linear-gradient(135deg,var(--gold),#ff9900);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.screen-title.purple{background:linear-gradient(135deg,var(--purple),#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.screen-title.cyan{background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.screen-sub{text-align:center;font-size:9px;color:rgba(0,255,136,.4);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:18px}
-
-/* Buttons */
-.btn{border:none;cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;letter-spacing:1.5px;border-radius:40px;transition:all .2s;display:block;width:100%;text-align:center}
-.btn:active{transform:scale(.95)}
-.btn-primary{background:linear-gradient(135deg,var(--green),var(--cyan));color:#04040f;font-size:14px;padding:13px;box-shadow:0 4px 20px rgba(0,255,136,.35)}
-.btn-primary:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.25);cursor:not-allowed;box-shadow:none}
-.btn-secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:11px;padding:10px}
-.btn-gold{border-color:rgba(255,215,0,.4);color:var(--gold)}
-.btn-cyan{border-color:rgba(0,212,255,.4);color:var(--cyan)}
-.btn-purple{border-color:rgba(168,85,247,.4);color:var(--purple)}
-.btn-red{border-color:rgba(255,0,102,.4);color:var(--pink)}
-
-/* ── DIFFICULTY SCREEN REDESIGN ── */
-.main-hero{text-align:center;padding:10px 0 6px;position:relative}
-.main-title{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;line-height:1;letter-spacing:4px;background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;margin-bottom:2px}
-.main-sub{font-size:8px;color:rgba(0,212,255,0.5);font-family:'Orbitron',monospace;letter-spacing:5px;text-transform:uppercase;margin-bottom:10px}
-.main-ship-preview{width:60px;height:60px;margin:0 auto 8px;position:relative}
-.main-ship-preview canvas{display:block}
-.best-score-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:4px 12px;font-family:'Orbitron',monospace;font-size:10px;color:var(--gold);margin-bottom:12px}
-
-.diff-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
-.diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
-.diff-item::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(circle at center,rgba(0,255,136,.12),transparent 70%)}
-.diff-item:active{transform:scale(.95)}
-.diff-item.selected{border-color:var(--green);background:rgba(0,255,136,.1);box-shadow:0 0 18px rgba(0,255,136,.2)}
-.diff-item.selected::before{opacity:1}
-.diff-icon{font-size:24px;margin-bottom:3px;display:block}
-.diff-name{font-size:12px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;margin-bottom:1px}
-.diff-desc{font-size:9px;color:rgba(255,255,255,.45);line-height:1.3}
-.diff-badge{font-size:8px;padding:1px 6px;border-radius:8px;border:1px solid;font-family:'Orbitron',monospace;vertical-align:middle;display:block;margin-top:3px}
-.diff-badge.nm{color:var(--pink);border-color:var(--pink)}
-
-.auto-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(8,18,35,.5);border-radius:10px;border:1px solid rgba(0,255,136,.1);margin-bottom:10px;cursor:pointer}
-.auto-row-lbl{font-size:11px;font-family:'Rajdhani',sans-serif;color:var(--green)}
-.auto-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
-
-.start-btn-wrap{margin-bottom:10px}
-
-.nav-menu{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.nav-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:9px 4px 7px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:3px;letter-spacing:.5px}
-.nav-btn:active{transform:scale(.93)}
-.nav-btn .nav-ico{font-size:20px;display:block}
-.nav-btn.gold{border-color:rgba(255,215,0,.25);color:var(--gold)}
-.nav-btn.cyan{border-color:rgba(0,212,255,.25);color:var(--cyan)}
-.nav-btn.purple{border-color:rgba(168,85,247,.25);color:var(--purple)}
-.nav-btn.green{border-color:rgba(0,255,136,.25);color:var(--green)}
-
-/* animated glow rings on main title */
-@keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(0,255,136,.4)}50%{text-shadow:0 0 60px rgba(0,255,136,.7),0 0 100px rgba(0,212,255,.3)}}
-.diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
-
-/* ── CUSTOMIZE SCREEN - ship preview ── */
-.ship-preview-wrap{background:rgba(4,4,15,.8);border:1.5px solid rgba(0,255,136,.2);border-radius:14px;padding:10px;margin-bottom:14px;text-align:center;position:relative}
-.ship-preview-lbl{font-size:8px;color:rgba(0,255,136,.45);font-family:'Orbitron',monospace;letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
-#shipPreviewCanvas{display:block;margin:0 auto;border-radius:8px}
-
-
-/* ── GAME OVER SCREEN ── */
-.score-block{background:rgba(8,18,35,.7);border:1px solid rgba(0,255,136,.15);border-radius:12px;padding:12px 14px;margin-bottom:8px}
-.score-lbl{font-size:10px;color:rgba(0,255,136,.55);font-family:'Orbitron',monospace;letter-spacing:1px}
-.score-val{font-size:26px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;text-shadow:0 0 12px rgba(0,255,136,.4)}
-.score-val.record{color:var(--gold);text-shadow:0 0 12px rgba(255,215,0,.4)}
-.new-record{display:inline-block;font-size:9px;color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:1px 8px;font-family:'Orbitron',monospace;margin-left:6px;animation:blink 1s infinite}
-@keyframes blink{50%{opacity:.3}}
-.ach-badges{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}
-.ach-badge{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid;font-family:'Rajdhani',sans-serif;font-weight:700}
-.ach-badge.unlocked{color:var(--gold);border-color:rgba(255,215,0,.5);background:rgba(255,215,0,.08)}
-.ach-badge.locked{color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.1)}
-.coins-earned{text-align:center;color:var(--gold);font-size:13px;font-family:'Orbitron',monospace;padding:8px;background:rgba(255,215,0,.06);border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,215,0,.15)}
-
-/* ── UPGRADE SCREEN ── */
-.coins-banner{text-align:center;color:var(--gold);font-size:16px;font-family:'Orbitron',monospace;margin-bottom:14px;padding:8px;background:rgba(255,215,0,.07);border-radius:10px;border:1px solid rgba(255,215,0,.2)}
-/* ── UPGRADE CARD ── */
-.upg-item{
-  background:rgba(5,10,25,.75);
-  border:1.5px solid rgba(255,215,0,.12);
-  border-radius:14px;padding:11px 12px;margin-bottom:8px;
-  display:flex;align-items:center;gap:10px;
-  transition:border-color .2s, background .2s;
-  position:relative;overflow:hidden;
-}
-.upg-item::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,215,0,.03),transparent 60%);pointer-events:none}
-.upg-item.can-buy{border-color:rgba(255,215,0,.3);}
-.upg-item.can-buy::after{content:'';position:absolute;inset:0;border-radius:13px;box-shadow:inset 0 0 14px rgba(255,215,0,.05);pointer-events:none}
-.upg-item.maxed{border-color:rgba(0,255,136,.25);background:rgba(0,20,10,.7)}
-
-/* Иконка */
-.upg-icon{font-size:26px;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(255,215,0,.3))}
-.upg-item.maxed .upg-icon{filter:drop-shadow(0 0 6px rgba(0,255,136,.4))}
-
-/* Название */
-.upg-name{font-size:12px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace;margin-bottom:3px;display:flex;align-items:center;gap:5px}
-.upg-lvl-badge{font-size:9px;color:rgba(255,255,255,.3);font-weight:400;font-family:'Orbitron',monospace;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:8px}
-
-/* Строка бонусов */
-.upg-bonus-line{font-size:10px;margin-bottom:4px;display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-.bonus-cur{color:rgba(255,255,255,.45)}
-.bonus-arrow{color:rgba(255,255,255,.2);font-size:9px}
-.bonus-next{color:#4dffb0;font-weight:700}
-.upg-item.maxed .bonus-cur{color:rgba(0,255,136,.7)}
-
-/* Сегменты прогресса */
-.upg-segs{display:flex;gap:2px;height:4px}
-.seg{flex:1;border-radius:2px;background:rgba(255,255,255,.08);transition:background .25s}
-.seg.seg-done{background:var(--gold);box-shadow:0 0 4px rgba(255,215,0,.5)}
-.seg.seg-next{background:rgba(255,215,0,.25);border:1px dashed rgba(255,215,0,.4)}
-.upg-item.maxed .seg.seg-done{background:var(--green);box-shadow:0 0 4px rgba(0,255,136,.4)}
-
-/* Кнопка */
-.upg-btn{
-  background:linear-gradient(135deg,var(--gold),#ff9900);
-  border:none;color:#04040f;font-weight:700;font-size:10px;
-  font-family:'Orbitron',monospace;padding:6px 10px;border-radius:12px;
-  cursor:pointer;white-space:nowrap;flex-shrink:0;
-  transition:all .18s;text-align:center;line-height:1.2;
-}
-.upg-btn-inner{display:flex;flex-direction:column;align-items:center;gap:1px}
-.upg-cost{font-size:9px;opacity:.85}
-.upg-btn:active{transform:scale(.9)}
-.upg-btn:disabled{background:rgba(255,255,255,.07);color:rgba(255,255,255,.2);cursor:not-allowed;box-shadow:none}
-.upg-btn.maxed{background:linear-gradient(135deg,#00ff88,#00d4ff);color:#04040f;font-size:14px;padding:5px 8px}
-
-/* ── LEADERBOARD ── */
-.lb-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:6px;background:rgba(8,18,35,.5);border:1px solid rgba(0,212,255,.12);transition:all .2s}
-.lb-row.me{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07)}
-.lb-rank{font-size:18px;font-family:'Orbitron',monospace;font-weight:900;min-width:30px;text-align:center}
-.lb-info{flex:1;overflow:hidden}
-.lb-name{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lb-sub{font-size:10px;color:rgba(255,255,255,.35)}
-.lb-score{font-size:15px;font-weight:700;color:var(--cyan);font-family:'Orbitron',monospace}
-.lb-loading{text-align:center;color:rgba(0,212,255,.5);font-size:12px;padding:20px;font-family:'Orbitron',monospace;letter-spacing:1px}
-
-/* ── CUSTOMIZE SCREEN ── */
-.cust-section{margin-bottom:16px}
-.cust-lbl{color:var(--green);font-size:12px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:1px}
-.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
-.color-opt{aspect-ratio:1;border-radius:10px;border:2px solid rgba(0,255,136,.15);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative}
-.color-opt i{position:absolute;color:#fff;font-size:14px;opacity:0;transition:opacity .2s;text-shadow:0 1px 4px #0008}
-.color-opt.sel{border-color:var(--green);box-shadow:0 0 14px rgba(0,255,136,.4);transform:scale(1.08)}
-.color-opt.sel i{opacity:1}
-.color-opt:active{transform:scale(.92)}
-.trail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.trail-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,255,255,.65);font-weight:700}
-.trail-opt:active{transform:scale(.94)}
-.trail-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12);color:var(--green)}
-
-/* Updated shape grid - 3 cols */
-.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.shape-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
-.shape-opt:active{transform:scale(.94)}
-.shape-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
-.shape-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
-.shape-desc{color:rgba(255,255,255,.45);font-size:9px}
-.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.style-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
-.style-opt:active{transform:scale(.94)}
-.style-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
-.style-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
-.style-desc{color:rgba(255,255,255,.45);font-size:9px}
-.toggle-row{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer}
-.toggle-row input{width:16px;height:16px;accent-color:var(--green)}
-.toggle-row label{color:var(--green);font-size:12px;cursor:pointer}
-
-/* ── SKIN SCREEN ── */
-.skin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.skin-item{background:rgba(8,18,35,.6);border:2px solid rgba(168,85,247,.15);border-radius:14px;padding:14px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
-.skin-item.ok{border-color:rgba(168,85,247,.4)}
-.skin-item.active{border-color:var(--purple);background:rgba(168,85,247,.12);box-shadow:0 0 18px rgba(168,85,247,.25)}
-.skin-item.locked{opacity:.45;cursor:not-allowed}
-.skin-icon{font-size:36px;margin-bottom:5px;display:block}
-.skin-name{font-size:12px;font-weight:700;color:var(--purple);font-family:'Orbitron',monospace;margin-bottom:3px}
-.skin-req{font-size:9px;color:rgba(255,255,255,.4)}
-.skin-unlocked{font-size:9px;color:var(--green)}
-.skin-active-badge{position:absolute;top:6px;right:6px;font-size:9px;background:rgba(0,255,136,.15);border:1px solid var(--green);border-radius:8px;padding:1px 6px;color:var(--green);font-family:'Orbitron',monospace}
-
-/* ── TOUCH HINT ── */
-.touch-hint{position:absolute;bottom:82px;left:50%;transform:translateX(-50%);color:rgba(0,255,136,.4);font-size:11px;font-family:'Orbitron',monospace;text-align:center;pointer-events:none;z-index:5;animation:fadeOut 4s ease forwards;letter-spacing:1px;white-space:nowrap}
-@keyframes fadeOut{0%,60%{opacity:1}100%{opacity:0}}
-
-/* ── RESET CONFIRM OVERLAY ── */
-#resetConfirm{position:fixed;inset:0;background:rgba(4,4,15,.92);display:none;align-items:center;justify-content:center;z-index:60;backdrop-filter:blur(18px)}
-#resetConfirm.show{display:flex}
-.reset-card{background:var(--card);border:2px solid rgba(255,0,102,.4);border-radius:20px;padding:28px 24px;max-width:300px;width:90%;text-align:center;box-shadow:0 0 60px rgba(255,0,102,.2)}
-.reset-title{font-family:'Orbitron',monospace;font-size:20px;color:var(--pink);text-shadow:0 0 15px var(--pink);margin-bottom:8px;letter-spacing:2px}
-.reset-sub{font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px;line-height:1.5}
-.reset-btns{display:flex;gap:10px}
-.reset-btns .btn{font-size:11px;padding:11px}
-
-/* ── UPGRADE CATEGORIES ── */
-.upg-cat{font-size:9px;font-family:'Orbitron',monospace;color:rgba(0,255,136,.4);letter-spacing:3px;text-transform:uppercase;margin:14px 0 6px;padding:0 2px;border-bottom:1px solid rgba(0,255,136,.1);padding-bottom:4px}
-.upg-cat:first-child{margin-top:0}
-.upg-item.locked-upg{opacity:.5;pointer-events:none}
-.upg-item.locked-upg .upg-btn{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
-.upg-req{font-size:9px;color:rgba(255,100,100,.7);margin-top:2px}
-
-/* ── РЕЛЬСА — кнопка в перезарядке ── */
-.weapon-btn.rail-cd{border-color:rgba(0,255,204,.3)!important;background:rgba(0,255,204,.05)!important;opacity:.75}
-.weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:6px!important;letter-spacing:0}
-
-/* ── WEAPON SELECT GRID ── */
-.weapon-select-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.wpn-sel-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
-.wpn-sel-opt:active{transform:scale(.94)}
-.wpn-sel-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
-.wpn-sel-opt.disabled{opacity:.35;cursor:not-allowed;border-color:rgba(255,255,255,.07)}
-.wpn-sel-ico{font-size:22px;margin-bottom:3px;display:block}
-.wpn-sel-name{color:var(--green);font-size:9px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
-.wpn-sel-desc{color:rgba(255,255,255,.4);font-size:8px;line-height:1.3}
-.wpn-sel-badge{position:absolute;top:4px;right:5px;width:16px;height:16px;border-radius:50%;background:var(--green);color:#04040f;font-size:9px;font-family:'Orbitron',monospace;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
-.wpn-sel-opt.sel .wpn-sel-badge{opacity:1}
-
-/* ── STARFIELD SCREEN ── */
-#difficultyScreen{overflow:hidden}
-
-/* ══════════════════════════════════════════
-   SKILL TREE — полный редизайн
-══════════════════════════════════════════ */
-.skill-points-banner{
-  text-align:center;color:#00ffcc;font-size:14px;
-  font-family:'Orbitron',monospace;margin-bottom:12px;padding:8px 12px;
-  background:rgba(0,255,204,.06);border-radius:12px;
-  border:1px solid rgba(0,255,204,.2);
-}
-
-/* ── Слоты активных навыков сверху ── */
-.skill-slot-header{display:flex;gap:10px;margin-bottom:16px;padding:10px;background:rgba(0,0,0,.3);border-radius:12px;border:1px solid rgba(255,255,255,.06)}
-.skill-slot-group{flex:1;display:flex;flex-direction:column;gap:5px}
-.skill-slot-label{font-size:8px;font-family:'Orbitron',monospace;letter-spacing:2px;color:rgba(255,255,255,.3);text-transform:uppercase}
-.skill-slots-row{display:flex;gap:5px}
-.skill-slot{
-  flex:1;background:rgba(255,255,255,.04);border:1.5px dashed rgba(255,255,255,.12);
-  border-radius:10px;padding:7px 8px;display:flex;align-items:center;gap:6px;
-  min-height:36px;transition:all .25s;
-}
-.skill-slot.slot-filled{border-style:solid;border-color:rgba(0,255,136,.35);background:rgba(0,255,136,.06)}
-.skill-slot-active{border-color:rgba(0,212,255,.2)}
-.skill-slot-active.slot-filled{border-color:rgba(0,212,255,.45);background:rgba(0,212,255,.07)}
-.slot-ico{font-size:18px;line-height:1}
-.slot-name{font-size:9px;font-family:'Orbitron',monospace;color:var(--green);font-weight:700;flex:1}
-.slot-key{font-size:8px;font-family:'Orbitron',monospace;color:rgba(0,212,255,.7);background:rgba(0,212,255,.1);padding:1px 5px;border-radius:5px}
-.slot-empty{font-size:8px;color:rgba(255,255,255,.2);font-style:italic}
-
-/* ── Заголовок секции ── */
-.skill-branch{margin-bottom:14px}
-.skill-branch-title{
-  font-size:9px;font-family:'Orbitron',monospace;color:rgba(0,255,204,.5);
-  letter-spacing:2.5px;text-transform:uppercase;margin-bottom:8px;
-  padding-bottom:5px;border-bottom:1px solid rgba(0,255,204,.1);
-  display:flex;align-items:center;justify-content:space-between;
-}
-.skill-count-badge{
-  font-size:10px;letter-spacing:0;color:rgba(255,255,255,.3);
-  background:rgba(255,255,255,.06);padding:1px 7px;border-radius:8px;
-}
-
-/* ── Карточки навыков ── */
-.skill-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px}
-.skill-node{
-  background:rgba(5,12,30,.8);border:1.5px solid rgba(0,255,136,.12);
-  border-radius:13px;padding:10px 9px;cursor:pointer;transition:all .2s;
-  text-align:center;flex:1;min-width:88px;position:relative;overflow:hidden;
-}
-.skill-node::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,.03),transparent);pointer-events:none}
-.skill-node:active{transform:scale(.94)}
-.skill-node.maxed{
-  border-color:rgba(255,215,0,.5);background:rgba(20,15,0,.9);
-  box-shadow:0 0 16px rgba(255,215,0,.12);cursor:default;
-}
-.skill-node.maxed::before{background:linear-gradient(135deg,rgba(255,215,0,.05),transparent)}
-.skill-node.locked{opacity:.3;cursor:not-allowed}
-.skill-node-ico{font-size:22px;display:block;margin-bottom:4px;filter:drop-shadow(0 0 6px rgba(0,255,136,.3))}
-.skill-node.maxed .skill-node-ico{filter:drop-shadow(0 0 8px rgba(255,215,0,.5))}
-.skill-node-name{font-size:8.5px;font-family:'Orbitron',monospace;color:var(--green);font-weight:700;margin-bottom:3px;letter-spacing:.5px}
-.skill-node.maxed .skill-node-name{color:#ffd700}
-.skill-node-desc{font-size:7.5px;color:rgba(255,255,255,.38);line-height:1.35;margin-bottom:5px}
-.sknode-cd{font-size:7.5px;color:rgba(0,212,255,.55);margin-bottom:4px;font-family:'Orbitron',monospace}
-.sknode-action{font-size:8px;font-family:'Orbitron',monospace;font-weight:700;padding:3px 6px;border-radius:7px;display:inline-block}
-.sknode-action.learned{color:#ffd700;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25)}
-.sknode-action.can-learn{color:#00ff88;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);cursor:pointer}
-.sknode-action.locked-lbl{color:rgba(255,255,255,.25);background:rgba(255,255,255,.04)}
-.sknode-action.slot-full{color:rgba(255,100,100,.6);background:rgba(255,0,0,.06)}
-.sknode-action.no-pts{color:rgba(255,255,255,.25)}
-
-/* ── UPGRADE TABS ── */
-.upg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
-.upg-tab{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:6px 8px;font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.4);cursor:pointer;flex:1;min-width:40px;text-align:center;line-height:1.4;transition:all .2s}
-.upg-tab.active{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
-.upg-tab span{font-size:6.5px;letter-spacing:.5px}
-
-/* ── SKILL TYPE TAGS ── */
-.skill-type-tag{font-size:7px;font-family:'Orbitron',monospace;letter-spacing:.5px;padding:2px 6px;border-radius:6px;display:inline-block;margin:2px 0 3px}
-.passive-tag{background:rgba(168,85,247,.2);color:#a855f7;border:1px solid rgba(168,85,247,.3)}
-.active-tag{background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.25)}
-
-/* ══════════════════════════════════════════
-   ПАССИВНЫЕ НАВЫКИ В БОЮ — стили перенесены в MOBILE COMBAT UX
-══════════════════════════════════════════ */
-
-/* ── АКТИВНЫЙ НАВЫК В БОЮ — стили перенесены в MOBILE COMBAT UX ── */
-/* ask-wrap и ask-card переопределены выше в MOBILE COMBAT UX */
-.ask-wrap.ask-active .ask-card{
-  border-color:rgba(0,255,136,.6);
-  box-shadow:0 0 24px rgba(0,255,136,.35),inset 0 1px 0 rgba(255,255,255,.08);
-  animation:activeGlow 1.2s infinite alternate;
-}
-@keyframes activeGlow{from{box-shadow:0 0 18px rgba(0,255,136,.3)}to{box-shadow:0 0 32px rgba(0,255,136,.6)}}
-.ask-wrap.ask-ready .ask-card{
-  border-color:rgba(0,212,255,.6);
-  box-shadow:0 0 20px rgba(0,212,255,.3),inset 0 1px 0 rgba(255,255,255,.08);
-  animation:readyGlow .9s infinite alternate;
-}
-@keyframes readyGlow{from{box-shadow:0 0 16px rgba(0,212,255,.2)}to{box-shadow:0 0 28px rgba(0,212,255,.55)}}
-.ask-wrap.ask-cd .ask-card{ border-color:rgba(255,255,255,.1);opacity:.7; }
-.ask-ring-svg{
-  position:absolute;inset:0;width:100%;height:100%;
-  transform:rotate(-90deg);pointer-events:none;
-}
-.ask-ring-bg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:2.5}
-.ask-ring-fill{fill:none;stroke:#00d4ff;stroke-width:2.5;stroke-linecap:round;transition:stroke-dashoffset .12s linear}
-.ask-ring-ready{fill:none;stroke:rgba(0,255,136,.5);stroke-width:2.5}
-.ask-ring-active{fill:none;stroke:rgba(0,255,136,.8);stroke-width:2.5;stroke-dasharray:4 2}
-/* ask-ico переопределён выше */
-.ask-wrap.ask-ready .ask-ico{filter:drop-shadow(0 0 8px rgba(0,212,255,.8))}
-.ask-wrap.ask-active .ask-ico{filter:drop-shadow(0 0 10px rgba(0,255,136,.9))}
-.ask-cd-txt{
-  font-size:7px;font-family:'Orbitron',monospace;font-weight:700;
-  color:rgba(255,255,255,.55);z-index:1;position:relative;line-height:1;
-}
-.ask-eff-txt{
-  font-size:7px;font-family:'Orbitron',monospace;font-weight:700;
-  color:#00ff88;z-index:1;position:relative;line-height:1;
-  text-shadow:0 0 8px rgba(0,255,136,.6);
-}
-.ask-ready-badge{
-  position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
-  background:rgba(0,212,255,.9);color:#000;
-  font-size:5px;font-family:'Orbitron',monospace;font-weight:900;
-  padding:2px 4px;border-radius:3px;white-space:nowrap;letter-spacing:.5px;
-}
-.ask-key-badge{
-  position:absolute;top:-5px;right:-5px;
-  background:rgba(0,212,255,.9);color:#000;
-  font-size:7px;font-family:'Orbitron',monospace;font-weight:900;
-  padding:2px 5px;border-radius:5px;z-index:2;
-}
-.ask-label{
-  font-size:6px;font-family:'Orbitron',monospace;
-  color:rgba(255,255,255,.35);letter-spacing:.5px;
-  text-align:center;margin-top:2px;white-space:nowrap;
-}
-@keyframes skillIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
-@keyframes skillRingRotate{from{stroke-dashoffset:0}to{stroke-dashoffset:-60}}
-/* Прячем кнопку АВТО */
-#autoBtn{ display:none !important; }
-
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
-::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
-
-/* ── FLEX UTILS ── */
-.flex{display:flex}.gap2{gap:8px}.mt1{margin-top:8px}.mt2{margin-top:12px}.mt3{margin-top:16px}.w100{width:100%}.grow{flex:1}
-
-/* ── SETTINGS SCREEN ── */
-.settings-block{background:rgba(8,18,35,.6);border:1px solid rgba(0,212,255,.12);border-radius:14px;padding:14px;margin-bottom:10px}
-.settings-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.settings-lbl{font-size:11px;color:rgba(255,255,255,.7);font-family:"Orbitron",monospace;letter-spacing:.5px}
-.settings-val{font-size:12px;color:var(--cyan);font-family:"Orbitron",monospace;font-weight:700;min-width:40px;text-align:right}
-.settings-slider{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(0,212,255,.15);outline:none;cursor:pointer}
-.settings-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--green));cursor:pointer;box-shadow:0 0 8px rgba(0,212,255,.5)}
-
-.music-style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.music-style-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,212,255,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
-.music-style-btn:active{transform:scale(.93)}
-.music-style-btn.active{border-color:var(--cyan);background:rgba(0,212,255,.12);box-shadow:0 0 14px rgba(0,212,255,.25)}
-.ms-ico{font-size:22px;display:block}
-.ms-name{font-size:8px;font-family:"Orbitron",monospace;font-weight:700;color:var(--cyan);letter-spacing:.5px}
-.ms-desc{font-size:7px;color:rgba(255,255,255,.4);font-family:"Rajdhani",sans-serif}
-
-/* ── SUGGEST SCREEN ── */
-.suggest-cats{display:flex;flex-wrap:wrap;gap:6px}
-.suggest-cat{background:rgba(8,18,35,.7);border:1.5px solid rgba(255,100,100,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-family:"Orbitron",monospace;color:rgba(255,100,100,.6);cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
-.suggest-cat:active{transform:scale(.93)}
-.suggest-cat.active{border-color:#ff6464;color:#ff6464;background:rgba(255,100,100,.1);box-shadow:0 0 10px rgba(255,100,100,.2)}
-.suggest-textarea{width:100%;min-height:120px;background:rgba(4,4,15,.8);border:1.5px solid rgba(255,100,100,.2);border-radius:10px;color:rgba(255,255,255,.85);font-family:"Rajdhani",sans-serif;font-size:13px;padding:10px;resize:none;outline:none;transition:border-color .2s;line-height:1.5}
-.suggest-textarea:focus{border-color:#ff6464}
-.suggest-counter{text-align:right;font-size:9px;color:rgba(255,255,255,.3);font-family:"Orbitron",monospace;margin-top:4px}
-.suggest-status{padding:10px 14px;border-radius:10px;font-size:11px;font-family:"Orbitron",monospace;text-align:center}
-.suggest-status.success{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:var(--green)}
-.suggest-status.error{background:rgba(255,0,102,.08);border:1px solid rgba(255,0,102,.25);color:var(--pink)}
-.suggest-status.loading{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan)}
-
-/* ══════════════════════════════════════
-   NEW MAIN MENU
-══════════════════════════════════════ */
-.menu-card{position:relative;z-index:1;width:100%;max-width:420px;padding:20px 16px 16px;display:flex;flex-direction:column;gap:0;background:rgba(8,18,35,.82);border:1.5px solid rgba(0,255,136,.25);border-radius:22px;box-shadow:0 0 40px rgba(0,255,136,.12),0 0 80px rgba(0,212,255,.06),inset 0 0 30px rgba(0,255,136,.03);backdrop-filter:blur(12px)}
-
-/* Hero */
-.menu-hero{display:flex;flex-direction:column;align-items:center;padding:8px 0 16px;gap:6px}
-.menu-ship-canvas{filter:drop-shadow(0 0 18px rgba(0,255,136,.7));animation:menuShipFloat 3s ease-in-out infinite}
-@keyframes menuShipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.menu-title-wrap{text-align:center;line-height:1}
-.menu-title{font-family:'Orbitron',monospace;font-size:38px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,#00ff88 0%,#00d4ff 50%,#a855f7 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.05}
-.menu-title--second{font-size:28px;letter-spacing:10px;background:linear-gradient(135deg,#a855f7,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.menu-tagline{font-size:8px;letter-spacing:5px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;margin-top:4px;text-transform:uppercase}
-.menu-score-row{display:flex;gap:8px;align-items:center}
-.menu-stat-pill{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.25);border-radius:20px;padding:4px 14px;font-family:'Orbitron',monospace;font-size:11px;color:var(--gold)}
-
-/* Big start button */
-.menu-start-btn{position:relative;width:100%;padding:18px;background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,212,255,.1));border:2px solid rgba(0,255,136,.5);border-radius:18px;font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#00ff88;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;overflow:hidden;transition:all .2s;margin-bottom:12px;text-shadow:0 0 20px rgba(0,255,136,.6);box-shadow:0 0 30px rgba(0,255,136,.15),inset 0 0 30px rgba(0,255,136,.05)}
-.menu-start-btn:active{transform:scale(.97)}
-.menu-start-btn:hover,.menu-start-btn:focus{border-color:rgba(0,255,136,.8);box-shadow:0 0 40px rgba(0,255,136,.3),inset 0 0 30px rgba(0,255,136,.08)}
-.menu-start-ico{font-size:22px}
-.menu-start-txt{flex:1;text-align:center}
-.menu-start-pulse{position:absolute;inset:0;border-radius:16px;background:transparent;border:2px solid rgba(0,255,136,.3);animation:startPulse 2s ease-out infinite;pointer-events:none}
-@keyframes startPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.06);opacity:0}}
-
-/* Nav grid */
-.menu-nav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px}
-.menu-nav-btn{background:rgba(8,18,35,.75);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 6px 10px;cursor:pointer;transition:all .18s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-.menu-nav-btn:active{transform:scale(.92);background:rgba(0,255,136,.07)}
-.menu-nav-ico{font-size:22px;line-height:1}
-.menu-nav-lbl{font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.55);letter-spacing:.8px}
-
-/* Suggest button */
-.menu-suggest-btn{width:100%;padding:10px;background:rgba(255,100,100,.05);border:1.5px solid rgba(255,100,100,.2);border-radius:12px;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,100,100,.65);letter-spacing:1px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
-.menu-suggest-btn:active{background:rgba(255,100,100,.1);border-color:rgba(255,100,100,.4)}
-
-/* Difficulty modal */
-.diff-modal{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,4,15,.7);backdrop-filter:blur(8px);animation:diffModalIn .25s ease}
-@keyframes diffModalIn{from{opacity:0}to{opacity:1}}
-.diff-modal-card{background:rgba(8,12,28,.97);border:1.5px solid rgba(0,255,136,.2);border-radius:24px;padding:24px 20px;width:90%;max-width:400px;animation:diffCardUp .3s cubic-bezier(.22,.68,0,1.2)}
-@keyframes diffCardUp{from{transform:scale(.85) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
-.diff-modal-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--green);letter-spacing:2px;text-align:center;margin-bottom:16px}
-.diff-modal-actions{display:flex;gap:10px;margin-top:14px}
-.diff-modal-actions .btn{flex:1;padding:14px}
-
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Space Shooter</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --green:#00ff88;--cyan:#00d4ff;--pink:#ff0066;--gold:#ffd700;--purple:#a855f7;
+      --bg:#04040f;--card:rgba(8,18,35,.95);--border:rgba(0,255,136,.25);
+    }
+    body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touch-action:none;user-select:none}
+    #gameCanvas{display:block;touch-action:none;position:absolute;inset:0}
+
+    /* ── PAUSE OVERLAY ── */
+    #pauseOverlay{position:absolute;inset:0;background:rgba(4,4,15,.85);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(16px)}
+    .pause-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:32px 28px;text-align:center;min-width:240px;box-shadow:0 0 60px rgba(0,255,136,.15)}
+    .pause-title{font-family:'Orbitron',monospace;font-size:28px;color:var(--green);text-shadow:0 0 20px var(--green);margin-bottom:24px;letter-spacing:4px}
+    .pause-btn{display:block;width:100%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;color:#04040f;font-family:'Orbitron',monospace;font-weight:700;font-size:13px;padding:12px;border-radius:40px;cursor:pointer;letter-spacing:2px;margin-bottom:10px;transition:all .2s}
+    .pause-btn:active{transform:scale(.95)}
+    .pause-btn.secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:12px}
+
+    /* ── UI TOP — Safe area for iPhone notch ── */
+    #ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;padding:10px;padding-top:max(10px,env(safe-area-inset-top))}
+    /* ── REDESIGNED HUD ── */
+    .stats-row{display:flex;gap:5px;align-items:stretch}
+
+    /* Базовый пилл — без backdrop-filter для производительности на Android */
+    .stat-pill{
+      background:rgba(4,8,20,.92);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:6px 10px 5px;
+      flex:1;position:relative;overflow:hidden;
+      display:flex;flex-direction:column;gap:2px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .stat-pill::after{
+      content:'';position:absolute;inset:0;border-radius:12px;
+      background:linear-gradient(135deg,rgba(255,255,255,.03),transparent 60%);
+      pointer-events:none;
+    }
+
+    /* Лейблы — маленькие капслок */
+    .stat-lbl{font-size:7px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1.5px;font-family:'Orbitron',monospace;line-height:1}
+
+    /* ── ОЧКИ ── */
+    .stat-pill--score{border-color:rgba(0,255,136,.2);}
+    .stat-pill--score::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 0% 100%,rgba(0,255,136,.08),transparent 70%);pointer-events:none}
+    .stat-val{font-size:16px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 10px rgba(0,255,136,.6);letter-spacing:-.5px}
+
+    /* ── ЖИЗНИ — сердечки ── */
+    .stat-pill--lives{border-color:rgba(255,80,120,.2);}
+    .stat-pill--lives::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(255,80,120,.08),transparent 70%);pointer-events:none}
+    .lives-hearts{display:flex;gap:2px;flex-wrap:wrap;align-items:center;min-height:20px}
+    .heart-ico{font-size:13px;line-height:1;transition:all .2s;filter:drop-shadow(0 0 4px rgba(255,80,120,.7))}
+    .heart-ico.empty{opacity:.2;filter:none}
+
+    /* ── МИССИЯ — прогресс-кольцо ── */
+    .stat-pill--mission{border-color:rgba(0,212,255,.2);}
+    .stat-pill--mission::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 100% 0%,rgba(0,212,255,.08),transparent 70%);pointer-events:none}
+    .mission-row{display:flex;align-items:center;gap:6px}
+    .mission-ring-wrap{position:relative;width:32px;height:32px;flex-shrink:0}
+    .mission-ring-svg{width:32px;height:32px;transform:rotate(-90deg)}
+    .mission-ring-bg{fill:none;stroke:rgba(0,212,255,.15);stroke-width:3}
+    .mission-ring-fill{fill:none;stroke:url(#missionGrad);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .4s ease}
+    .mission-ring-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:9px;font-weight:900;color:var(--cyan);text-shadow:0 0 6px rgba(0,212,255,.8)}
+    .mission-label{font-family:'Orbitron',monospace;font-size:8px;color:rgba(0,212,255,.5);letter-spacing:.5px}
+
+    /* ── КОРАБЛЬ — уровень+полоска ── */
+    .stat-pill--ship{border-color:rgba(255,215,0,.2);}
+    .stat-pill--ship::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 100% 100%,rgba(255,215,0,.08),transparent 70%);pointer-events:none}
+    .ship-lvl-row{display:flex;align-items:baseline;gap:3px}
+    .ship-lvl-num{font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:var(--gold);text-shadow:0 0 10px rgba(255,215,0,.6);line-height:1}
+    .ship-lvl-tag{font-size:7px;color:rgba(255,215,0,.45);font-family:'Orbitron',monospace;letter-spacing:.5px}
+    .ship-xp-micro{height:3px;background:rgba(255,215,0,.1);border-radius:2px;overflow:hidden;margin-top:3px}
+    .ship-xp-micro-fill{height:100%;background:linear-gradient(90deg,#ffd700,#ff9900);border-radius:2px;transition:width .4s ease;box-shadow:0 0 4px rgba(255,215,0,.5)}
+
+    /* Убираем старые ненужные стили */
+    .stat-val.lives{color:#ff6b88;text-shadow:0 0 8px rgba(255,107,136,.5)}
+    .stat-val.level-val{color:var(--cyan);text-shadow:0 0 8px rgba(0,212,255,.5)}
+
+    /* Level progress - unified */
+    #levelBar{height:6px;background:rgba(0,212,255,.1);border-radius:3px;overflow:hidden;margin-top:6px;position:relative}
+    #levelFill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green),var(--gold));border-radius:3px;transition:width .4s ease;box-shadow:0 0 8px var(--cyan)}
+    #levelBarLabel{position:absolute;right:0;top:-13px;font-size:8px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;display:none}
+    .stat-pill--level{min-width:80px}
+    .lvl-sub{font-size:9px;color:var(--gold);font-family:'Orbitron',monospace;margin-top:1px}
+
+    /* XP bar - hidden, replaced by unified bar */
+    #xpRow{display:none}
+
+    /* ── PAUSE BTN ── */
+    #pauseBtn{
+      display:none !important; /* скрыт — используем pauseBtnPill в stats-row */
+    }
+    .stat-pill--pause{
+      display:flex;align-items:center;justify-content:center;
+      transition:border-color .18s,box-shadow .18s;
+      pointer-events:all;
+    }
+    .stat-pill--pause:active{ transform:scale(.88); }
+    .stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15); }
+
+    /* ── COMBO ── */
+    #comboDisplay{position:absolute;top:130px;right:10px;text-align:right;pointer-events:none;z-index:10;transition:opacity .3s,transform .3s}
+    .combo-word{font-size:9px;color:rgba(255,215,0,.7);font-family:'Orbitron',monospace;letter-spacing:2px}
+    .combo-num{font-size:32px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 20px rgba(255,215,0,.6);line-height:1;animation:comboPulse .3s ease}
+    @keyframes comboPulse{0%{transform:scale(1.3)}100%{transform:scale(1)}}
+    .combo-hidden{opacity:0;transform:translateX(20px)}
+
+    /* ── NOTIFICATIONS ── */
+    #notifications{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;text-align:center}
+    .notif{font-size:20px;font-weight:700;font-family:'Orbitron',monospace;color:var(--green);text-shadow:0 0 15px var(--green);animation:notifAnim .9s forwards;white-space:nowrap}
+    .notif.boss{font-size:28px;color:var(--pink);text-shadow:0 0 30px var(--pink)}
+    .notif.gold{color:var(--gold);text-shadow:0 0 15px var(--gold);font-size:16px}
+    .notif.levelup{font-size:26px;color:var(--cyan);text-shadow:0 0 25px var(--cyan)}
+    @keyframes notifAnim{0%{opacity:0;transform:scale(.4) translateY(0)}20%{opacity:1;transform:scale(1.1) translateY(0)}60%{opacity:1;transform:scale(1) translateY(-10px)}100%{opacity:0;transform:scale(.8) translateY(-45px)}}
+
+    /* ── POWERUP BAR ── */
+    #powerupBar{position:absolute;bottom:max(72px,calc(env(safe-area-inset-bottom)+60px));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
+    .pu-chip{background:rgba(8,18,35,.88);border:1.5px solid;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;font-family:'Orbitron',monospace;display:flex;align-items:center;gap:5px}
+    .pu-chip.shield{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.3)}
+    .pu-chip.speed{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(255,215,0,.3)}
+    .pu-chip.coin{border-color:#ffdd00;color:#ffdd00;box-shadow:0 0 12px rgba(255,220,0,.3)}
+    .pu-chip.laser{border-color:#00ffff;color:#00ffff;box-shadow:0 0 12px rgba(0,255,255,.3)}
+    .pu-chip.freeze{border-color:#88eeff;color:#88eeff;box-shadow:0 0 12px rgba(136,238,255,.4);animation:freezePulse .8s infinite}
+    @keyframes freezePulse{0%,100%{box-shadow:0 0 12px rgba(136,238,255,.4)}50%{box-shadow:0 0 22px rgba(136,238,255,.8)}}
+    /* Freeze screen overlay */
+    #freezeOverlay{position:absolute;inset:0;background:rgba(136,238,255,.06);pointer-events:none;z-index:8;display:none;animation:freezeFlash .3s ease}
+    @keyframes freezeFlash{from{background:rgba(136,238,255,.25)}to{background:rgba(136,238,255,.06)}}
+
+    /* ── BOSS BAR ── */
+    /* #bossBar стили перенесены ниже в блок MOBILE COMBAT UX */
+    .boss-lbl{font-size:10px;color:var(--pink);text-align:center;margin-bottom:4px;font-family:'Orbitron',monospace;letter-spacing:2px;text-shadow:0 0 10px var(--pink);animation:bossNamePulse 1.5s infinite}
+    @keyframes bossNamePulse{0%,100%{opacity:1;text-shadow:0 0 10px var(--pink)}50%{opacity:.7;text-shadow:0 0 20px var(--pink),0 0 40px var(--pink)}}
+    @keyframes missionBossPulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .stat-pill--mission.boss-mode{border-color:rgba(255,0,102,.4);background:rgba(40,0,15,.85)}
+    .stat-pill--mission.boss-mode .mission-ring-num{color:var(--pink);animation:missionBossPulse .8s infinite}
+    .stat-pill--mission.boss-mode .mission-label{color:rgba(255,0,102,.7)}
+    .boss-track{height:8px;background:rgba(255,0,102,.1);border-radius:6px;border:1px solid rgba(255,0,102,.3);overflow:hidden}
+    #bossFill{height:100%;background:linear-gradient(90deg,var(--pink),#ff6b00);border-radius:6px;transition:width .3s;box-shadow:0 0 8px rgba(255,0,102,.6)}
+
+    /* ── TOUCH SKILL BUTTONS ── */
+    #touchSkillBar{ display:none !important; }
+    .touch-skill-btn{display:none}
+
+    /* ══════════════════════════════════
+       MOBILE COMBAT UX — REDESIGN
+    ══════════════════════════════════ */
+
+    /* ── ОРУЖИЕ — крупные кнопки снизу ── */
+    .weapon-btn{
+      width:62px;height:62px;min-width:52px;
+      background:rgba(6,10,24,.95);
+      border:2px solid rgba(0,255,136,.25);
+      border-radius:16px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      cursor:pointer;transition:all .15s;gap:2px;
+      position:relative;overflow:hidden;
+      box-shadow:0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .weapon-btn::before{
+      content:'';position:absolute;inset:0;border-radius:14px;
+      background:linear-gradient(135deg,rgba(255,255,255,.04),transparent 60%);
+      pointer-events:none;
+    }
+    .weapon-btn.active{
+      border-color:var(--green);
+      background:rgba(0,40,20,.95);
+      box-shadow:0 0 20px rgba(0,255,136,.35),0 4px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(0,255,136,.15);
+    }
+    .weapon-btn:active{transform:scale(.85);transition:transform .08s}
+    .weapon-emoji{font-size:20px;line-height:1}
+    .weapon-lbl{font-size:8px;color:rgba(0,255,136,.5);font-family:'Orbitron',monospace;font-weight:700;letter-spacing:.5px}
+    .weapon-btn.active .weapon-lbl{color:var(--green)}
+    .weapon-btn.active::after{
+      content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:60%;height:2px;background:var(--green);border-radius:2px;
+      box-shadow:0 0 8px var(--green);
+    }
+
+    /* ── WEAPON GROUP ── */
+    .weapons-group{display:flex;gap:7px;align-items:center}
+
+    /* ── НИЖНЯЯ ПАНЕЛЬ — оружие+пассивные слева, активный навык справа ── */
+    #bottomBar{
+      position:absolute;
+      bottom:max(16px,env(safe-area-inset-bottom));
+      left:10px;right:10px;
+      display:flex;align-items:flex-end;justify-content:space-between;
+      z-index:10;pointer-events:all;
+      gap:8px;
+    }
+
+    /* Левая группа: пассивные навыки + оружие */
+    #bottomLeft{
+      display:flex;flex-direction:column;gap:6px;align-items:flex-start;
+      flex-shrink:1;min-width:0;
+    }
+
+    /* ask-wrap */
+    .ask-wrap{
+      position:relative;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;gap:0;
+      -webkit-tap-highlight-color:transparent;
+      animation:skillIn .3s cubic-bezier(.22,.68,0,1.2) both;
+    }
+
+    /* ── АКТИВНЫЕ НАВЫКИ — правый нижний угол, колонка ── */
+    #activeSkillBar{
+      position:static;
+      display:flex;flex-direction:column;gap:5px;z-index:15;
+      align-items:center;pointer-events:all;
+      flex-shrink:0;
+    }
+    .ask-card{
+      width:58px;height:58px;
+      background:rgba(6,8,22,.92);
+      border:1.5px solid rgba(0,212,255,.35);
+      border-radius:14px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:1px;position:relative;overflow:hidden;
+      box-shadow:0 0 16px rgba(0,212,255,.15),inset 0 1px 0 rgba(255,255,255,.06),0 4px 16px rgba(0,0,0,.5);
+      transition:border-color .2s,box-shadow .2s,transform .1s;
+    }
+    .ask-wrap:active .ask-card{transform:scale(.84)}
+    .ask-ico{font-size:22px;line-height:1;z-index:1;position:relative;transition:filter .2s}
+
+    /* ── ПАУЗА — встроена в HUD строку сверху ── */
+    .stat-pill--pause{
+      display:flex!important;align-items:center!important;justify-content:center!important;
+      pointer-events:all!important;
+      min-width:44px!important;
+      flex:0 0 44px!important;
+      transition:border-color .18s,box-shadow .18s;
+      position:static!important;
+      top:auto!important;left:auto!important;transform:none!important;
+      width:auto!important;height:auto!important;
+      border-radius:10px!important;
+      background:rgba(3,6,18,.94)!important;
+      border:1px solid rgba(255,255,255,.12)!important;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4)!important;
+      z-index:auto!important;
+    }
+    .stat-pill--pause:active{ transform:scale(.88)!important; }
+    .stat-pill--pause:hover{ border-color:rgba(0,255,136,.5)!important; box-shadow:0 0 14px rgba(0,255,136,.15)!important; }
+    .stat-pill--pause span{font-size:16px}
+
+    /* ── HUD TOP — компактнее ── */
+    #ui{
+      position:absolute;top:0;left:0;right:0;z-index:10;
+      pointer-events:none;
+      padding:max(10px,env(safe-area-inset-top)) 10px 0;
+      display:none;
+    }
+    #ui.ui-visible{ display:block; }
+    .stats-row{display:flex;gap:4px;align-items:stretch}
+    .stat-pill{
+      background:rgba(3,6,18,.94);
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:10px;
+      padding:5px 8px 4px;
+      flex:1;position:relative;overflow:hidden;
+      display:flex;flex-direction:column;gap:1px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 4px 12px rgba(0,0,0,.4);
+    }
+    .stat-val{font-size:14px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;line-height:1.1;text-shadow:0 0 8px rgba(0,255,136,.5)}
+    .stat-lbl{font-size:6.5px;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:1.2px;font-family:'Orbitron',monospace;line-height:1}
+
+    /* ── ПАССИВНЫЕ НАВЫКИ — горизонтально в нижней панели рядом с оружием ── */
+    #passiveHud{
+      position:static;
+      display:flex;flex-direction:row;gap:5px;z-index:12;
+      align-items:center;
+      flex-wrap:nowrap;
+      flex-shrink:1;
+    }
+    .passive-hud-item{
+      width:38px;height:38px;
+      background:rgba(6,8,22,.94);
+      border:1px solid rgba(168,85,247,.45);
+      border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 10px rgba(168,85,247,.2),0 2px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+      animation:passiveIn .3s cubic-bezier(.22,.68,0,1.2) both;
+      position:relative;overflow:hidden;cursor:default;
+      flex-shrink:0;
+    }
+    .passive-hud-item::before{
+      content:'';position:absolute;inset:0;border-radius:10px;
+      background:linear-gradient(135deg,rgba(168,85,247,.1),transparent 60%);
+      pointer-events:none;
+    }
+    .passive-hud-ico-wrap{ display:flex;align-items:center;justify-content:center; }
+    .passive-hud-ico{font-size:18px;line-height:1;filter:drop-shadow(0 0 4px rgba(168,85,247,.6))}
+    .passive-hud-info{ display:none; }
+    @keyframes passiveIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+
+    /* ── POWERUP BAR — над нижней панелью, по центру ── */
+    #powerupBar{
+      position:absolute;
+      bottom:max(86px,calc(env(safe-area-inset-bottom)+76px));
+      left:50%;transform:translateX(-50%);
+      display:flex;gap:6px;z-index:10;pointer-events:none;
+    }
+    .pu-chip{
+      background:rgba(6,10,24,.94);
+      border:1.5px solid;border-radius:16px;
+      padding:4px 10px;font-size:10px;font-weight:700;
+      font-family:'Orbitron',monospace;
+      display:flex;align-items:center;gap:4px;
+      box-shadow:0 2px 10px rgba(0,0,0,.4);
+    }
+
+    /* ── BOSS BAR — снизу над нижней панелью с оружием ── */
+    #bossBar{
+      position:fixed;
+      top:70px;
+      left:10px;right:10px;
+      z-index:20;display:none;pointer-events:none;
+      background:rgba(3,6,18,.92);border-radius:12px;
+      padding:8px 12px;
+      box-shadow:0 0 20px rgba(255,0,102,.15),0 4px 16px rgba(0,0,0,.5);
+      border:1px solid rgba(255,0,102,.3);
+    }
+
+    /* ── COMBO — над нижней панелью, справа ── */
+    #comboDisplay{
+      position:absolute;
+      bottom:max(92px,calc(env(safe-area-inset-bottom)+82px));
+      right:10px;
+      left:auto;
+      text-align:right;
+      pointer-events:none;z-index:10;
+      transition:opacity .3s,transform .3s;
+      background:rgba(3,6,18,.7);
+      border-radius:10px;padding:4px 8px;
+      border:1px solid rgba(255,215,0,.1);
+    }
+    .combo-num{font-size:28px;font-weight:900;color:var(--gold);font-family:'Orbitron',monospace;text-shadow:0 0 16px rgba(255,215,0,.6);line-height:1}
+
+    /* ── RAIL CD — читаемее ── */
+    .weapon-btn.rail-cd{
+      border-color:rgba(0,255,204,.4)!important;
+      background:rgba(0,20,20,.95)!important;
+      opacity:.8;
+    }
+    .weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:7px!important}
+
+    /* ── СВАЙП HINT — читаемее ── */
+    .swipe-hint{
+      position:absolute;
+      bottom:max(92px,calc(env(safe-area-inset-bottom)+80px));
+      left:50%;transform:translateX(-50%);
+      font-size:9px;color:rgba(168,85,247,.55);
+      font-family:'Orbitron',monospace;letter-spacing:2px;
+      pointer-events:none;animation:swipeHintFade 4s forwards;
+      background:rgba(4,4,15,.7);border-radius:8px;padding:4px 10px;
+      white-space:nowrap;
+    }
+
+    /* ── DAMAGE OVERLAY — усилен ── */
+    #damageOverlay{
+      position:fixed;inset:0;pointer-events:none;z-index:9;
+      background:radial-gradient(ellipse at center,transparent 50%,rgba(255,0,60,.5) 100%);
+      opacity:0;transition:opacity 0.1s ease-out;
+    }
+
+    /* ── МЕДИА: телефоны в landscape ── */
+    @media (orientation:landscape) and (max-height:450px){
+      .weapon-btn{width:50px;height:50px}
+      .ask-card{width:48px;height:48px}
+      .stat-val{font-size:12px}
+      #powerupBar{bottom:max(72px,calc(env(safe-area-inset-bottom)+62px))}
+      /* #bossBar top position handled globally */
+      #comboDisplay{bottom:max(74px,calc(env(safe-area-inset-bottom)+64px))}
+      .passive-hud-item{width:32px;height:32px}
+      .passive-hud-ico{font-size:15px}
+    }
+
+    /* ── TOUCH RIPPLE на кнопках оружия ── */
+    @keyframes weaponRipple{
+      0%{transform:scale(0);opacity:.4}
+      100%{transform:scale(2.5);opacity:0}
+    }
+    .weapon-btn .ripple{
+      position:absolute;width:30px;height:30px;border-radius:50%;
+      background:rgba(0,255,136,.25);transform:scale(0);
+      pointer-events:none;
+      animation:weaponRipple 0.35s ease-out forwards;
+    }
+    .ask-wrap .ripple{
+      position:absolute;width:30px;height:30px;border-radius:50%;
+      background:rgba(0,212,255,.25);transform:scale(0);
+      pointer-events:none;
+      animation:weaponRipple 0.35s ease-out forwards;
+    }
+
+    /* Swipe hint */
+    .swipe-hint{position:absolute;bottom:130px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(168,85,247,.6);font-family:'Orbitron',monospace;letter-spacing:2px;pointer-events:none;animation:swipeHintFade 4s forwards}
+    @keyframes swipeHintFade{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
+    /* ── AUTO BTN (скрыт) ── */
+    #autoBtn{display:none!important}
+    /* ── AUTO / WEAPON BAR — safe area ── */
+    @media (hover: none) and (pointer: coarse) {
+      /* activeSkillBar always shown via JS */
+    }
+
+    /* ── COMBO — перенесён вправо-вниз ── */
+    /* Стили уже заданы выше в MOBILE COMBAT UX block */
+
+    /* ── DAMAGE OVERLAY — красный flash по краям при уроне ── */
+    #damageOverlay{
+      position:fixed;inset:0;pointer-events:none;z-index:9;
+      background:radial-gradient(ellipse at center,transparent 40%,rgba(255,0,60,.4) 100%);
+      opacity:0;transition:opacity 0.08s ease-out;
+    }
+    #damageOverlay.flash{opacity:1}
+
+    /* ── HEART BURST — анимация потери жизни ── */
+    @keyframes heartBurst{
+      0%  {transform:scale(1);filter:drop-shadow(0 0 4px #ff5077)}
+      30% {transform:scale(1.7);opacity:1}
+      100%{transform:scale(0.2);opacity:0}
+    }
+    .heart-ico.losing{animation:heartBurst 0.35s ease-out forwards!important}
+
+    /* ── COIN FLY — монеты летят вверх ── */
+    @keyframes coinFly{
+      0%  {opacity:1;transform:translateY(0) scale(1)}
+      100%{opacity:0;transform:translateY(-65px) scale(0.7)}
+    }
+
+    /* ── WAVE INCOMING — индикатор пустого экрана ── */
+    @keyframes waveIncoming{0%,100%{opacity:.25}50%{opacity:.7}}
+
+    /* ── WEAPON SWITCH FLASH ── */
+    @keyframes weaponSwitchFlash{
+      0%  {transform:scale(1.3);opacity:1}
+      100%{transform:scale(1);opacity:0}
+    }
+    .weapon-btn.just-switched::after{
+      content:'';position:absolute;inset:0;border-radius:11px;
+      background:rgba(0,255,136,.25);
+      animation:weaponSwitchFlash 0.3s ease-out forwards;
+      pointer-events:none;
+    }
+
+
+    /* ── SHIP LEVEL BANNER IN UPGRADE SCREEN ── */
+    .ship-lvl-banner{display:flex;align-items:center;justify-content:space-between;background:rgba(255,215,0,.06);border:1.5px solid rgba(255,215,0,.2);border-radius:14px;padding:12px 14px;margin-bottom:12px;gap:12px}
+    .ship-lvl-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .ship-lvl-ico{font-size:28px;line-height:1}
+    .ship-lvl-label{font-size:7px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
+    .ship-lvl-num{font-size:20px;font-weight:900;color:var(--gold);font-family:"Orbitron",monospace;text-shadow:0 0 12px rgba(255,215,0,.5);line-height:1}
+    .ship-lvl-right{flex:1;min-width:0}
+    .ship-xp-label{font-size:7px;color:rgba(255,215,0,.4);font-family:"Orbitron",monospace;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase}
+    .ship-xp-bar-wrap{height:6px;background:rgba(255,215,0,.1);border-radius:3px;overflow:hidden;margin-bottom:4px}
+    .ship-xp-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),#ff9900);border-radius:3px;transition:width .4s ease;box-shadow:0 0 6px rgba(255,215,0,.4)}
+    .ship-xp-nums{font-size:8px;color:rgba(255,215,0,.5);font-family:"Orbitron",monospace;text-align:right}
+    /* ── ACHIEVEMENT TOAST ── */
+    #achieveToast{position:absolute;top:80px;left:50%;transform:translateX(-50%);background:rgba(8,18,35,.96);border:1.5px solid var(--gold);border-radius:14px;padding:10px 20px;display:none;z-index:25;text-align:center;box-shadow:0 0 30px rgba(255,215,0,.3);backdrop-filter:blur(10px);animation:slideDown .4s ease}
+    @keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .ach-lbl{font-size:8px;color:rgba(255,215,0,.6);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:2px}
+    .ach-name{font-size:14px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace}
+
+    /* ══════════════════════════════════
+       SCREENS
+    ══════════════════════════════════ */
+    .screen{position:absolute;inset:0;background:rgba(4,4,15,.97);display:none;align-items:center;justify-content:center;z-index:30;backdrop-filter:blur(16px);padding:12px;overflow-y:auto;pointer-events:all;touch-action:auto}
+    .screen.active{display:flex}
+
+    /* Common card */
+    .card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;max-width:400px;width:100%;box-shadow:0 10px 60px rgba(0,255,136,.12);max-height:94vh;overflow-y:auto;touch-action:auto}
+
+    /* Screen titles */
+    .screen-title{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;text-align:center;margin-bottom:2px;line-height:1.1}
+    .screen-title.green{background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .screen-title.gold{background:linear-gradient(135deg,var(--gold),#ff9900);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .screen-title.purple{background:linear-gradient(135deg,var(--purple),#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .screen-title.cyan{background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .screen-sub{text-align:center;font-size:9px;color:rgba(0,255,136,.4);font-family:'Orbitron',monospace;letter-spacing:3px;margin-bottom:18px}
+
+    /* Buttons */
+    .btn{border:none;cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;letter-spacing:1.5px;border-radius:40px;transition:all .2s;display:block;width:100%;text-align:center}
+    .btn:active{transform:scale(.95)}
+    .btn-primary{background:linear-gradient(135deg,var(--green),var(--cyan));color:#04040f;font-size:14px;padding:13px;box-shadow:0 4px 20px rgba(0,255,136,.35)}
+    .btn-primary:disabled{background:rgba(255,255,255,.08);color:rgba(255,255,255,.25);cursor:not-allowed;box-shadow:none}
+    .btn-secondary{background:transparent;border:1.5px solid var(--border);color:var(--green);font-size:11px;padding:10px}
+    .btn-gold{border-color:rgba(255,215,0,.4);color:var(--gold)}
+    .btn-cyan{border-color:rgba(0,212,255,.4);color:var(--cyan)}
+    .btn-purple{border-color:rgba(168,85,247,.4);color:var(--purple)}
+    .btn-red{border-color:rgba(255,0,102,.4);color:var(--pink)}
+
+    /* ── DIFFICULTY SCREEN REDESIGN ── */
+    .main-hero{text-align:center;padding:10px 0 6px;position:relative}
+    .main-title{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;line-height:1;letter-spacing:4px;background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;margin-bottom:2px}
+    .main-sub{font-size:8px;color:rgba(0,212,255,0.5);font-family:'Orbitron',monospace;letter-spacing:5px;text-transform:uppercase;margin-bottom:10px}
+    .main-ship-preview{width:60px;height:60px;margin:0 auto 8px;position:relative}
+    .main-ship-preview canvas{display:block}
+    .best-score-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:4px 12px;font-family:'Orbitron',monospace;font-size:10px;color:var(--gold);margin-bottom:12px}
+
+    .diff-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
+    .diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+    .diff-item::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(circle at center,rgba(0,255,136,.12),transparent 70%)}
+    .diff-item:active{transform:scale(.95)}
+    .diff-item.selected{border-color:var(--green);background:rgba(0,255,136,.1);box-shadow:0 0 18px rgba(0,255,136,.2)}
+    .diff-item.selected::before{opacity:1}
+    .diff-icon{font-size:24px;margin-bottom:3px;display:block}
+    .diff-name{font-size:12px;font-weight:700;color:var(--green);font-family:'Orbitron',monospace;margin-bottom:1px}
+    .diff-desc{font-size:9px;color:rgba(255,255,255,.45);line-height:1.3}
+    .diff-badge{font-size:8px;padding:1px 6px;border-radius:8px;border:1px solid;font-family:'Orbitron',monospace;vertical-align:middle;display:block;margin-top:3px}
+    .diff-badge.nm{color:var(--pink);border-color:var(--pink)}
+
+    .auto-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(8,18,35,.5);border-radius:10px;border:1px solid rgba(0,255,136,.1);margin-bottom:10px;cursor:pointer}
+    .auto-row-lbl{font-size:11px;font-family:'Rajdhani',sans-serif;color:var(--green)}
+    .auto-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green)}
+
+    .start-btn-wrap{margin-bottom:10px}
+
+    .nav-menu{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .nav-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:9px 4px 7px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:3px;letter-spacing:.5px}
+    .nav-btn:active{transform:scale(.93)}
+    .nav-btn .nav-ico{font-size:20px;display:block}
+    .nav-btn.gold{border-color:rgba(255,215,0,.25);color:var(--gold)}
+    .nav-btn.cyan{border-color:rgba(0,212,255,.25);color:var(--cyan)}
+    .nav-btn.purple{border-color:rgba(168,85,247,.25);color:var(--purple)}
+    .nav-btn.green{border-color:rgba(0,255,136,.25);color:var(--green)}
+
+    /* animated glow rings on main title */
+    @keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(0,255,136,.4)}50%{text-shadow:0 0 60px rgba(0,255,136,.7),0 0 100px rgba(0,212,255,.3)}}
+    .diff-item{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,255,136,.12);border-radius:14px;padding:10px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+
+    /* ── CUSTOMIZE SCREEN - ship preview ── */
+    .ship-preview-wrap{background:rgba(4,4,15,.8);border:1.5px solid rgba(0,255,136,.2);border-radius:14px;padding:10px;margin-bottom:14px;text-align:center;position:relative}
+    .ship-preview-lbl{font-size:8px;color:rgba(0,255,136,.45);font-family:'Orbitron',monospace;letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
+    #shipPreviewCanvas{display:block;margin:0 auto;border-radius:8px}
+
+
+    /* ── GAME OVER SCREEN ── */
+    .score-block{background:rgba(8,18,35,.7);border:1px solid rgba(0,255,136,.15);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+    .score-lbl{font-size:10px;color:rgba(0,255,136,.55);font-family:'Orbitron',monospace;letter-spacing:1px}
+    .score-val{font-size:26px;font-weight:900;color:var(--green);font-family:'Orbitron',monospace;text-shadow:0 0 12px rgba(0,255,136,.4)}
+    .score-val.record{color:var(--gold);text-shadow:0 0 12px rgba(255,215,0,.4)}
+    .new-record{display:inline-block;font-size:9px;color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:1px 8px;font-family:'Orbitron',monospace;margin-left:6px;animation:blink 1s infinite}
+    @keyframes blink{50%{opacity:.3}}
+    .ach-badges{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}
+    .ach-badge{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid;font-family:'Rajdhani',sans-serif;font-weight:700}
+    .ach-badge.unlocked{color:var(--gold);border-color:rgba(255,215,0,.5);background:rgba(255,215,0,.08)}
+    .ach-badge.locked{color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.1)}
+    .coins-earned{text-align:center;color:var(--gold);font-size:13px;font-family:'Orbitron',monospace;padding:8px;background:rgba(255,215,0,.06);border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,215,0,.15)}
+
+    /* ── UPGRADE SCREEN ── */
+    .coins-banner{text-align:center;color:var(--gold);font-size:16px;font-family:'Orbitron',monospace;margin-bottom:14px;padding:8px;background:rgba(255,215,0,.07);border-radius:10px;border:1px solid rgba(255,215,0,.2)}
+    /* ── UPGRADE CARD ── */
+    .upg-item{
+      background:rgba(5,10,25,.75);
+      border:1.5px solid rgba(255,215,0,.12);
+      border-radius:14px;padding:11px 12px;margin-bottom:8px;
+      display:flex;align-items:center;gap:10px;
+      transition:border-color .2s, background .2s;
+      position:relative;overflow:hidden;
+    }
+    .upg-item::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,215,0,.03),transparent 60%);pointer-events:none}
+    .upg-item.can-buy{border-color:rgba(255,215,0,.3);}
+    .upg-item.can-buy::after{content:'';position:absolute;inset:0;border-radius:13px;box-shadow:inset 0 0 14px rgba(255,215,0,.05);pointer-events:none}
+    .upg-item.maxed{border-color:rgba(0,255,136,.25);background:rgba(0,20,10,.7)}
+
+    /* Иконка */
+    .upg-icon{font-size:26px;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(255,215,0,.3))}
+    .upg-item.maxed .upg-icon{filter:drop-shadow(0 0 6px rgba(0,255,136,.4))}
+
+    /* Название */
+    .upg-name{font-size:12px;font-weight:700;color:var(--gold);font-family:'Orbitron',monospace;margin-bottom:3px;display:flex;align-items:center;gap:5px}
+    .upg-lvl-badge{font-size:9px;color:rgba(255,255,255,.3);font-weight:400;font-family:'Orbitron',monospace;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:8px}
+
+    /* Строка бонусов */
+    .upg-bonus-line{font-size:10px;margin-bottom:4px;display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+    .bonus-cur{color:rgba(255,255,255,.45)}
+    .bonus-arrow{color:rgba(255,255,255,.2);font-size:9px}
+    .bonus-next{color:#4dffb0;font-weight:700}
+    .upg-item.maxed .bonus-cur{color:rgba(0,255,136,.7)}
+
+    /* Сегменты прогресса */
+    .upg-segs{display:flex;gap:2px;height:4px}
+    .seg{flex:1;border-radius:2px;background:rgba(255,255,255,.08);transition:background .25s}
+    .seg.seg-done{background:var(--gold);box-shadow:0 0 4px rgba(255,215,0,.5)}
+    .seg.seg-next{background:rgba(255,215,0,.25);border:1px dashed rgba(255,215,0,.4)}
+    .upg-item.maxed .seg.seg-done{background:var(--green);box-shadow:0 0 4px rgba(0,255,136,.4)}
+
+    /* Кнопка */
+    .upg-btn{
+      background:linear-gradient(135deg,var(--gold),#ff9900);
+      border:none;color:#04040f;font-weight:700;font-size:10px;
+      font-family:'Orbitron',monospace;padding:6px 10px;border-radius:12px;
+      cursor:pointer;white-space:nowrap;flex-shrink:0;
+      transition:all .18s;text-align:center;line-height:1.2;
+    }
+    .upg-btn-inner{display:flex;flex-direction:column;align-items:center;gap:1px}
+    .upg-cost{font-size:9px;opacity:.85}
+    .upg-btn:active{transform:scale(.9)}
+    .upg-btn:disabled{background:rgba(255,255,255,.07);color:rgba(255,255,255,.2);cursor:not-allowed;box-shadow:none}
+    .upg-btn.maxed{background:linear-gradient(135deg,#00ff88,#00d4ff);color:#04040f;font-size:14px;padding:5px 8px}
+
+    /* ── LEADERBOARD ── */
+    .lb-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:6px;background:rgba(8,18,35,.5);border:1px solid rgba(0,212,255,.12);transition:all .2s}
+    .lb-row.me{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07)}
+    .lb-rank{font-size:18px;font-family:'Orbitron',monospace;font-weight:900;min-width:30px;text-align:center}
+    .lb-info{flex:1;overflow:hidden}
+    .lb-name{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .lb-sub{font-size:10px;color:rgba(255,255,255,.35)}
+    .lb-score{font-size:15px;font-weight:700;color:var(--cyan);font-family:'Orbitron',monospace}
+    .lb-loading{text-align:center;color:rgba(0,212,255,.5);font-size:12px;padding:20px;font-family:'Orbitron',monospace;letter-spacing:1px}
+
+    /* ── CUSTOMIZE SCREEN ── */
+    .cust-section{margin-bottom:16px}
+    .cust-lbl{color:var(--green);font-size:12px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:1px}
+    .color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+    .color-opt{aspect-ratio:1;border-radius:10px;border:2px solid rgba(0,255,136,.15);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;position:relative}
+    .color-opt i{position:absolute;color:#fff;font-size:14px;opacity:0;transition:opacity .2s;text-shadow:0 1px 4px #0008}
+    .color-opt.sel{border-color:var(--green);box-shadow:0 0 14px rgba(0,255,136,.4);transform:scale(1.08)}
+    .color-opt.sel i{opacity:1}
+    .color-opt:active{transform:scale(.92)}
+    .trail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .trail-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,255,255,.65);font-weight:700}
+    .trail-opt:active{transform:scale(.94)}
+    .trail-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12);color:var(--green)}
+
+    /* Updated shape grid - 3 cols */
+    .shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .shape-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
+    .shape-opt:active{transform:scale(.94)}
+    .shape-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+    .shape-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+    .shape-desc{color:rgba(255,255,255,.45);font-size:9px}
+    .style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .style-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center}
+    .style-opt:active{transform:scale(.94)}
+    .style-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+    .style-name{color:var(--green);font-size:11px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+    .style-desc{color:rgba(255,255,255,.45);font-size:9px}
+    .toggle-row{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer}
+    .toggle-row input{width:16px;height:16px;accent-color:var(--green)}
+    .toggle-row label{color:var(--green);font-size:12px;cursor:pointer}
+
+    /* ── SKIN SCREEN ── */
+    .skin-grid{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+    .skin-rarity-header{display:flex;align-items:center;gap:6px;font-family:'Orbitron',monospace;font-size:9px;font-weight:800;letter-spacing:1.5px;padding:8px 0 4px;white-space:nowrap}
+    .skin-stats{font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,255,255,.4);text-align:center;margin-bottom:8px;letter-spacing:1px}
+    .skin-item{background:rgba(8,18,35,.7);border:2px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 8px 10px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden}
+    .skin-item.ok{border-color:rgba(255,255,255,.2)}
+    .skin-item.active{box-shadow:0 0 16px rgba(255,255,255,.2)}
+    .skin-item.locked{opacity:.45;cursor:not-allowed}
+    .skin-icon{font-size:30px;margin-bottom:4px;display:block}
+    .skin-name{font-size:10px;font-weight:800;font-family:'Orbitron',monospace;margin-bottom:3px;letter-spacing:.5px}
+    .skin-req{font-size:8px;color:rgba(255,255,255,.4);line-height:1.3}
+    .skin-unlocked{font-size:8px;color:var(--green)}
+    .skin-active-badge{position:absolute;top:5px;right:5px;font-size:8px;border:1px solid;border-radius:6px;padding:1px 5px;font-family:'Orbitron',monospace}
+    /* Achievement flash */
+    @keyframes achFlashAnim{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+    /* Wave announcer */
+    @keyframes waveIn{0%{opacity:0;transform:translateX(-50%) scale(.8)}20%{opacity:1;transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) scale(.95)}}
+    #waveAnnounce{position:fixed;top:18%;left:50%;transform:translateX(-50%);pointer-events:none;z-index:50;text-align:center;display:none}
+    #waveAnnounce.wave-show{display:block;animation:waveIn 3s ease forwards}
+    .wave-title{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;color:#fff;text-shadow:0 0 20px rgba(0,255,136,.8),0 0 40px rgba(0,212,255,.4);letter-spacing:2px}
+    .wave-sub{font-family:'Orbitron',monospace;font-size:11px;color:rgba(255,255,255,.7);margin-top:4px;letter-spacing:1px}
+    /* Daily challenge */
+    .daily-header{font-family:'Orbitron',monospace;font-size:10px;font-weight:800;color:#ffd700;letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+    .daily-desc{font-size:11px;color:rgba(255,255,255,.8);margin-bottom:4px}
+    .daily-reward{font-family:'Orbitron',monospace;font-size:10px;color:#00ff88}
+    .daily-reward.done{color:#ffd700}
+    .daily-streak{color:#ff6600;font-size:9px}
+    /* Post-game stats */
+    .go-stat{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.7)}
+    .go-stat span:last-child{font-family:'Orbitron',monospace;color:#00ff88;font-size:10px}
+
+    /* ── TOUCH HINT ── */
+    .touch-hint{position:absolute;bottom:82px;left:50%;transform:translateX(-50%);color:rgba(0,255,136,.4);font-size:11px;font-family:'Orbitron',monospace;text-align:center;pointer-events:none;z-index:5;animation:fadeOut 4s ease forwards;letter-spacing:1px;white-space:nowrap}
+    @keyframes fadeOut{0%,60%{opacity:1}100%{opacity:0}}
+
+    /* ── RESET CONFIRM OVERLAY ── */
+    #resetConfirm{position:fixed;inset:0;background:rgba(4,4,15,.92);display:none;align-items:center;justify-content:center;z-index:60;backdrop-filter:blur(18px)}
+    #resetConfirm.show{display:flex}
+    .reset-card{background:var(--card);border:2px solid rgba(255,0,102,.4);border-radius:20px;padding:28px 24px;max-width:300px;width:90%;text-align:center;box-shadow:0 0 60px rgba(255,0,102,.2)}
+    .reset-title{font-family:'Orbitron',monospace;font-size:20px;color:var(--pink);text-shadow:0 0 15px var(--pink);margin-bottom:8px;letter-spacing:2px}
+    .reset-sub{font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px;line-height:1.5}
+    .reset-btns{display:flex;gap:10px}
+    .reset-btns .btn{font-size:11px;padding:11px}
+
+    /* ── UPGRADE CATEGORIES ── */
+    .upg-cat{font-size:9px;font-family:'Orbitron',monospace;color:rgba(0,255,136,.4);letter-spacing:3px;text-transform:uppercase;margin:14px 0 6px;padding:0 2px;border-bottom:1px solid rgba(0,255,136,.1);padding-bottom:4px}
+    .upg-cat:first-child{margin-top:0}
+    .upg-item.locked-upg{opacity:.5;pointer-events:none}
+    .upg-item.locked-upg .upg-btn{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
+    .upg-req{font-size:9px;color:rgba(255,100,100,.7);margin-top:2px}
+
+    /* ── РЕЛЬСА — кнопка в перезарядке ── */
+    .weapon-btn.rail-cd{border-color:rgba(0,255,204,.3)!important;background:rgba(0,255,204,.05)!important;opacity:.75}
+    .weapon-btn.rail-cd .weapon-lbl{color:#00ffcc!important;font-size:6px!important;letter-spacing:0}
+
+    /* ── WEAPON SELECT GRID ── */
+    .weapon-select-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .wpn-sel-opt{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+    .wpn-sel-opt:active{transform:scale(.94)}
+    .wpn-sel-opt.sel{border-color:var(--green);background:rgba(0,255,136,.12)}
+    .wpn-sel-opt.disabled{opacity:.35;cursor:not-allowed;border-color:rgba(255,255,255,.07)}
+    .wpn-sel-ico{font-size:22px;margin-bottom:3px;display:block}
+    .wpn-sel-name{color:var(--green);font-size:9px;font-family:'Orbitron',monospace;font-weight:700;margin-bottom:2px}
+    .wpn-sel-desc{color:rgba(255,255,255,.4);font-size:8px;line-height:1.3}
+    .wpn-sel-badge{position:absolute;top:4px;right:5px;width:16px;height:16px;border-radius:50%;background:var(--green);color:#04040f;font-size:9px;font-family:'Orbitron',monospace;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+    .wpn-sel-opt.sel .wpn-sel-badge{opacity:1}
+
+    /* ── STARFIELD SCREEN ── */
+    #difficultyScreen{overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:12px 12px 20px;background:transparent;backdrop-filter:none}
+
+    /* ══════════════════════════════════════════
+       SKILL TREE — полный редизайн
+    ══════════════════════════════════════════ */
+    .skill-points-banner{
+      text-align:center;color:#00ffcc;font-size:14px;
+      font-family:'Orbitron',monospace;margin-bottom:12px;padding:8px 12px;
+      background:rgba(0,255,204,.06);border-radius:12px;
+      border:1px solid rgba(0,255,204,.2);
+    }
+
+    /* ── Слоты активных навыков сверху ── */
+    /* ══════════════════════════════════════════
+       SKILL TREE — полный редизайн, список
+       ══════════════════════════════════════════ */
+
+    /* Шапка: слоты */
+    .skt-header{display:flex;gap:8px;margin-bottom:14px;padding:10px 12px;background:rgba(0,0,0,.35);border-radius:12px;border:1px solid rgba(255,255,255,.07)}
+    .skt-header-col{flex:1;min-width:0}
+    .skt-header-label{font-size:8px;font-family:'Orbitron',monospace;letter-spacing:2px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:6px}
+    .skt-cnt{color:rgba(255,255,255,.55);background:rgba(255,255,255,.08);padding:1px 6px;border-radius:6px;letter-spacing:0;margin-left:4px}
+    .skt-slots-row{display:flex;flex-direction:column;gap:4px}
+    .skt-active-slot,.skt-passive-slot{
+      display:flex;align-items:center;gap:7px;
+      padding:5px 8px;border-radius:8px;
+      border:1.5px dashed rgba(255,255,255,.12);
+      background:rgba(255,255,255,.03);
+      min-height:30px;font-size:12px;
+    }
+    .skt-active-slot.filled{border-style:solid;border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.06);}
+    .skt-passive-slot.filled{border-style:solid;border-color:rgba(0,255,136,.35);background:rgba(0,255,136,.05);}
+    .skt-slot-ico{font-size:16px;line-height:1;flex-shrink:0}
+    .skt-slot-name{font-size:9px;font-family:'Orbitron',monospace;font-weight:700;color:var(--green);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .skt-active-slot.filled .skt-slot-name{color:#00d4ff}
+    .skt-slot-key{font-size:8px;font-family:'Orbitron',monospace;color:rgba(0,212,255,.8);background:rgba(0,212,255,.12);padding:1px 5px;border-radius:5px;flex-shrink:0}
+    .skt-slot-empty{font-size:9px;color:rgba(255,255,255,.18);font-style:italic}
+
+    /* Секция */
+    .skt-section{margin-bottom:12px}
+    .skt-section-title{
+      font-size:9px;font-family:'Orbitron',monospace;color:rgba(0,255,204,.5);
+      letter-spacing:2.5px;text-transform:uppercase;
+      padding:6px 0 5px;border-bottom:1px solid rgba(0,255,204,.1);margin-bottom:6px;
+    }
+
+    /* Строка навыка */
+    .skt-row{
+      display:flex;align-items:flex-start;gap:10px;
+      padding:9px 10px;margin-bottom:5px;
+      border-radius:11px;border:1px solid rgba(255,255,255,.07);
+      background:rgba(5,12,30,.7);transition:background .18s,border-color .18s;
+      position:relative;overflow:hidden;
+    }
+    .skt-row::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,255,136,.02),transparent 60%);pointer-events:none}
+    .skt-row.learned{border-color:rgba(255,215,0,.3);background:rgba(18,14,0,.85)}
+    .skt-row.learned::before{background:linear-gradient(90deg,rgba(255,215,0,.04),transparent 60%)}
+    .skt-row.available{border-color:rgba(0,255,136,.22);background:rgba(0,12,0,.7)}
+    .skt-row.available:hover{border-color:rgba(0,255,136,.45);background:rgba(0,20,5,.85)}
+    .skt-row.locked{opacity:.35}
+    .skt-row.blocked{opacity:.5}
+
+    .skt-ico{font-size:24px;line-height:1;flex-shrink:0;margin-top:1px;filter:drop-shadow(0 0 5px rgba(0,255,136,.2))}
+    .skt-row.learned .skt-ico{filter:drop-shadow(0 0 7px rgba(255,215,0,.45))}
+    .skt-info{flex:1;min-width:0}
+    .skt-name{font-size:11px;font-family:'Orbitron',monospace;font-weight:700;color:var(--green);margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .skt-row.learned .skt-name{color:#ffd700}
+    .skt-cd{font-size:8.5px;color:rgba(0,212,255,.65);font-family:'Orbitron',monospace;background:rgba(0,212,255,.08);padding:1px 6px;border-radius:5px}
+    .skt-desc{font-size:10px;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:5px}
+    .skt-status{font-size:9px;font-family:'Orbitron',monospace;font-weight:700;padding:3px 8px;border-radius:7px;display:inline-flex;align-items:center;gap:4px}
+    .skt-active{color:#ffd700;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25)}
+    .skt-remove{font-size:8px;opacity:.6;font-weight:400;margin-left:3px}
+    .skt-buy{color:#00ff88;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3)}
+    .skt-locked{color:rgba(255,255,255,.25);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+    .skt-blocked{color:rgba(255,80,80,.6);background:rgba(255,0,0,.05);border:1px solid rgba(255,0,0,.1)}
+    .skt-nopt{color:rgba(255,255,255,.3);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)}
+
+    /* ── UPGRADE TABS ── */
+    .upg-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+    .upg-tab{background:rgba(8,18,35,.6);border:1.5px solid rgba(0,255,136,.15);border-radius:10px;padding:6px 8px;font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.4);cursor:pointer;flex:1;min-width:40px;text-align:center;line-height:1.4;transition:all .2s}
+    .upg-tab.active{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
+    .upg-tab span{font-size:6.5px;letter-spacing:.5px}
+
+    /* ── SKILL TYPE TAGS ── */
+    .skill-type-tag{font-size:7px;font-family:'Orbitron',monospace;letter-spacing:.5px;padding:2px 6px;border-radius:6px;display:inline-block;margin:2px 0 3px}
+    .passive-tag{background:rgba(168,85,247,.2);color:#a855f7;border:1px solid rgba(168,85,247,.3)}
+    .active-tag{background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.25)}
+
+    /* ══════════════════════════════════════════
+       ПАССИВНЫЕ НАВЫКИ В БОЮ — стили перенесены в MOBILE COMBAT UX
+    ══════════════════════════════════════════ */
+
+    /* ── АКТИВНЫЙ НАВЫК В БОЮ — стили перенесены в MOBILE COMBAT UX ── */
+    /* ask-wrap и ask-card переопределены выше в MOBILE COMBAT UX */
+    .ask-wrap.ask-active .ask-card{
+      border-color:rgba(0,255,136,.6);
+      box-shadow:0 0 24px rgba(0,255,136,.35),inset 0 1px 0 rgba(255,255,255,.08);
+      animation:activeGlow 1.2s infinite alternate;
+    }
+    @keyframes activeGlow{from{box-shadow:0 0 18px rgba(0,255,136,.3)}to{box-shadow:0 0 32px rgba(0,255,136,.6)}}
+    .ask-wrap.ask-ready .ask-card{
+      border-color:rgba(0,212,255,.6);
+      box-shadow:0 0 20px rgba(0,212,255,.3),inset 0 1px 0 rgba(255,255,255,.08);
+      animation:readyGlow .9s infinite alternate;
+    }
+    @keyframes readyGlow{from{box-shadow:0 0 16px rgba(0,212,255,.2)}to{box-shadow:0 0 28px rgba(0,212,255,.55)}}
+    .ask-wrap.ask-cd .ask-card{ border-color:rgba(255,255,255,.1);opacity:.7; }
+    .ask-ring-svg{
+      position:absolute;inset:0;width:100%;height:100%;
+      pointer-events:none;
+    }
+    #ui.ui-visible{ display:block; }
+    .ask-ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:3}
+    .ask-ring-fill{fill:none;stroke:#00d4ff;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .1s linear}
+    .ask-ring-ready{fill:none;stroke:rgba(0,255,136,.5);stroke-width:3}
+    .ask-ring-active{fill:none;stroke:rgba(0,255,136,.8);stroke-width:3;stroke-dasharray:4 2}
+    @keyframes skillReadyFlash{0%{box-shadow:0 0 0 0 rgba(0,255,136,.8)}50%{box-shadow:0 0 0 8px rgba(0,255,136,.0)}100%{box-shadow:0 0 16px rgba(0,212,255,.3)}}
+    .ask-wrap.ask-ready .ask-card{ animation:readyGlow .9s infinite alternate,skillReadyFlash .4s ease-out; }
+    /* ask-ico переопределён выше */
+    .ask-wrap.ask-ready .ask-ico{filter:drop-shadow(0 0 8px rgba(0,212,255,.8))}
+    .ask-wrap.ask-active .ask-ico{filter:drop-shadow(0 0 10px rgba(0,255,136,.9))}
+    .ask-cd-txt{
+      font-size:7px;font-family:'Orbitron',monospace;font-weight:700;
+      color:rgba(255,255,255,.55);z-index:1;position:relative;line-height:1;
+    }
+    .ask-eff-txt{
+      font-size:7px;font-family:'Orbitron',monospace;font-weight:700;
+      color:#00ff88;z-index:1;position:relative;line-height:1;
+      text-shadow:0 0 8px rgba(0,255,136,.6);
+    }
+    .ask-ready-badge{
+      position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+      background:rgba(0,212,255,.9);color:#000;
+      font-size:5px;font-family:'Orbitron',monospace;font-weight:900;
+      padding:2px 4px;border-radius:3px;white-space:nowrap;letter-spacing:.5px;
+    }
+    .ask-key-badge{
+      position:absolute;top:-5px;right:-5px;
+      background:rgba(0,212,255,.9);color:#000;
+      font-size:7px;font-family:'Orbitron',monospace;font-weight:900;
+      padding:2px 5px;border-radius:5px;z-index:2;
+    }
+    .ask-label{
+      font-size:6px;font-family:'Orbitron',monospace;
+      color:rgba(255,255,255,.35);letter-spacing:.5px;
+      text-align:center;margin-top:2px;white-space:nowrap;
+    }
+    @keyframes skillIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+    @keyframes skillRingRotate{from{stroke-dashoffset:0}to{stroke-dashoffset:-60}}
+    /* Прячем кнопку АВТО */
+    #autoBtn{ display:none !important; }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
+
+    /* ── FLEX UTILS ── */
+    .flex{display:flex}.gap2{gap:8px}.mt1{margin-top:8px}.mt2{margin-top:12px}.mt3{margin-top:16px}.w100{width:100%}.grow{flex:1}
+
+    /* ── SETTINGS SCREEN ── */
+    .settings-block{background:rgba(8,18,35,.6);border:1px solid rgba(0,212,255,.12);border-radius:14px;padding:14px;margin-bottom:10px}
+    .settings-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .settings-lbl{font-size:11px;color:rgba(255,255,255,.7);font-family:"Orbitron",monospace;letter-spacing:.5px}
+    .settings-val{font-size:12px;color:var(--cyan);font-family:"Orbitron",monospace;font-weight:700;min-width:40px;text-align:right}
+    .settings-slider{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(0,212,255,.15);outline:none;cursor:pointer}
+    .settings-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--green));cursor:pointer;box-shadow:0 0 8px rgba(0,212,255,.5)}
+
+    .music-style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .music-style-btn{background:rgba(8,18,35,.7);border:1.5px solid rgba(0,212,255,.15);border-radius:12px;padding:10px 6px;cursor:pointer;transition:all .2s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+    .music-style-btn:active{transform:scale(.93)}
+    .music-style-btn.active{border-color:var(--cyan);background:rgba(0,212,255,.12);box-shadow:0 0 14px rgba(0,212,255,.25)}
+    .ms-ico{font-size:22px;display:block}
+    .ms-name{font-size:8px;font-family:"Orbitron",monospace;font-weight:700;color:var(--cyan);letter-spacing:.5px}
+    .ms-desc{font-size:7px;color:rgba(255,255,255,.4);font-family:"Rajdhani",sans-serif}
+
+    /* ── SUGGEST SCREEN ── */
+    .suggest-cats{display:flex;flex-wrap:wrap;gap:6px}
+    .suggest-cat{background:rgba(8,18,35,.7);border:1.5px solid rgba(255,100,100,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-family:"Orbitron",monospace;color:rgba(255,100,100,.6);cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+    .suggest-cat:active{transform:scale(.93)}
+    .suggest-cat.active{border-color:#ff6464;color:#ff6464;background:rgba(255,100,100,.1);box-shadow:0 0 10px rgba(255,100,100,.2)}
+    .suggest-textarea{width:100%;min-height:120px;background:rgba(4,4,15,.8);border:1.5px solid rgba(255,100,100,.2);border-radius:10px;color:rgba(255,255,255,.85);font-family:"Rajdhani",sans-serif;font-size:13px;padding:10px;resize:none;outline:none;transition:border-color .2s;line-height:1.5}
+    .suggest-textarea:focus{border-color:#ff6464}
+    .suggest-counter{text-align:right;font-size:9px;color:rgba(255,255,255,.3);font-family:"Orbitron",monospace;margin-top:4px}
+    .suggest-status{padding:10px 14px;border-radius:10px;font-size:11px;font-family:"Orbitron",monospace;text-align:center}
+    .suggest-status.success{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:var(--green)}
+    .suggest-status.error{background:rgba(255,0,102,.08);border:1px solid rgba(255,0,102,.25);color:var(--pink)}
+    .suggest-status.loading{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan)}
+
+    /* ══════════════════════════════════════
+       NEW MAIN MENU
+    ══════════════════════════════════════ */
+    .menu-card{position:relative;z-index:1;width:calc(100% - 24px);max-width:420px;padding:20px 16px 16px;display:flex;flex-direction:column;gap:0;background:rgba(8,18,35,.88);border:1.5px solid rgba(0,255,136,.3);border-radius:22px;box-shadow:0 0 40px rgba(0,255,136,.14),0 0 80px rgba(0,212,255,.08),inset 0 0 30px rgba(0,255,136,.04);backdrop-filter:blur(14px);margin:auto;flex-shrink:0}
+
+    /* Hero */
+    .menu-hero{display:flex;flex-direction:column;align-items:center;padding:8px 0 16px;gap:6px}
+    .menu-ship-canvas{filter:drop-shadow(0 0 18px rgba(0,255,136,.7));animation:menuShipFloat 3s ease-in-out infinite}
+    @keyframes menuShipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    .menu-title-wrap{text-align:center;line-height:1}
+    .menu-title{font-family:'Orbitron',monospace;font-size:38px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,#00ff88 0%,#00d4ff 50%,#a855f7 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.05}
+    .menu-title--second{font-size:28px;letter-spacing:10px;background:linear-gradient(135deg,#a855f7,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .menu-tagline{font-size:8px;letter-spacing:5px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;margin-top:4px;text-transform:uppercase}
+    .menu-score-row{display:flex;gap:8px;align-items:center}
+    .menu-stat-pill{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.25);border-radius:20px;padding:4px 14px;font-family:'Orbitron',monospace;font-size:11px;color:var(--gold)}
+
+    /* Big start button */
+    .menu-start-btn{position:relative;width:100%;padding:18px;background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,212,255,.1));border:2px solid rgba(0,255,136,.5);border-radius:18px;font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#00ff88;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;overflow:hidden;transition:all .2s;margin-bottom:12px;text-shadow:0 0 20px rgba(0,255,136,.6);box-shadow:0 0 30px rgba(0,255,136,.15),inset 0 0 30px rgba(0,255,136,.05)}
+    .menu-start-btn:active{transform:scale(.97)}
+    .menu-start-btn:hover,.menu-start-btn:focus{border-color:rgba(0,255,136,.8);box-shadow:0 0 40px rgba(0,255,136,.3),inset 0 0 30px rgba(0,255,136,.08)}
+    .menu-start-ico{font-size:22px}
+    .menu-start-txt{flex:1;text-align:center}
+    .menu-start-pulse{position:absolute;inset:0;border-radius:16px;background:transparent;border:2px solid rgba(0,255,136,.3);animation:startPulse 2s ease-out infinite;pointer-events:none}
+    @keyframes startPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.06);opacity:0}}
+
+    /* Nav grid */
+    .menu-nav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px}
+    .menu-nav-btn{background:rgba(8,18,35,.75);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 6px 10px;cursor:pointer;transition:all .18s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+    .menu-nav-btn:active{transform:scale(.92);background:rgba(0,255,136,.07)}
+    .menu-nav-ico{font-size:22px;line-height:1}
+    .menu-nav-lbl{font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.55);letter-spacing:.8px}
+
+    /* Suggest button */
+    .menu-suggest-btn{width:100%;padding:10px;background:rgba(255,100,100,.05);border:1.5px solid rgba(255,100,100,.2);border-radius:12px;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,100,100,.65);letter-spacing:1px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+    .menu-suggest-btn:active{background:rgba(255,100,100,.1);border-color:rgba(255,100,100,.4)}
+
+    /* Difficulty modal */
+    .diff-modal{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,4,15,.7);backdrop-filter:blur(8px);animation:diffModalIn .25s ease}
+    @keyframes diffModalIn{from{opacity:0}to{opacity:1}}
+    .diff-modal-card{background:rgba(8,12,28,.97);border:1.5px solid rgba(0,255,136,.2);border-radius:24px;padding:24px 20px;width:90%;max-width:400px;animation:diffCardUp .3s cubic-bezier(.22,.68,0,1.2)}
+    @keyframes diffCardUp{from{transform:scale(.85) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+    .diff-modal-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--green);letter-spacing:2px;text-align:center;margin-bottom:16px}
+    .diff-modal-actions{display:flex;gap:10px;margin-top:14px}
+    .diff-modal-actions .btn{flex:1;padding:14px}
+
+  </style>
 </head>
 <body>
 
@@ -936,6 +966,8 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
   </div>
 </div>
 
+<!-- Wave announcer -->
+<div id="waveAnnounce"></div>
 <!-- ═══ HUD ═══ -->
 <div id="ui">
   <svg width="0" height="0" style="position:absolute">
@@ -975,7 +1007,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
           <svg class="mission-ring-svg" viewBox="0 0 32 32">
             <circle class="mission-ring-bg" cx="16" cy="16" r="13"/>
             <circle class="mission-ring-fill" id="missionRingFill" cx="16" cy="16" r="13"
-              stroke-dasharray="81.68" stroke-dashoffset="81.68"/>
+                    stroke-dasharray="81.68" stroke-dashoffset="81.68"/>
           </svg>
           <div class="mission-ring-num" id="levelVal">1</div>
         </div>
@@ -1116,6 +1148,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
       </button>
     </div>
 
+    <div id="dailyChallengeBlock" style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:10px 12px;margin-bottom:8px"></div>
     <button class="menu-suggest-btn" id="suggestBtn">💌 ПРЕДЛОЖИТЬ ИДЕЮ</button>
 
   </div>
@@ -1179,6 +1212,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
     </div>
     <div class="score-block"><div class="score-lbl">🏆 РЕКОРД</div><div class="score-val record" id="goBest">0</div></div>
     <div class="coins-earned" id="goCoins">💰 Монет: 0</div>
+    <div id="goStats" style="margin:8px 0 4px"></div>
     <div class="ach-badges" id="goAch"></div>
     <div class="flex gap2 mt2">
       <button class="btn btn-primary grow" id="restartBtn">↺ СНОВА</button>
@@ -1261,14 +1295,6 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
         <div class="shape-opt" data-ship-shape="scythe"><div class="shape-name">☠️ КОСА</div><div class="shape-desc">Ассимет.</div></div>
         <div class="shape-opt" data-ship-shape="star"><div class="shape-name">⭐ ЗВЕЗДА</div><div class="shape-desc">Пятиугол.</div></div>
       </div>
-      <div class="cust-lbl" style="margin-top:10px;color:rgba(255,215,0,.8)">⚔️ Звёздные войны</div>
-      <div class="shape-grid">
-        <div class="shape-opt" data-ship-shape="xwing"><div class="shape-name">✦ X-WING</div><div class="shape-desc">Повстанцы</div></div>
-        <div class="shape-opt" data-ship-shape="tie"><div class="shape-name">◈ TIE</div><div class="shape-desc">Империя</div></div>
-        <div class="shape-opt" data-ship-shape="falcon"><div class="shape-name">🦅 СОКОЛ</div><div class="shape-desc">Миллениум</div></div>
-        <div class="shape-opt" data-ship-shape="vader"><div class="shape-name">🔴 ВЕЙДЕР</div><div class="shape-desc">TIE Adv.</div></div>
-        <div class="shape-opt" data-ship-shape="awing"><div class="shape-name">⚡ A-WING</div><div class="shape-desc">Стремит.</div></div>
-      </div>
     </div>
 
     <!-- Ship Color -->
@@ -1287,10 +1313,6 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
         <div class="color-opt" data-ship-color="rose"   style="background:linear-gradient(135deg,#ff4488,#ff88bb)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="indigo" style="background:linear-gradient(135deg,#6644ff,#44aaff)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="gold"   style="background:linear-gradient(135deg,#ffd700,#ff8800)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="empire" style="background:linear-gradient(135deg,#888888,#cccccc)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="rebel"  style="background:linear-gradient(135deg,#cc4400,#ff8800)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="sith"   style="background:linear-gradient(135deg,#ff0000,#880000)"><i>✓</i></div>
-        <div class="color-opt" data-ship-color="jedi"   style="background:linear-gradient(135deg,#00aaff,#0044ff)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="neon"   style="background:linear-gradient(135deg,#ff00ff,#00ffff)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="toxic"  style="background:linear-gradient(135deg,#88ff00,#00ff44)"><i>✓</i></div>
         <div class="color-opt" data-ship-color="chrome" style="background:linear-gradient(135deg,#e8e8e8,#b0c4de)"><i>✓</i></div>
@@ -1328,7 +1350,6 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
         <div class="trail-opt" data-trail-style="rainbow">🌈 РАДУГА</div>
         <div class="trail-opt" data-trail-style="dark">🌑 ТЬМА</div>
         <div class="trail-opt" data-trail-style="lightsaber">⚔️ ЛАЙТСАБЕР</div>
-        <div class="trail-opt" data-trail-style="sith">🔴 СИТХ</div>
         <div class="trail-opt" data-trail-style="acid">🧪 КИСЛОТА</div>
       </div>
     </div>
@@ -1357,6 +1378,7 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
   <div class="card">
     <h1 class="screen-title purple">👾 СКИНЫ</h1>
     <p class="screen-sub">ОБЛИК КОРАБЛЯ</p>
+    <div class="skin-stats" id="skinStats"></div>
     <div class="skin-grid" id="skinGrid"></div>
     <button class="btn btn-secondary btn-purple w100" id="backFromSkin">← НАЗАД</button>
   </div>
@@ -1376,12 +1398,13 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 
 <!-- SKILL TREE SCREEN -->
 <div id="skillScreen" class="screen">
-  <div class="card" style="max-width:440px">
-    <h1 class="screen-title" style="background:linear-gradient(135deg,#00ffcc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:20px">🌿 НАВЫКИ</h1>
-    <p class="screen-sub">ОЧКИ НАВЫКОВ ЗА КАЖДЫЙ УРОВЕНЬ КОРАБЛЯ</p>
-    <div class="skill-points-banner" id="skillPointsBanner">🔮 Очков навыков: <span id="skillPtsVal">0</span></div>
-    <div id="skillTree" style="max-height:55vh;overflow-y:auto;padding-right:4px"></div>
-    <button class="btn btn-secondary w100 mt2" style="border-color:rgba(0,255,204,.4);color:#00ffcc" id="backFromSkill">← НАЗАД</button>
+  <div class="card" style="max-width:440px;padding:14px 12px">
+    <h1 class="screen-title" style="background:linear-gradient(135deg,#00ffcc,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:18px;margin-bottom:2px">🌿 НАВЫКИ</h1>
+    <p class="screen-sub" style="margin-bottom:10px;font-size:7.5px">ОЧКИ ЗА КАЖДЫЙ УРОВЕНЬ КОРАБЛЯ</p>
+    <!-- skillPtsVal нужен для JS но скрыт — отображение идёт внутри дерева -->
+    <span id="skillPtsVal" style="display:none">0</span>
+    <div id="skillTree" style="max-height:72vh;overflow-y:auto;padding-right:2px"></div>
+    <button class="btn btn-secondary w100 mt2" style="border-color:rgba(0,255,204,.4);color:#00ffcc;margin-top:10px" id="backFromSkill">← НАЗАД</button>
   </div>
 </div>
 
@@ -1427,6 +1450,16 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
           <span class="ms-ico">🌌</span>
           <span class="ms-name">ЭМБИЕНТ</span>
           <span class="ms-desc">Атмосферный</span>
+        </button>
+        <button class="music-style-btn" data-style="dnb">
+          <span class="ms-ico">🥁</span>
+          <span class="ms-name">DnB</span>
+          <span class="ms-desc">174 BPM</span>
+        </button>
+        <button class="music-style-btn" data-style="synthwave2">
+          <span class="ms-ico">⚡</span>
+          <span class="ms-name">SYNTH+</span>
+          <span class="ms-desc">Расширенный</span>
         </button>
       </div>
     </div>
@@ -1532,32 +1565,34 @@ body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touc
 </div>
 
 <script src="game-code.js"></script>
+<script src="improvements-patch.js"></script>
+<script src="visual-music-patch.js"></script>
 <script>
-/* ── RIPPLE EFFECT для кнопок оружия и навыков ── */
-function addRipple(el, e){
-  const r = document.createElement('span');
-  r.className = 'ripple';
-  const rect = el.getBoundingClientRect();
-  const touch = e.touches ? e.touches[0] : e;
-  r.style.left = (touch.clientX - rect.left - 15) + 'px';
-  r.style.top  = (touch.clientY - rect.top  - 15) + 'px';
-  el.appendChild(r);
-  r.addEventListener('animationend', () => r.remove());
-}
-
-document.addEventListener('touchstart', function(e){
-  const btn = e.target.closest('.weapon-btn, .ask-wrap');
-  if(btn) addRipple(btn, e);
-}, {passive:true});
-
-/* ── Увеличиваем hitbox паузы чтобы было удобнее ── */
-document.addEventListener('DOMContentLoaded', function(){
-  const pausePill = document.querySelector('.stat-pill--pause');
-  if(pausePill){
-    pausePill.style.minWidth = '52px';
-    pausePill.style.minHeight = '40px';
+  /* ── RIPPLE EFFECT для кнопок оружия и навыков ── */
+  function addRipple(el, e){
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    const rect = el.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    r.style.left = (touch.clientX - rect.left - 15) + 'px';
+    r.style.top  = (touch.clientY - rect.top  - 15) + 'px';
+    el.appendChild(r);
+    r.addEventListener('animationend', () => r.remove());
   }
-});
+
+  document.addEventListener('touchstart', function(e){
+    const btn = e.target.closest('.weapon-btn, .ask-wrap');
+    if(btn) addRipple(btn, e);
+  }, {passive:true});
+
+  /* ── Увеличиваем hitbox паузы чтобы было удобнее ── */
+  document.addEventListener('DOMContentLoaded', function(){
+    const pausePill = document.querySelector('.stat-pill--pause');
+    if(pausePill){
+      pausePill.style.minWidth = '52px';
+      pausePill.style.minHeight = '40px';
+    }
+  });
 </script>
 </body>
 </html>

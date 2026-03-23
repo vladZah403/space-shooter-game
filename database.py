@@ -166,7 +166,48 @@ class Database:
             
             conn.commit()
             logger.info("✅ Все таблицы созданы успешно")
-    
+
+            # Миграции: добавляем колонки если их нет (для старых БД)
+            self._run_migrations(conn)
+
+    def _run_migrations(self, conn):
+        """Применяет миграции для обновления существующей схемы БД"""
+        cursor = conn.cursor()
+        migrations = [
+            # users
+            ("users", "last_name",       "ALTER TABLE users ADD COLUMN last_name TEXT"),
+            ("users", "language_code",   "ALTER TABLE users ADD COLUMN language_code TEXT DEFAULT 'ru'"),
+            ("users", "is_premium",      "ALTER TABLE users ADD COLUMN is_premium INTEGER DEFAULT 0"),
+            ("users", "last_seen",       "ALTER TABLE users ADD COLUMN last_seen TIMESTAMP"),
+            # games
+            ("games", "duration_seconds","ALTER TABLE games ADD COLUMN duration_seconds INTEGER DEFAULT 0"),
+            ("games", "enemies_killed",  "ALTER TABLE games ADD COLUMN enemies_killed INTEGER DEFAULT 0"),
+            ("games", "accuracy_percent","ALTER TABLE games ADD COLUMN accuracy_percent REAL DEFAULT 0"),
+            # user_stats
+            ("user_stats", "total_playtime_seconds", "ALTER TABLE user_stats ADD COLUMN total_playtime_seconds INTEGER DEFAULT 0"),
+            ("user_stats", "total_enemies_killed",   "ALTER TABLE user_stats ADD COLUMN total_enemies_killed INTEGER DEFAULT 0"),
+            ("user_stats", "avg_accuracy",           "ALTER TABLE user_stats ADD COLUMN avg_accuracy REAL DEFAULT 0"),
+            ("user_stats", "easy_games",             "ALTER TABLE user_stats ADD COLUMN easy_games INTEGER DEFAULT 0"),
+            ("user_stats", "normal_games",           "ALTER TABLE user_stats ADD COLUMN normal_games INTEGER DEFAULT 0"),
+            ("user_stats", "hard_games",             "ALTER TABLE user_stats ADD COLUMN hard_games INTEGER DEFAULT 0"),
+            ("user_stats", "nightmare_games",        "ALTER TABLE user_stats ADD COLUMN nightmare_games INTEGER DEFAULT 0"),
+            ("user_stats", "win_streak",             "ALTER TABLE user_stats ADD COLUMN win_streak INTEGER DEFAULT 0"),
+            ("user_stats", "best_win_streak",        "ALTER TABLE user_stats ADD COLUMN best_win_streak INTEGER DEFAULT 0"),
+            ("user_stats", "max_level",              "ALTER TABLE user_stats ADD COLUMN max_level INTEGER DEFAULT 0"),
+            ("user_stats", "total_score",            "ALTER TABLE user_stats ADD COLUMN total_score INTEGER DEFAULT 0"),
+            ("user_stats", "updated_at",             "ALTER TABLE user_stats ADD COLUMN updated_at TIMESTAMP"),
+        ]
+        for table, column, sql in migrations:
+            try:
+                cursor.execute(f"SELECT {column} FROM {table} LIMIT 1")
+            except sqlite3.OperationalError:
+                try:
+                    cursor.execute(sql)
+                    conn.commit()
+                    logger.info(f"✅ Миграция: добавлена колонка {table}.{column}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Миграция {table}.{column} не выполнена: {e}")
+
     def _invalidate_cache(self, user_id: int = None):
         """Инвалидация кэша"""
         if user_id:
@@ -177,14 +218,17 @@ class Database:
         else:
             self._cache_stats.clear()
             self._cache_expiry.clear()
-    
-    def add_user(self, user_id: int, username: str = None, 
+
+    def add_user(self, user_id: int, username: str = None,
                  first_name: str = None, last_name: str = None,
                  language_code: str = 'ru', is_premium: bool = False) -> bool:
         """Добавить или обновить пользователя"""
+        is_premium_int = int(bool(is_premium)) if is_premium is not None else 0
+        language_code = language_code or 'ru'
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     INSERT INTO users (user_id, username, first_name, last_name, language_code, is_premium, last_seen)
@@ -196,38 +240,35 @@ class Database:
                         language_code = excluded.language_code,
                         is_premium = excluded.is_premium,
                         last_seen = CURRENT_TIMESTAMP
-                ''', (user_id, username, first_name, last_name, language_code, int(is_premium)))
-                
+                ''', (user_id, username, first_name, last_name, language_code, is_premium_int))
+
                 # Создать запись статистики если её нет
                 cursor.execute('''
                     INSERT OR IGNORE INTO user_stats (user_id)
                     VALUES (?)
                 ''', (user_id,))
-                
+
                 conn.commit()
                 logger.info(f"✅ Пользователь {user_id} добавлен/обновлен")
                 return True
             except Exception as e:
                 logger.error(f"❌ Ошибка добавления пользователя: {e}")
                 return False
-    
+
     def save_game(self, user_id: int, score: int, level: int, difficulty: str,
-                  duration_seconds: int = 0, enemies_killed: int = 0, 
+                  duration_seconds: int = 0, enemies_killed: int = 0,
                   accuracy_percent: float = 0.0) -> Tuple[bool, Dict]:
         """Сохранить результат игры с транзакцией"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
-                # Начинаем транзакцию
-                cursor.execute('BEGIN IMMEDIATE')
-                
                 # Получаем текущую статистику
                 cursor.execute('''
                     SELECT best_score, games_played, win_streak, best_win_streak 
                     FROM user_stats WHERE user_id = ?
                 ''', (user_id,))
-                
+
                 result = cursor.fetchone()
                 if not result:
                     # Создаем статистику если её нет
@@ -238,26 +279,29 @@ class Database:
                     best_win_streak = 0
                 else:
                     old_best, games_played, win_streak, best_win_streak = result
-                
+
                 # Сохраняем игру
                 cursor.execute('''
                     INSERT INTO games (user_id, score, level, difficulty, duration_seconds, 
                                       enemies_killed, accuracy_percent)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (user_id, score, level, difficulty, duration_seconds, enemies_killed, accuracy_percent))
-                
+
                 # Вычисляем новые значения
                 new_best = max(old_best, score)
                 is_new_record = score > old_best
-                
+
                 # Обновляем серию побед (если набрал больше 100 очков - считаем победой)
                 if score >= 100:
                     win_streak += 1
                     best_win_streak = max(best_win_streak, win_streak)
                 else:
                     win_streak = 0
-                
+
                 # Обновляем статистику
+                valid_difficulties = {'easy', 'normal', 'hard', 'nightmare'}
+                if difficulty not in valid_difficulties:
+                    difficulty = 'normal'
                 difficulty_column = f"{difficulty}_games"
                 cursor.execute(f'''
                     UPDATE user_stats
@@ -270,25 +314,24 @@ class Database:
                         avg_accuracy = (avg_accuracy * games_played + ?) / (games_played + 1),
                         {difficulty_column} = {difficulty_column} + 1,
                         win_streak = ?,
-                        best_win_streak = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                        best_win_streak = ?
                     WHERE user_id = ?
-                ''', (new_best, level, score, duration_seconds, enemies_killed, 
+                ''', (new_best, level, score, duration_seconds, enemies_killed,
                       accuracy_percent, win_streak, best_win_streak, user_id))
-                
+
                 # Проверяем достижения
                 new_achievements = self._check_achievements(cursor, user_id)
-                
+
                 # Обновляем ежедневные задания
                 self._update_daily_challenges(cursor, user_id, score, enemies_killed)
-                
+
                 conn.commit()
-                
+
                 # Инвалидируем кэш
                 self._invalidate_cache(user_id)
-                
+
                 logger.info(f"✅ Игра сохранена: user={user_id}, score={score}, level={level}")
-                
+
                 return True, {
                     'is_new_record': is_new_record,
                     'old_best': old_best,
@@ -296,22 +339,22 @@ class Database:
                     'new_achievements': new_achievements,
                     'win_streak': win_streak
                 }
-            
+
             except Exception as e:
                 conn.rollback()
                 logger.error(f"❌ Ошибка сохранения игры: {e}")
                 return False, {}
-    
+
     def _check_achievements(self, cursor, user_id: int) -> List[Dict]:
         """Проверить и разблокировать достижения"""
         from config import ACHIEVEMENTS
-        
+
         # Получаем статистику
         cursor.execute('''
             SELECT * FROM user_stats WHERE user_id = ?
         ''', (user_id,))
         stats = dict(cursor.fetchone())
-        
+
         # Получаем ранг
         cursor.execute('''
             SELECT COUNT(*) + 1
@@ -319,15 +362,15 @@ class Database:
             WHERE best_score > (SELECT best_score FROM user_stats WHERE user_id = ?)
         ''', (user_id,))
         stats['rank'] = cursor.fetchone()[0]
-        
+
         # Получаем уже разблокированные достижения
         cursor.execute('''
             SELECT achievement_key FROM achievements WHERE user_id = ?
         ''', (user_id,))
         unlocked = {row[0] for row in cursor.fetchall()}
-        
+
         new_achievements = []
-        
+
         # Проверяем каждое достижение
         for key, achievement in ACHIEVEMENTS.items():
             if key not in unlocked and achievement['condition'](stats):
@@ -342,13 +385,13 @@ class Database:
                     'description': achievement['description']
                 })
                 logger.info(f"🎊 Новое достижение для {user_id}: {achievement['name']}")
-        
+
         return new_achievements
-    
+
     def _update_daily_challenges(self, cursor, user_id: int, score: int, enemies_killed: int):
         """Обновить прогресс ежедневных заданий"""
         today = datetime.now().date()
-        
+
         # Обновляем задание на очки
         cursor.execute('''
             INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, date)
@@ -357,7 +400,7 @@ class Database:
                 current_value = current_value + excluded.current_value,
                 completed = CASE WHEN current_value >= target_value THEN 1 ELSE 0 END
         ''', (user_id, score, today))
-        
+
         # Обновляем задание на убийства
         cursor.execute('''
             INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, date)
@@ -366,42 +409,42 @@ class Database:
                 current_value = current_value + excluded.current_value,
                 completed = CASE WHEN current_value >= target_value THEN 1 ELSE 0 END
         ''', (user_id, enemies_killed, today))
-    
+
     def get_user_stats(self, user_id: int, use_cache: bool = True) -> Optional[Dict]:
         """Получить статистику пользователя с кэшированием"""
         cache_key = f"stats_{user_id}"
-        
+
         # Проверяем кэш
         if use_cache and cache_key in self._cache_stats:
             expiry = self._cache_expiry.get(cache_key, datetime.min)
             if datetime.now() < expiry:
                 return self._cache_stats[cache_key]
-        
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('SELECT * FROM user_stats WHERE user_id = ?', (user_id,))
                 result = cursor.fetchone()
-                
+
                 if result:
                     stats = dict(result)
-                    
+
                     # Кэшируем на 30 секунд
                     self._cache_stats[cache_key] = stats
                     self._cache_expiry[cache_key] = datetime.now() + timedelta(seconds=30)
-                    
+
                     return stats
                 return None
             except Exception as e:
                 logger.error(f"❌ Ошибка получения статистики: {e}")
                 return None
-    
+
     def get_top_players(self, limit: int = 10) -> List[Dict]:
         """Получить топ игроков"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     SELECT u.first_name, u.username, s.best_score, s.games_played, 
@@ -412,7 +455,7 @@ class Database:
                     ORDER BY s.best_score DESC, s.games_played ASC
                     LIMIT ?
                 ''', (limit,))
-                
+
                 results = cursor.fetchall()
                 return [
                     {
@@ -426,12 +469,12 @@ class Database:
             except Exception as e:
                 logger.error(f"❌ Ошибка получения топа: {e}")
                 return []
-    
+
     def get_user_rank(self, user_id: int) -> Optional[int]:
         """Получить место пользователя в рейтинге"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     SELECT COUNT(*) + 1
@@ -440,18 +483,18 @@ class Database:
                        OR (best_score = (SELECT best_score FROM user_stats WHERE user_id = ?)
                            AND games_played < (SELECT games_played FROM user_stats WHERE user_id = ?))
                 ''', (user_id, user_id, user_id))
-                
+
                 result = cursor.fetchone()
                 return result[0] if result else None
             except Exception as e:
                 logger.error(f"❌ Ошибка получения ранга: {e}")
                 return None
-    
+
     def get_recent_games(self, user_id: int, limit: int = 5) -> List[Dict]:
         """Получить последние игры пользователя"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     SELECT score, level, difficulty, duration_seconds, 
@@ -461,7 +504,7 @@ class Database:
                     ORDER BY played_at DESC
                     LIMIT ?
                 ''', (user_id, limit))
-                
+
                 results = cursor.fetchall()
                 return [
                     {
@@ -478,12 +521,12 @@ class Database:
             except Exception as e:
                 logger.error(f"❌ Ошибка получения истории игр: {e}")
                 return []
-    
+
     def get_user_achievements(self, user_id: int) -> List[str]:
         """Получить разблокированные достижения пользователя"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     SELECT achievement_key, unlocked_at 
@@ -491,25 +534,25 @@ class Database:
                     WHERE user_id = ?
                     ORDER BY unlocked_at DESC
                 ''', (user_id,))
-                
+
                 return [row[0] for row in cursor.fetchall()]
             except Exception as e:
                 logger.error(f"❌ Ошибка получения достижений: {e}")
                 return []
-    
+
     def get_daily_challenges(self, user_id: int) -> List[Dict]:
         """Получить ежедневные задания пользователя"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             today = datetime.now().date()
-            
+
             try:
                 cursor.execute('''
                     SELECT challenge_type, target_value, current_value, completed, reward_claimed
                     FROM daily_challenges
                     WHERE user_id = ? AND date = ?
                 ''', (user_id, today))
-                
+
                 return [
                     {
                         'type': row[0],
@@ -523,12 +566,12 @@ class Database:
             except Exception as e:
                 logger.error(f"❌ Ошибка получения заданий: {e}")
                 return []
-    
+
     def get_global_stats(self) -> Dict:
         """Получить глобальную статистику"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cursor.execute('''
                     SELECT 
@@ -539,7 +582,7 @@ class Database:
                         AVG(score) as avg_score
                     FROM games
                 ''')
-                
+
                 row = cursor.fetchone()
                 return {
                     'total_users': row[0] or 0,
@@ -551,12 +594,12 @@ class Database:
             except Exception as e:
                 logger.error(f"❌ Ошибка получения глобальной статистики: {e}")
                 return {}
-    
+
     def cleanup_old_data(self, days: int = 90):
         """Очистка старых данных"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             try:
                 cutoff_date = datetime.now() - timedelta(days=days)
                 cursor.execute('''
@@ -565,7 +608,7 @@ class Database:
                         SELECT user_id FROM user_stats WHERE best_score > 0
                     )
                 ''', (cutoff_date,))
-                
+
                 deleted = cursor.rowcount
                 conn.commit()
                 logger.info(f"✅ Удалено {deleted} старых записей игр")
