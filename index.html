@@ -874,9 +874,6 @@
     /* Прячем кнопку АВТО */
     #autoBtn{ display:none !important; }
 
-    /* ── PWA INSTALL BTN ── */
-    #pwaInstallBtn{position:fixed;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:none;z-index:9999;background:linear-gradient(135deg,#00ff88,#00d4ff);border:none;color:#04040f;font-family:"Orbitron",monospace;font-weight:900;font-size:13px;padding:12px 24px;border-radius:40px;cursor:pointer;letter-spacing:2px;box-shadow:0 0 30px rgba(0,255,136,.5);animation:installPulse 2s ease-in-out infinite;white-space:nowrap}
-    @keyframes installPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.04)}}
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
     ::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
@@ -1603,37 +1600,117 @@
     }
   });
 </script>
-<button id="pwaInstallBtn">📲 УСТАНОВИТЬ НА РАБОЧИЙ СТОЛ</button>
+
+<!-- ── PWA INSTALL BUTTON + IOS HINT ── -->
+<button id="pwaInstallBtn" style="
+  display:none;position:fixed;
+  bottom:max(20px,env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  z-index:9999;
+  background:linear-gradient(135deg,#00ff88,#00d4ff);
+  border:none;color:#04040f;
+  font-family:'Orbitron',monospace;font-weight:900;font-size:13px;
+  padding:13px 26px;border-radius:40px;cursor:pointer;letter-spacing:2px;
+  box-shadow:0 0 30px rgba(0,255,136,.6);
+  white-space:nowrap;
+  animation:installPulse 2s ease-in-out infinite;
+">📲 УСТАНОВИТЬ</button>
+
+<!-- iOS hint overlay -->
+<div id="iosHint" style="
+  display:none;position:fixed;inset:0;z-index:10000;
+  background:rgba(4,4,15,.85);backdrop-filter:blur(12px);
+  align-items:flex-end;justify-content:center;padding-bottom:0;
+">
+  <div style="
+    background:rgba(8,18,35,.98);
+    border:1.5px solid rgba(0,255,136,.35);
+    border-radius:24px 24px 0 0;
+    padding:28px 24px 40px;
+    width:100%;max-width:460px;
+    text-align:center;
+    animation:slideUpHint .35s cubic-bezier(.22,.68,0,1.2);
+  ">
+    <div style="font-size:36px;margin-bottom:10px">📲</div>
+    <div style="font-family:'Orbitron',monospace;font-size:15px;font-weight:900;color:#00ff88;letter-spacing:2px;margin-bottom:6px">УСТАНОВИТЬ ИГРУ</div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:14px;color:rgba(255,255,255,.7);line-height:1.7;margin-bottom:20px">
+      1. Нажми <span style="background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.4);border-radius:6px;padding:2px 8px;color:#00d4ff;font-weight:700">Поделиться</span>
+      <span style="font-size:18px">⬆️</span> внизу экрана<br>
+      2. Выбери <span style="background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.35);border-radius:6px;padding:2px 8px;color:#00ff88;font-weight:700">На экран «Домой»</span> <span style="font-size:16px">➕</span><br>
+      3. Нажми <strong style="color:#fff">Добавить</strong>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('iosHint').style.display='none'" style="
+        flex:1;padding:13px;border-radius:40px;
+        border:1.5px solid rgba(255,255,255,.2);
+        background:transparent;color:rgba(255,255,255,.6);
+        font-family:'Orbitron',monospace;font-size:11px;font-weight:700;cursor:pointer;
+      ">ЗАКРЫТЬ</button>
+      <button onclick="document.getElementById('iosHint').style.display='none'" style="
+        flex:2;padding:13px;border-radius:40px;border:none;
+        background:linear-gradient(135deg,#00ff88,#00d4ff);
+        color:#04040f;font-family:'Orbitron',monospace;font-size:12px;font-weight:900;cursor:pointer;
+      ">✓ ПОНЯТНО</button>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes installPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.05)}}
+@keyframes slideUpHint{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
 
 <script>
-/* ── SERVICE WORKER + PWA INSTALL ── */
+/* ── SERVICE WORKER ── */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }
-let deferredPrompt = null;
+
+/* ── DETECT IOS ── */
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isInStandaloneMode = () =>
+  window.navigator.standalone === true ||
+  window.matchMedia("(display-mode: fullscreen)").matches ||
+  window.matchMedia("(display-mode: standalone)").matches;
+
 const installBtn = document.getElementById("pwaInstallBtn");
+const iosHint    = document.getElementById("iosHint");
+
+/* ── ANDROID / DESKTOP: авто-промпт ── */
+let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if (installBtn) installBtn.style.display = "block";
+  if (!isInStandaloneMode()) installBtn.style.display = "block";
 });
 window.addEventListener("appinstalled", () => {
-  if (installBtn) installBtn.style.display = "none";
+  installBtn.style.display = "none";
   deferredPrompt = null;
 });
-if (installBtn) {
-  installBtn.addEventListener("click", async () => {
-    if (!deferredPrompt) {
-      alert("Открой игру в Chrome или Edge.\nЗатем нажми ⬇ или ☰ → Установить приложение");
-      return;
-    }
+
+installBtn.addEventListener("click", async () => {
+  if (deferredPrompt) {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === "accepted") installBtn.style.display = "none";
     deferredPrompt = null;
+  }
+});
+
+/* ── IOS: показываем кнопку вручную ── */
+if (isIOS && !isInStandaloneMode()) {
+  installBtn.style.display = "block";
+  installBtn.textContent = "📲 НА ЭКРАН ДОМОЙ";
+  installBtn.addEventListener("click", () => {
+    iosHint.style.display = "flex";
   });
+}
+
+/* ── Если уже установлено — скрыть кнопку ── */
+if (isInStandaloneMode()) {
+  installBtn.style.display = "none";
 }
 </script>
 </body>
