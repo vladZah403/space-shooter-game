@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Space Shooter</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Space Shooter">
+  <meta name="theme-color" content="#04040f">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
@@ -868,6 +874,9 @@
     /* Прячем кнопку АВТО */
     #autoBtn{ display:none !important; }
 
+    /* ── PWA INSTALL BTN ── */
+    #pwaInstallBtn{position:fixed;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:none;z-index:9999;background:linear-gradient(135deg,#00ff88,#00d4ff);border:none;color:#04040f;font-family:"Orbitron",monospace;font-weight:900;font-size:13px;padding:12px 24px;border-radius:40px;cursor:pointer;letter-spacing:2px;box-shadow:0 0 30px rgba(0,255,136,.5);animation:installPulse 2s ease-in-out infinite;white-space:nowrap}
+    @keyframes installPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.04)}}
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,255,136,.25);border-radius:2px}
     ::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,.45)}
@@ -1593,6 +1602,39 @@
       pausePill.style.minHeight = '40px';
     }
   });
+</script>
+<button id="pwaInstallBtn">📲 УСТАНОВИТЬ НА РАБОЧИЙ СТОЛ</button>
+
+<script>
+/* ── SERVICE WORKER + PWA INSTALL ── */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+let deferredPrompt = null;
+const installBtn = document.getElementById("pwaInstallBtn");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installBtn) installBtn.style.display = "block";
+});
+window.addEventListener("appinstalled", () => {
+  if (installBtn) installBtn.style.display = "none";
+  deferredPrompt = null;
+});
+if (installBtn) {
+  installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) {
+      alert("Открой игру в Chrome или Edge.\nЗатем нажми ⬇ или ☰ → Установить приложение");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") installBtn.style.display = "none";
+    deferredPrompt = null;
+  });
+}
 </script>
 </body>
 </html>
