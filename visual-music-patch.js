@@ -264,9 +264,10 @@ if (window._visualMusicPatchApplied) {
 
 // ── Улучшаем туманности — заменяем initNebulas ───────────────────────
         (function upgradeNebulas() {
-            if (typeof nebulas === 'undefined') return;
+            const _nebulas = (typeof nebulas !== 'undefined' && nebulas) ? nebulas : window.nebulas;
+            if (!_nebulas) return;
             // Перерисовываем существующие туманности с большим радиусом и layering
-            nebulas.forEach((n, i) => {
+            _nebulas.forEach((n, i) => {
                 n.r      = i < 2 ? 200 + Math.random() * 120 : 90 + Math.random() * 100;
                 n.o      = i < 2 ? 0.08 + Math.random() * 0.05 : 0.05 + Math.random() * 0.04;
                 n.layers = 3; // кол-во слоёв туманности
@@ -276,8 +277,9 @@ if (window._visualMusicPatchApplied) {
 
 // ── Улучшаем планеты — добавляем атмосферу и облака ─────────────────
         (function upgradePlanets() {
-            if (typeof planets === 'undefined') return;
-            planets.forEach((p, i) => {
+            const _planets = (typeof planets !== 'undefined' && planets) ? planets : window.planets;
+            if (!_planets) return;
+            _planets.forEach((p, i) => {
                 p.r          = 35 + Math.random() * 65;
                 p.atmThick   = 0.2 + Math.random() * 0.15; // толщина атмосферы
                 p.cloudSpeed = (Math.random() - 0.5) * 0.008;
@@ -454,18 +456,18 @@ if (window._visualMusicPatchApplied) {
             overlay.width  = window.innerWidth;
             overlay.height = window.innerHeight;
 
-            window._triggerAberration = function(strength) {
-                _aberration = Math.min(1, strength || 0.6);
-            };
-
             // Анимируем аберрацию — только красный/синий shift на краях
-            let _aberRAF;
+            // [FIX] раньше rAF планировался безусловно каждый кадр НАВСЕГДА,
+            // даже когда эффект не активен. Теперь цикл останавливается и
+            // перезапускается только по триггеру урона.
+            let _aberRAF = null;
             function animAberration() {
-                _aberRAF = requestAnimationFrame(animAberration);
                 if (_aberration <= 0.01) {
                     overlay.style.opacity = '0';
+                    _aberRAF = null;
                     return;
                 }
+                _aberRAF = requestAnimationFrame(animAberration);
                 _aberration *= 0.85;
                 const oc = overlay.getContext('2d');
                 overlay.width = overlay.width; // clear
@@ -482,7 +484,11 @@ if (window._visualMusicPatchApplied) {
                 oc.restore();
                 overlay.style.opacity = String(Math.min(1, _aberration));
             }
-            animAberration();
+
+            window._triggerAberration = function(strength) {
+                _aberration = Math.min(1, strength || 0.6);
+                if (_aberRAF == null) animAberration(); // перезапускаем остановленный цикл
+            };
 
             // Вызываем при уроне
             const _prev = window.damagePlayer;

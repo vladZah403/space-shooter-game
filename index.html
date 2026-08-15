@@ -7,16 +7,19 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Space Shooter">
   <meta name="theme-color" content="#04040f">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
       --green:#00ff88;--cyan:#00d4ff;--pink:#ff0066;--gold:#ffd700;--purple:#a855f7;
-      --bg:#04040f;--card:rgba(8,18,35,.95);--border:rgba(0,255,136,.25);
+      --bg:#04040f;--card:#081223f2;--border:rgba(0,255,136,.25);
     }
     body{overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;touch-action:none;user-select:none}
     #gameCanvas{display:block;touch-action:none;position:absolute;inset:0}
@@ -911,42 +914,221 @@
     .suggest-status.loading{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--cyan)}
 
     /* ══════════════════════════════════════
-       NEW MAIN MENU
+       NEW MAIN MENU — CINEMATIC MOBILE
     ══════════════════════════════════════ */
-    .menu-card{position:relative;z-index:1;width:calc(100% - 24px);max-width:420px;padding:20px 16px 16px;display:flex;flex-direction:column;gap:0;background:rgba(8,18,35,.88);border:1.5px solid rgba(0,255,136,.3);border-radius:22px;box-shadow:0 0 40px rgba(0,255,136,.14),0 0 80px rgba(0,212,255,.08),inset 0 0 30px rgba(0,255,136,.04);backdrop-filter:blur(14px);margin:auto;flex-shrink:0}
 
-    /* Hero */
-    .menu-hero{display:flex;flex-direction:column;align-items:center;padding:8px 0 16px;gap:6px}
-    .menu-ship-canvas{filter:drop-shadow(0 0 18px rgba(0,255,136,.7));animation:menuShipFloat 3s ease-in-out infinite}
-    @keyframes menuShipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-    .menu-title-wrap{text-align:center;line-height:1}
-    .menu-title{font-family:'Orbitron',monospace;font-size:38px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,#00ff88 0%,#00d4ff 50%,#a855f7 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.05}
-    .menu-title--second{font-size:28px;letter-spacing:10px;background:linear-gradient(135deg,#a855f7,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .menu-tagline{font-size:8px;letter-spacing:5px;color:rgba(0,212,255,.4);font-family:'Orbitron',monospace;margin-top:4px;text-transform:uppercase}
-    .menu-score-row{display:flex;gap:8px;align-items:center}
-    .menu-stat-pill{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.25);border-radius:20px;padding:4px 14px;font-family:'Orbitron',monospace;font-size:11px;color:var(--gold)}
+    /* Screen override */
+    #difficultyScreen{
+      overflow-y:auto;overflow-x:hidden;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:flex-start;
+      padding:0;background:transparent;backdrop-filter:none;
+    }
 
-    /* Big start button */
-    .menu-start-btn{position:relative;width:100%;padding:18px;background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,212,255,.1));border:2px solid rgba(0,255,136,.5);border-radius:18px;font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#00ff88;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;overflow:hidden;transition:all .2s;margin-bottom:12px;text-shadow:0 0 20px rgba(0,255,136,.6);box-shadow:0 0 30px rgba(0,255,136,.15),inset 0 0 30px rgba(0,255,136,.05)}
-    .menu-start-btn:active{transform:scale(.97)}
-    .menu-start-btn:hover,.menu-start-btn:focus{border-color:rgba(0,255,136,.8);box-shadow:0 0 40px rgba(0,255,136,.3),inset 0 0 30px rgba(0,255,136,.08)}
-    .menu-start-ico{font-size:22px}
-    .menu-start-txt{flex:1;text-align:center}
-    .menu-start-pulse{position:absolute;inset:0;border-radius:16px;background:transparent;border:2px solid rgba(0,255,136,.3);animation:startPulse 2s ease-out infinite;pointer-events:none}
-    @keyframes startPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.06);opacity:0}}
+    /* Full-width layout, no card */
+    .menu-wrap{
+      width:100%;max-width:480px;
+      display:flex;flex-direction:column;
+      min-height:100vh;
+      padding:max(54px,env(safe-area-inset-top)) 18px max(28px,env(safe-area-inset-bottom));
+      gap:0;
+      position:relative;z-index:1;
+      box-sizing:border-box;
+    }
 
-    /* Nav grid */
-    .menu-nav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px}
-    .menu-nav-btn{background:rgba(8,18,35,.75);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 6px 10px;cursor:pointer;transition:all .18s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-    .menu-nav-btn:active{transform:scale(.92);background:rgba(0,255,136,.07)}
-    .menu-nav-ico{font-size:22px;line-height:1}
-    .menu-nav-lbl{font-size:8px;font-family:'Orbitron',monospace;color:rgba(255,255,255,.55);letter-spacing:.8px}
+    /* ── HERO: ship + title ── */
+    .m-hero{
+      display:flex;flex-direction:column;
+      align-items:center;
+      padding-bottom:18px;
+      flex-shrink:0;
+    }
+    .m-ship-wrap{
+      position:relative;width:110px;height:110px;
+      margin-bottom:14px;
+    }
+    .m-ship-glow{
+      position:absolute;inset:-20px;border-radius:50%;
+      background:radial-gradient(circle,rgba(0,255,136,.28) 0%,transparent 70%);
+      animation:shipGlowPulse 3s ease-in-out infinite;
+    }
+    @keyframes shipGlowPulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+    .m-ship-rings{
+      position:absolute;inset:-30px;border-radius:50%;
+      border:1px solid rgba(0,255,136,.1);
+      animation:ringRotate 8s linear infinite;
+    }
+    .m-ship-rings::after{
+      content:'';position:absolute;inset:12px;border-radius:50%;
+      border:1px solid rgba(0,212,255,.08);
+    }
+    @keyframes ringRotate{to{transform:rotate(360deg)}}
+    #menuShipCanvas{
+      position:relative;z-index:1;display:block;
+      filter:drop-shadow(0 0 18px rgba(0,255,136,.8)) drop-shadow(0 0 40px rgba(0,212,255,.3));
+      animation:shipFloat 3.5s ease-in-out infinite;
+    }
+    @keyframes shipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 
-    /* Suggest button */
-    .menu-suggest-btn{width:100%;padding:10px;background:rgba(255,100,100,.05);border:1.5px solid rgba(255,100,100,.2);border-radius:12px;font-family:'Orbitron',monospace;font-size:10px;color:rgba(255,100,100,.65);letter-spacing:1px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
-    .menu-suggest-btn:active{background:rgba(255,100,100,.1);border-color:rgba(255,100,100,.4)}
+    .m-title{
+      text-align:center;line-height:1;margin-bottom:10px;
+    }
+    .m-title-line1{
+      display:block;
+      font-family:'Orbitron',monospace;font-size:48px;font-weight:900;
+      letter-spacing:8px;line-height:.95;
+      background:linear-gradient(135deg,#00ff88 0%,#00d4ff 60%,#a855f7 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 0 30px rgba(0,255,136,.4));
+    }
+    .m-title-line2{
+      display:block;
+      font-family:'Orbitron',monospace;font-size:32px;font-weight:900;
+      letter-spacing:12px;line-height:1.1;
+      background:linear-gradient(135deg,#a855f7 0%,#00d4ff 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .m-tagline{
+      font-family:'Orbitron',monospace;font-size:8px;
+      color:rgba(0,212,255,.4);letter-spacing:6px;
+      text-transform:uppercase;margin-top:6px;display:block;
+    }
+    .m-score-row{
+      display:flex;gap:8px;align-items:center;margin-top:10px;
+    }
+    .m-score-pill{
+      background:rgba(255,215,0,.08);
+      border:1px solid rgba(255,215,0,.3);
+      border-radius:24px;padding:6px 16px;
+      font-family:'Orbitron',monospace;font-size:13px;
+      color:var(--gold);
+      box-shadow:0 0 14px rgba(255,215,0,.12);
+    }
+
+    /* ── START BUTTON ── */
+    .m-start-btn{
+      position:relative;width:100%;
+      padding:20px 24px;margin-bottom:10px;
+      background:linear-gradient(135deg,rgba(0,255,136,.12),rgba(0,212,255,.08));
+      border:2px solid rgba(0,255,136,.55);border-radius:20px;
+      font-family:'Orbitron',monospace;font-size:20px;font-weight:900;
+      letter-spacing:3px;color:#00ff88;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;gap:14px;
+      overflow:hidden;transition:all .2s;
+      text-shadow:0 0 20px rgba(0,255,136,.7);
+      box-shadow:0 0 36px rgba(0,255,136,.18),inset 0 0 30px rgba(0,255,136,.05);
+      -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+      flex-shrink:0;
+    }
+    .m-start-btn:active{transform:scale(.97)}
+    .m-start-btn::before{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(90deg,transparent,rgba(0,255,136,.06),transparent);
+      transform:translateX(-100%);
+      animation:startShimmer 3s ease-in-out infinite;
+    }
+    @keyframes startShimmer{0%{transform:translateX(-100%)}60%,100%{transform:translateX(100%)}}
+    .m-start-pulse{
+      position:absolute;inset:0;border-radius:18px;
+      border:2px solid rgba(0,255,136,.35);
+      animation:startPulse 2.2s ease-out infinite;pointer-events:none;
+    }
+    @keyframes startPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.06);opacity:0}}
+    .m-start-ico{font-size:22px}
+
+    /* ── AUTO TOGGLE — REMOVED (always auto) ── */
+    .m-auto-row{ display:none !important; }
+
+    /* ── NAV GRID — 2 columns, bigger cards ── */
+    .m-nav-grid{
+      display:grid;grid-template-columns:repeat(2,1fr);
+      gap:10px;margin-bottom:12px;flex-shrink:0;
+    }
+    .m-nav-btn{
+      background:rgba(6,10,24,.9);
+      border:1.5px solid rgba(255,255,255,.07);
+      border-radius:20px;
+      padding:20px 12px 17px;
+      cursor:pointer;transition:all .18s cubic-bezier(.22,.68,0,1.2);
+      text-align:center;
+      display:flex;flex-direction:column;align-items:center;gap:8px;
+      -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+      position:relative;overflow:hidden;
+      box-shadow:0 4px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .m-nav-btn::before{
+      content:'';position:absolute;inset:0;border-radius:18px;
+      background:linear-gradient(145deg,rgba(255,255,255,.04),transparent 55%);
+      pointer-events:none;
+    }
+    /* Glow accent strip at bottom */
+    .m-nav-btn::after{
+      content:'';position:absolute;bottom:0;left:20%;right:20%;height:2px;
+      border-radius:2px;opacity:0;transition:opacity .2s;
+    }
+    .m-nav-btn.c-green::after{background:var(--green);box-shadow:0 0 8px var(--green)}
+    .m-nav-btn.c-cyan::after{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+    .m-nav-btn.c-gold::after{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+    .m-nav-btn.c-purple::after{background:var(--purple);box-shadow:0 0 8px var(--purple)}
+    .m-nav-btn.c-pink::after{background:var(--pink);box-shadow:0 0 8px var(--pink)}
+    .m-nav-btn.c-gray::after{background:rgba(255,255,255,.3);box-shadow:0 0 6px rgba(255,255,255,.2)}
+    .m-nav-btn:active{transform:scale(.91);transition:transform .08s}
+    .m-nav-btn:active::after{opacity:1}
+    .m-nav-ico{font-size:36px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+    .m-nav-lbl{
+      font-family:'Orbitron',monospace;font-size:9px;
+      color:rgba(255,255,255,.6);letter-spacing:1.5px;
+      font-weight:700;
+    }
+    .m-nav-sub{
+      font-family:'Rajdhani',sans-serif;font-size:10.5px;
+      color:rgba(255,255,255,.28);letter-spacing:.2px;
+      font-weight:500;line-height:1;
+    }
+    /* Per-color hover glows */
+    .m-nav-btn.c-green:active{background:rgba(0,255,136,.07);border-color:rgba(0,255,136,.35)}
+    .m-nav-btn.c-cyan:active{background:rgba(0,212,255,.07);border-color:rgba(0,212,255,.35)}
+    .m-nav-btn.c-gold:active{background:rgba(255,215,0,.07);border-color:rgba(255,215,0,.35)}
+    .m-nav-btn.c-purple:active{background:rgba(168,85,247,.07);border-color:rgba(168,85,247,.35)}
+    .m-nav-btn.c-pink:active{background:rgba(255,0,102,.07);border-color:rgba(255,0,102,.35)}
+    /* Label colors per type */
+    .m-nav-btn.c-green .m-nav-lbl{color:rgba(0,255,136,.7)}
+    .m-nav-btn.c-cyan .m-nav-lbl{color:rgba(0,212,255,.7)}
+    .m-nav-btn.c-gold .m-nav-lbl{color:rgba(255,215,0,.7)}
+    .m-nav-btn.c-purple .m-nav-lbl{color:rgba(168,85,247,.7)}
+    .m-nav-btn.c-pink .m-nav-lbl{color:rgba(255,80,120,.7)}
+    /* Accent colors per button - handled in nav redesign above */
+
+    /* ── DAILY CHALLENGE ── */
+    .m-daily{
+      background:rgba(255,215,0,.04);
+      border:1.5px solid rgba(255,215,0,.2);
+      border-radius:16px;padding:14px 16px;
+      margin-bottom:10px;flex-shrink:0;
+    }
+
+    /* ── SUGGEST BTN ── */
+    .m-suggest-btn{
+      width:100%;padding:12px;
+      background:rgba(255,80,80,.04);
+      border:1.5px solid rgba(255,80,80,.18);
+      border-radius:14px;
+      font-family:'Orbitron',monospace;font-size:10px;
+      color:rgba(255,80,80,.6);letter-spacing:1.5px;
+      cursor:pointer;transition:all .18s;
+      -webkit-tap-highlight-color:transparent;
+      flex-shrink:0;
+    }
+    .m-suggest-btn:active{background:rgba(255,80,80,.1);border-color:rgba(255,80,80,.4)}
+
+    /* ── DIVIDER ── */
+    .m-divider{
+      height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,136,.15),transparent);
+      margin:4px 0 12px;flex-shrink:0;
+    }
 
     /* Difficulty modal */
+        /* Difficulty modal */
     .diff-modal{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(4,4,15,.7);backdrop-filter:blur(8px);animation:diffModalIn .25s ease}
     @keyframes diffModalIn{from{opacity:0}to{opacity:1}}
     .diff-modal-card{background:rgba(8,12,28,.97);border:1.5px solid rgba(0,255,136,.2);border-radius:24px;padding:24px 20px;width:90%;max-width:400px;animation:diffCardUp .3s cubic-bezier(.22,.68,0,1.2)}
@@ -1081,7 +1263,7 @@
   </div>
   <!-- Активный навык — правый нижний угол -->
   <div id="activeSkillBar" style="display:none"></div>
-  <button id="autoBtn" class="active">⚡ АВТО</button>
+  <!-- autoBtn removed — стрельба всегда автоматическая -->
 </div>
 
 <!-- Achievement toast -->
@@ -1097,73 +1279,84 @@
 <!-- DIFFICULTY / MAIN MENU -->
 <div id="difficultyScreen" class="screen active">
   <canvas id="starfieldCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
-  <div class="menu-card" style="position:relative;z-index:1">
 
-    <!-- HERO BLOCK -->
-    <div class="menu-hero">
-      <canvas id="menuShipCanvas" width="80" height="80" class="menu-ship-canvas"></canvas>
-      <div class="menu-title-wrap">
-        <div class="menu-title">SPACE</div>
-        <div class="menu-title menu-title--second">SHOOTER</div>
-        <div class="menu-tagline">ГАЛАКТИЧЕСКИЙ ШУТЕР</div>
+  <div class="menu-wrap">
+
+    <!-- HERO -->
+    <div class="m-hero">
+      <div class="m-ship-wrap">
+        <div class="m-ship-glow"></div>
+        <div class="m-ship-rings"></div>
+        <canvas id="menuShipCanvas" width="100" height="100" class="menu-ship-canvas"></canvas>
       </div>
-      <div class="menu-score-row">
-        <div class="menu-stat-pill">🏆 <span id="menuBestScore">0</span></div>
-        <div class="menu-stat-pill" id="bestScoreBadge" style="display:none"></div>
+      <div class="m-title">
+        <span class="m-title-line1">SPACE</span>
+        <span class="m-title-line2">SHOOTER</span>
+        <span class="m-tagline">ГАЛАКТИЧЕСКИЙ ШУТЕР</span>
+      </div>
+      <div class="m-score-row">
+        <div class="m-score-pill">🏆 <span id="menuBestScore">0</span></div>
+        <div class="m-score-pill" id="bestScoreBadge" style="display:none"></div>
       </div>
     </div>
 
-    <!-- BIG START BUTTON -->
-    <button class="menu-start-btn" id="startBtn">
-      <span class="menu-start-ico">▶</span>
-      <span class="menu-start-txt">НАЧАТЬ ИГРУ</span>
-      <span class="menu-start-pulse"></span>
+    <!-- START BUTTON -->
+    <button class="m-start-btn" id="startBtn">
+      <span class="m-start-ico">▶</span>
+      НАЧАТЬ ИГРУ
+      <span class="m-start-pulse"></span>
     </button>
 
-    <!-- Auto toggle -->
-    <label class="auto-row" for="autoChk" style="margin-bottom:12px">
-      <span class="auto-row-lbl">⚡ Автоматическая стрельба</span>
-      <input type="checkbox" id="autoChk" checked>
-    </label>
+    <!-- AUTO FIRE TOGGLE — REMOVED (always auto) -->
 
-    <!-- Nav grid -->
-    <div class="menu-nav-grid">
-      <button class="menu-nav-btn" id="upgradeBtn">
-        <span class="menu-nav-ico">⚡</span>
-        <span class="menu-nav-lbl">ПРОКАЧКА</span>
+    <!-- NAV GRID -->
+    <div class="m-nav-grid">
+      <button class="m-nav-btn c-gold" id="upgradeBtn">
+        <span class="m-nav-ico">⚡</span>
+        <span class="m-nav-lbl">ПРОКАЧКА</span>
+        <span class="m-nav-sub">Улучши оружие</span>
       </button>
-      <button class="menu-nav-btn" id="skillBtn">
-        <span class="menu-nav-ico">🌿</span>
-        <span class="menu-nav-lbl">НАВЫКИ</span>
+      <button class="m-nav-btn c-cyan" id="skillBtn">
+        <span class="m-nav-ico">🔮</span>
+        <span class="m-nav-lbl">НАВЫКИ</span>
+        <span class="m-nav-sub">Пассивные бонусы</span>
       </button>
-      <button class="menu-nav-btn" id="lbBtn">
-        <span class="menu-nav-ico">🏆</span>
-        <span class="menu-nav-lbl">РЕЙТИНГ</span>
+      <button class="m-nav-btn c-purple" id="skinBtn">
+        <span class="m-nav-ico">👾</span>
+        <span class="m-nav-lbl">СКИНЫ</span>
+        <span class="m-nav-sub">Облик корабля</span>
       </button>
-      <button class="menu-nav-btn" id="skinBtn">
-        <span class="menu-nav-ico">👾</span>
-        <span class="menu-nav-lbl">СКИНЫ</span>
+      <button class="m-nav-btn c-green" id="customBtn">
+        <span class="m-nav-ico">🎨</span>
+        <span class="m-nav-lbl">СТИЛЬ</span>
+        <span class="m-nav-sub">Цвет и форма</span>
       </button>
-      <button class="menu-nav-btn" id="customBtn">
-        <span class="menu-nav-ico">🎨</span>
-        <span class="menu-nav-lbl">СТИЛЬ</span>
+      <button class="m-nav-btn c-pink" id="lbBtn">
+        <span class="m-nav-ico">🏆</span>
+        <span class="m-nav-lbl">РЕЙТИНГ</span>
+        <span class="m-nav-sub">Мировые рекорды</span>
       </button>
-      <button class="menu-nav-btn" id="settingsBtn">
-        <span class="menu-nav-ico">⚙️</span>
-        <span class="menu-nav-lbl">НАСТРОЙКИ</span>
+      <button class="m-nav-btn c-gray" id="settingsBtn">
+        <span class="m-nav-ico">⚙️</span>
+        <span class="m-nav-lbl">НАСТРОЙКИ</span>
+        <span class="m-nav-sub">Звук и графика</span>
       </button>
     </div>
 
-    <div id="dailyChallengeBlock" style="background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:10px 12px;margin-bottom:8px"></div>
-    <button class="menu-suggest-btn" id="suggestBtn">💌 ПРЕДЛОЖИТЬ ИДЕЮ</button>
+    <div class="m-divider"></div>
+
+    <!-- DAILY CHALLENGE -->
+    <div class="m-daily" id="dailyChallengeBlock"></div>
+
+    <!-- SUGGEST -->
+    <button class="m-suggest-btn" id="suggestBtn">💌 ПРЕДЛОЖИТЬ ИДЕЮ</button>
 
   </div>
 
-  <!-- DIFFICULTY MODAL OVERLAY -->
+  <!-- DIFFICULTY MODAL -->
   <div id="diffModal" class="diff-modal" style="display:none">
     <div class="diff-modal-card">
       <div class="diff-modal-title">⚔️ ВЫБЕРИТЕ СЛОЖНОСТЬ</div>
-
       <div class="diff-grid">
         <div class="diff-item" data-diff="zen">
           <span class="diff-icon">🧘</span>
@@ -1196,7 +1389,6 @@
           <div class="diff-desc">1 жизнь · x5 очки<br><span class="diff-badge" style="background:linear-gradient(135deg,#ff0000,#880000)">НЕВОЗМОЖНО</span></div>
         </div>
       </div>
-
       <div class="diff-modal-actions">
         <button class="btn btn-secondary" id="diffCancelBtn">✕ ОТМЕНА</button>
         <button class="btn btn-primary" id="diffConfirmBtn" disabled>▶ ИГРАТЬ</button>
@@ -1205,6 +1397,7 @@
   </div>
 </div>
 
+<!-- GAME OVER -->
 <!-- GAME OVER -->
 <div id="gameOverScreen" class="screen">
   <div class="card">
@@ -1570,26 +1763,13 @@
   </div>
 </div>
 
-<script src="game-code.js"></script>
-<script src="improvements-patch.js"></script>
-<script src="visual-music-patch.js"></script>
+<script src="game-code.js?v=4"></script>
+<script src="improvements-patch.js?v=4"></script>
+<script src="visual-music-patch.js?v=4"></script>
 <script>
-  /* ── RIPPLE EFFECT для кнопок оружия и навыков ── */
-  function addRipple(el, e){
-    const r = document.createElement('span');
-    r.className = 'ripple';
-    const rect = el.getBoundingClientRect();
-    const touch = e.touches ? e.touches[0] : e;
-    r.style.left = (touch.clientX - rect.left - 15) + 'px';
-    r.style.top  = (touch.clientY - rect.top  - 15) + 'px';
-    el.appendChild(r);
-    r.addEventListener('animationend', () => r.remove());
-  }
-
-  document.addEventListener('touchstart', function(e){
-    const btn = e.target.closest('.weapon-btn, .ask-wrap');
-    if(btn) addRipple(btn, e);
-  }, {passive:true});
+  /* Ripple-эффект для кнопок реализован в improvements-patch.js (RIPPLE_SEL
+     уже покрывает .weapon-btn/.ask-wrap и другие кнопки) — здесь дубликат
+     удалён, он вызывал двойную анимацию на каждый тап. */
 
   /* ── Увеличиваем hitbox паузы чтобы было удобнее ── */
   document.addEventListener('DOMContentLoaded', function(){

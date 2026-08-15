@@ -7,12 +7,26 @@ import os
 from typing import Optional
 from dataclasses import dataclass
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv не установлен - используются системные переменные окружения
+
 # ===== ОСНОВНЫЕ НАСТРОЙКИ =====
-# ВАЖНО: Замените на ваш токен от @BotFather
-BOT_TOKEN =  "7797093049:AAG_IQXcjs-_hyVVPzs_QO3x2KSahccG1-o"
+# Токен и ID администратора берутся из переменных окружения (файл .env, не коммитится в git).
+# Получить токен: @BotFather. Узнать свой ID: @userinfobot
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0")) or None
 
 # ВАЖНО: Замените на URL вашей игры
-GAME_URL = "https://vladzah403.github.io/space-shooter-game/"
+GAME_URL = os.getenv("GAME_URL", "https://vladzah403.github.io/space-shooter-game/")
+
+# ===== ПУБЛИЧНЫЙ API ЛИДЕРБОРДА (api.py) =====
+# На большинстве PaaS (Render/Railway/Fly.io) порт передаётся через $PORT — обычно достаточно
+# оставить эти значения по умолчанию и не задавать их через .env.
+API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("PORT", os.getenv("API_PORT", "8080")))
 
 # ===== НАСТРОЙКИ БАЗЫ ДАННЫХ =====
 DATABASE_NAME = os.getenv("DATABASE_NAME", "space_shooter.db")

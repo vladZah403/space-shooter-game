@@ -45,8 +45,9 @@ space_shooter.db
 .DS_Store
 Thumbs.db
 
-# Секретные данные (если хотите не коммитить токены)
-# config.py
+# Секретные данные - НЕ загружать на Git!
+config.py
+.env
 
 # Временные файлы
 *.tmp
@@ -57,4 +58,9 @@ Thumbs.db
 # Загруженные файлы пользователей
 uploads/
 user-data/
+
+# Бэкапы и экспорты БД
+backups/
+leaderboard_*.json
+leaderboard_*.csv
 

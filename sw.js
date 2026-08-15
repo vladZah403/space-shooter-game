@@ -1,10 +1,12 @@
-const CACHE = 'space-shooter-v1';
+// Версия кэша: бампайте вместе с ?v= у скриптов в index.html при каждом деплое
+const CACHE = 'space-shooter-v4';
 const FILES = [
   './',
   './index.html',
-  './game-code.js',
-  './visual-music-patch.js',
-  './improvements-patch.js'
+  './game-code.js?v=4',
+  './improvements-patch.js?v=4',
+  './visual-music-patch.js?v=4',
+  './ship-player.png'
 ];
 
 self.addEventListener('install', e => {
@@ -21,10 +23,19 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: свежая версия приоритетнее кэша, кэш - только офлайн-подстраховка.
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() =>
-      caches.match('./index.html')
-    ))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() =>
+        caches.match(e.request).then(r => r || caches.match('./index.html'))
+      )
   );
 });

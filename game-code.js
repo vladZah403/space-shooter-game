@@ -1,6 +1,12 @@
 const tg = window.Telegram?.WebApp;
 if(tg){ tg.expand(); tg.enableClosingConfirmation(); }
 
+// ── Публичный HTTP API лидерборда (см. api.py в репозитории бота).
+// Пусто = лидерборд работает только локально (данные этого устройства).
+// После деплоя бота впишите сюда его публичный адрес, например:
+// 'https://ваш-бот.example.com'
+const LEADERBOARD_API_URL = '';
+
 // ── Ранняя заглушка notify — настоящая функция объявлена ниже (~4022)
 // Нужна потому что обработчики кликов на строке ~1616 вызывают notify
 // до того как движок доходит до её объявления при первом клике.
@@ -33,10 +39,18 @@ function showConfirm({ icon='⚠️', title='', text='', okLabel='ОК', onOk=nu
 
 
 // ════════════════════════════════════════════════════
+// СПРАЙТЫ (пилотный тест — пока только корабль игрока;
+// остальное по-прежнему рисуется процедурно)
+// ════════════════════════════════════════════════════
+const shipPlayerImg = new Image();
+shipPlayerImg.src = 'ship-player.png';
+
+// ════════════════════════════════════════════════════
 // CANVAS
 // ════════════════════════════════════════════════════
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+window.canvas = canvas; window.ctx = ctx;
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
@@ -384,6 +398,7 @@ const LS = {
   getJ:(k,def)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){return def;} },
   setJ:(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
+window.LS = LS;
 
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
@@ -398,6 +413,7 @@ const WEAPON_UNLOCK_DEFS = {
   lightning: { unlockCost: 2500, label:'⚡ МОЛНИЯ',   desc:'Цепная молния. Прыгает между врагами — чем больше рой, тем лучше.', always: false },
   darkmatter:{ unlockCost: 3500, label:'🌑 Т.МАТЕРИЯ',desc:'Орбитальные шары тёмной материи. Притягивают и взрывают врагов.', always: false },
 };
+window.WEAPON_UNLOCK_DEFS = WEAPON_UNLOCK_DEFS;
 
 // UPGRADES SYSTEM — ОРУЖИЕ ЗА МОНЕТЫ
 // ════════════════════════════════════════════════════
@@ -1979,27 +1995,61 @@ document.getElementById('resetConfirmBtn').addEventListener('click', resetAllPro
 // ════════════════════════════════════════════════════
 let bestScore = +LS.get('bestScore', 0);
 
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str==null ? '' : String(str);
+  return d.innerHTML;
+}
+
+async function fetchRemoteLeaderboard(){
+  if(!LEADERBOARD_API_URL) return null;
+  try{
+    const ctrl = new AbortController();
+    const timeout = setTimeout(()=>ctrl.abort(), 5000);
+    const res = await fetch(LEADERBOARD_API_URL.replace(/\/$/,'') + '/api/leaderboard?limit=20', {signal:ctrl.signal});
+    clearTimeout(timeout);
+    if(!res.ok) return null;
+    const remote = await res.json();
+    if(!Array.isArray(remote)) return null;
+    return remote.map(p=>({id:p.id, name:p.name, score:p.score, lvl:p.max_level}));
+  }catch(err){
+    console.warn('⚠️ Онлайн-лидерборд недоступен, показываю локальные данные:', err);
+    return null;
+  }
+}
+
 async function loadLeaderboard(){
   const content = document.getElementById('lbContent');
   content.innerHTML = '<div class="lb-loading">⏳ ЗАГРУЗКА...</div>';
   const myName = tg?.initDataUnsafe?.user?.first_name || 'Игрок';
   const myId   = tg?.initDataUnsafe?.user?.id || 0;
-  let entries = LS.getJ('leaderboard', []);
-  if(bestScore > 0){
-    entries = entries.filter(e => e.id !== myId);
-    entries.push({id:myId, name:myName, score:bestScore, lvl:shipLvl});
-    entries.sort((a,b)=>b.score-a.score);
-    entries = entries.slice(0,20);
-    LS.setJ('leaderboard', entries);
+
+  let entries = await fetchRemoteLeaderboard();
+  const isLocalOnly = !entries;
+
+  if(isLocalOnly){
+    // Фоллбэк: нет API или он недоступен — показываем только данные этого устройства
+    entries = LS.getJ('leaderboard', []);
+    if(bestScore > 0){
+      entries = entries.filter(e => e.id !== myId);
+      entries.push({id:myId, name:myName, score:bestScore, lvl:shipLvl});
+      entries.sort((a,b)=>b.score-a.score);
+      entries = entries.slice(0,20);
+      LS.setJ('leaderboard', entries);
+    }
   }
+
   const medals = ['🥇','🥈','🥉'];
+  const offlineNote = isLocalOnly && LEADERBOARD_API_URL
+      ? '<div class="lb-loading" style="padding:6px 0;font-size:12px;opacity:.7">📴 Нет связи с сервером — показаны только ваши результаты</div>'
+      : '';
   content.innerHTML = entries.length
-      ? entries.map((e,i)=>`
+      ? offlineNote + entries.map((e,i)=>`
       <div class="lb-row ${e.id===myId?'me':''}">
         <div class="lb-rank">${medals[i]||'#'+(i+1)}</div>
         <div class="lb-info">
-          <div class="lb-name">${e.name}${e.id===myId?' 👈':''}</div>
-          <div class="lb-sub">Корабль ур.${e.lvl||1}</div>
+          <div class="lb-name">${escapeHtml(e.name)}${e.id===myId?' 👈':''}</div>
+          <div class="lb-sub">${isLocalOnly?'Корабль ур.':'Волна '}${e.lvl||1}</div>
         </div>
         <div class="lb-score">${e.score.toLocaleString()}</div>
       </div>`).join('')
@@ -2023,6 +2073,7 @@ const ACHIEVEMENTS = [
   {id:'accuracy80',  name:'Снайпер точности 🎯'},
   {id:'prestige1',   name:'Легенда Галактики 🌌'},
 ];
+window.ACHIEVEMENTS = ACHIEVEMENTS;
 
 const SKINS = [
   // ОБЫЧНЫЕ
@@ -2475,6 +2526,7 @@ const DIFF = {
   god:       {lives:1, spd:2.1,  spawn:.036, scoreMult:5.5, bossHpMult:2.0,  powerupRate:0,    bg:'hell',     extraEnemyTypes:true,  eliteEnemies:true},
   zen:       {lives:9, spd:.32,  spawn:.006, scoreMult:0.4, bossHpMult:.25,  powerupRate:.022, bg:'cosmic',   extraEnemyTypes:false, eliteEnemies:false},
 };
+window.DIFF = DIFF;
 
 // ════════════════════════════════════════════════════
 // SCREEN MANAGER
@@ -2532,11 +2584,16 @@ function initMenuShip(){
     mctx.save();
     mctx.shadowBlur = 14 + 5*Math.sin(mT);
     mctx.shadowColor = shipC.a;
-    const sg = mctx.createLinearGradient(cx-hw, cy-hh, cx+hw, cy+hh);
-    sg.addColorStop(0, shipC.a); sg.addColorStop(1, shipC.b);
-    mctx.fillStyle = sg;
-    drawShipPath(mctx, custom.shipShape||'fighter', cx, cy, hw, hh);
-    mctx.fill();
+    if(shipPlayerImg.complete && shipPlayerImg.naturalWidth > 0){
+      const iw = hw*2*1.3, ih = hh*2*1.3;
+      mctx.drawImage(shipPlayerImg, cx-iw/2, cy-ih/2, iw, ih);
+    } else {
+      const sg = mctx.createLinearGradient(cx-hw, cy-hh, cx+hw, cy+hh);
+      sg.addColorStop(0, shipC.a); sg.addColorStop(1, shipC.b);
+      mctx.fillStyle = sg;
+      drawShipPath(mctx, custom.shipShape||'fighter', cx, cy, hw, hh);
+      mctx.fill();
+    }
     mctx.restore();
     menuShipRAF = requestAnimationFrame(drawMenuShip);
   }
@@ -3141,13 +3198,16 @@ document.getElementById('backFromSkill').addEventListener('click',()=>{ showScre
 })();
 
 function syncAutoUI(){
-  document.getElementById('autoBtn').classList.toggle('active', autoShoot);
-  document.getElementById('autoBtn').textContent = autoShoot ? '⚡ АВТО' : '✋ РУЧН.';
-  document.getElementById('autoChk').checked = autoShoot;
+  const btn = document.getElementById('autoBtn');
+  const chk = document.getElementById('autoChk');
+  if(btn){ btn.classList.toggle('active', autoShoot); btn.textContent = autoShoot ? '⚡ АВТО' : '✋ РУЧН.'; }
+  if(chk){ chk.checked = autoShoot; }
 }
 syncAutoUI();
-document.getElementById('autoBtn').addEventListener('click',()=>{ autoShoot=!autoShoot; LS.set('autoShoot',autoShoot); syncAutoUI(); });
-document.getElementById('autoChk').addEventListener('change',function(){ autoShoot=this.checked; LS.set('autoShoot',autoShoot); syncAutoUI(); });
+const _autoBtnEl = document.getElementById('autoBtn');
+if(_autoBtnEl) _autoBtnEl.addEventListener('click',()=>{ autoShoot=!autoShoot; LS.set('autoShoot',autoShoot); syncAutoUI(); });
+const _autoChkEl = document.getElementById('autoChk');
+if(_autoChkEl) _autoChkEl.addEventListener('change',function(){ autoShoot=this.checked; LS.set('autoShoot',autoShoot); syncAutoUI(); });
 
 let currentWeapon = custom.selectedWeapons[0] || 'laser';
 
@@ -3496,6 +3556,8 @@ class WeaponSystem {
 // Создаём глобальный экземпляр и даём совместимый алиас
 const _WeaponSystem = new WeaponSystem();
 const WEAPONS = _WeaponSystem.registry; // обратная совместимость
+window._WeaponSystem = _WeaponSystem;
+window.WEAPONS = WEAPONS;
 
 // ── Ракета: update/draw регистрируются ПОСЛЕ инициализации WEAPONS ──
 WEAPONS._rocketUpdateFn = function(b, dt){
@@ -3849,6 +3911,8 @@ document.getElementById('pauseMenuBtn').addEventListener('click',()=>{
 // BACKGROUND
 // ════════════════════════════════════════════════════
 const stars=[], nebulas=[], planets=[], asteroids=[], speedLines=[];
+window.stars=stars; window.nebulas=nebulas; window.planets=planets;
+window.asteroids=asteroids; window.speedLines=speedLines;
 
 // Звёзды — 3 слоя глубины
 for(let i=0;i<60;i++)  stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:.5+Math.random()*.6, sp:.15+Math.random()*.2, o:.2+Math.random()*.3,  layer:0}); // далёкие — медленные, маленькие
@@ -4016,6 +4080,8 @@ const particles   = GS.particles;
 const powerups    = GS.powerups;
 const playerTrail = GS.playerTrail;
 const player      = GS.player;
+window.bullets=bullets; window.enemies=enemies; window.particles=particles;
+window.powerups=powerups; window.player=player;
 
 // Инициализируем позицию игрока
 player.x       = canvas.width  / 2;
@@ -4261,6 +4327,9 @@ function fireRailgun(){
   playSound('shoot'); // короткий звук начала зарядки
   notify('🔮 ЗАРЯДКА...', 'gold');
 }
+
+// [OPT] boss HP bar — кэш DOM + дедупликация состояния (раньше писалась в DOM каждый кадр)
+let _bossFillEl = null, _bossLabelEl = null, _bossBarLastState = '';
 
 // [OPT] updateRailUI — кэш DOM + дедупликация состояния
 let _railBtn = null, _railEmojiEl = null, _railLblEl = null, _railLastState = '';
@@ -4892,6 +4961,7 @@ function getBossType(){
 
 function spawnBoss(){
   bossActive=true;
+  _bossBarLastState = ''; // форсируем перерисовку HP-бара на новом боссе
   const cfg=DIFF[difficulty];
   const btype=getBossType();
   const hp = Math.floor((80 + level*18 + Math.sqrt(level)*25) * cfg.bossHpMult);
@@ -5590,14 +5660,9 @@ function update(dt){
           } else {
             // Обычный враг — мгновенная смерть с эффектом
             for(let p=0;p<8;p++) pSpawn(e.x,e.y,{spread:20,decay:.06,color:`hsl(${160+Math.random()*40},100%,70%)`,size:3+Math.random()*3});
-            const pts = Math.floor((e.score||10)*level*DIFF[difficulty].scoreMult*combo);
-            score+=pts; levelProgress+=pts;
-            coins += e.coin||1;
-            killedEnemies++;
-            addCombo();
-            LS.set('totalKills',(+LS.get('totalKills',0))+1);
-            enemies.splice(i,1);
-            shakeAmount = Math.max(shakeAmount, 2);
+            // [FIX] раньше здесь дублировалась урезанная копия killEnemy() без
+            // ачивок/дропа/сплиттеров/вампиризма — теперь используем общий путь.
+            killEnemy(i, DIFF[difficulty]);
           }
         }
       }
@@ -5729,16 +5794,22 @@ function update(dt){
           spawnBossShot(e.x,e.y,Math.cos(ang)*3,Math.sin(ang)*3,e.bossType.color,9);
         }
       }
-      const bpct=e.hp/e.maxHp*100; const bfill=document.getElementById('bossFill');
+      if(!_bossFillEl){ _bossFillEl = document.getElementById('bossFill'); _bossLabelEl = document.getElementById('bossLabel'); }
+      const bpct=e.hp/e.maxHp*100;
       if(e.spawnInvincible){
-        bfill.style.width='100%';
-        bfill.style.background='linear-gradient(90deg,#44aaff,#00ccff)';
-        const bossLabel = document.getElementById('bossLabel');
-        if(bossLabel) bossLabel.textContent = '🛡️ ПОЯВЛЯЕТСЯ...';
+        if(_bossBarLastState !== 'spawn'){
+          _bossBarLastState = 'spawn';
+          _bossFillEl.style.width='100%';
+          _bossFillEl.style.background='linear-gradient(90deg,#44aaff,#00ccff)';
+          if(_bossLabelEl) _bossLabelEl.textContent = '🛡️ ПОЯВЛЯЕТСЯ...';
+        }
       } else {
-        bfill.style.width=bpct+'%'; bfill.style.background=bpct<30?'linear-gradient(90deg,#ff0000,#ff6600)':bpct<60?'linear-gradient(90deg,#ff6600,#ffaa00)':'linear-gradient(90deg,var(--pink),#ff6b00)';
-        const bossLabel = document.getElementById('bossLabel');
-        if(bossLabel && bossLabel.textContent === '🛡️ ПОЯВЛЯЕТСЯ...') bossLabel.textContent = bossEnemy?.bossType?.name || 'БОСС';
+        const state = 'dmg'+bpct;
+        if(_bossBarLastState !== state){
+          _bossBarLastState = state;
+          _bossFillEl.style.width=bpct+'%'; _bossFillEl.style.background=bpct<30?'linear-gradient(90deg,#ff0000,#ff6600)':bpct<60?'linear-gradient(90deg,#ff6600,#ffaa00)':'linear-gradient(90deg,var(--pink),#ff6b00)';
+          if(_bossLabelEl && _bossLabelEl.textContent === '🛡️ ПОЯВЛЯЕТСЯ...') _bossLabelEl.textContent = bossEnemy?.bossType?.name || 'БОСС';
+        }
       }
     }else{
       const frozen = timeFreezeActive>0;
@@ -6408,11 +6479,18 @@ function draw(){
   ctx.rotate(shipTilt);
   ctx.translate(-player.x, -player.y);
   if(custom.glow){ ctx.shadowBlur=24; ctx.shadowColor=skinC.glow; }
-  const sg=ctx.createLinearGradient(player.x-player.w/2,player.y-player.h/2,player.x+player.w/2,player.y+player.h/2);
-  sg.addColorStop(0,skinC.a); sg.addColorStop(1,skinC.b);
-  ctx.fillStyle=sg;
-  drawShipPath(ctx, custom.shipShape, player.x, player.y, player.w/2, player.h/2);
-  ctx.fill();
+  if(shipPlayerImg.complete && shipPlayerImg.naturalWidth > 0){
+    // [SPRITE] спрайт с полями внутри PNG — рисуем чуть крупнее хитбокса,
+    // чтобы сам корабль на картинке визуально совпадал по размеру со старой векторной отрисовкой
+    const iw = player.w * 1.3, ih = player.h * 1.3;
+    ctx.drawImage(shipPlayerImg, player.x-iw/2, player.y-ih/2, iw, ih);
+  } else {
+    const sg=ctx.createLinearGradient(player.x-player.w/2,player.y-player.h/2,player.x+player.w/2,player.y+player.h/2);
+    sg.addColorStop(0,skinC.a); sg.addColorStop(1,skinC.b);
+    ctx.fillStyle=sg;
+    drawShipPath(ctx, custom.shipShape, player.x, player.y, player.w/2, player.h/2);
+    ctx.fill();
+  }
   if(activePowerups.shield>0){
     ctx.strokeStyle='#00d4ff88'; ctx.lineWidth=3; ctx.shadowBlur=16; ctx.shadowColor='#00d4ff';
     ctx.beginPath(); ctx.arc(player.x,player.y,player.w*.9,0,Math.PI*2); ctx.stroke();
@@ -6941,7 +7019,6 @@ function updateHUD(){
 
   // ── Миссия — кольцо прогресса ──
   if(level !== _hudLastLevel){ _hudLastLevel = level; _hudEl('levelVal').textContent = level; }
-  else _hudEl('levelVal').textContent = level;
   const mLbl = _hudEl('missionLbl');
   if(mLbl) mLbl.textContent = bossActive ? '⚔️ БОСС' : 'ур. '+level;
   const diffMult2 = {easy:.7, normal:1, hard:1.3, nightmare:1.6}[difficulty]||1;
@@ -7031,6 +7108,7 @@ function loop(ts){
 // ════════════════════════════════════════════════════
 function resetBackground(){
   // Пересоздаём звёзды под текущий размер canvas
+  if(typeof stars==='undefined'||typeof speedLines==='undefined') return;
   stars.length=0; speedLines.length=0;
   for(let i=0;i<60;i++)  stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:.5+Math.random()*.6, sp:.15+Math.random()*.2, o:.2+Math.random()*.3,  layer:0});
   for(let i=0;i<80;i++)  stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:.8+Math.random()*1.2, sp:.4+Math.random()*.6,  o:.35+Math.random()*.35, layer:1});
@@ -7215,9 +7293,22 @@ function endGame(){
 // ════════════════════════════════════════════════════
 // RESIZE
 // ════════════════════════════════════════════════════
+// [FIX] раньше это срабатывало на каждое событие resize без debounce (частое
+// на мобильных при скрытии/показе адресной строки), всегда телепортировало
+// игрока в центр даже посреди боя и не пересоздавало фон под новый размер.
+let _resizeDebounce = null;
 window.addEventListener('resize',()=>{
-  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-  player.x=player.targetX=canvas.width/2;
+  clearTimeout(_resizeDebounce);
+  _resizeDebounce = setTimeout(()=>{
+    canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+    if(GS.running){
+      const halfW = player.w/2;
+      player.x = player.targetX = Math.max(halfW, Math.min(canvas.width-halfW, player.x));
+    } else {
+      player.x=player.targetX=canvas.width/2;
+    }
+    resetBackground();
+  }, 200);
 });
 
 

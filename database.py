@@ -40,6 +40,8 @@ class Database:
                 timeout=10.0
             )
             self._local.conn.row_factory = sqlite3.Row
+            # WAL: читатели (например, admin_utils.py) не блокируются во время записи бота
+            self._local.conn.execute("PRAGMA journal_mode=WAL")
         
         try:
             yield self._local.conn
@@ -132,8 +134,14 @@ class Database:
             ''')
             
             cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_achievements_user_id 
+                CREATE INDEX IF NOT EXISTS idx_achievements_user_id
                 ON achievements(user_id)
+            ''')
+
+            # Индекс для рейтинга/ранга (get_top_players, get_user_rank)
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_user_stats_best_score
+                ON user_stats(best_score DESC)
             ''')
             
             # Таблица ежедневных заданий
@@ -394,21 +402,21 @@ class Database:
 
         # Обновляем задание на очки
         cursor.execute('''
-            INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, date)
-            VALUES (?, 'daily_score', 1000, ?, ?)
+            INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, completed, date)
+            VALUES (?, 'daily_score', 1000, ?, CASE WHEN ? >= 1000 THEN 1 ELSE 0 END, ?)
             ON CONFLICT(user_id, challenge_type, date) DO UPDATE SET
                 current_value = current_value + excluded.current_value,
-                completed = CASE WHEN current_value >= target_value THEN 1 ELSE 0 END
-        ''', (user_id, score, today))
+                completed = CASE WHEN current_value + excluded.current_value >= target_value THEN 1 ELSE 0 END
+        ''', (user_id, score, score, today))
 
         # Обновляем задание на убийства
         cursor.execute('''
-            INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, date)
-            VALUES (?, 'daily_kills', 50, ?, ?)
+            INSERT INTO daily_challenges (user_id, challenge_type, target_value, current_value, completed, date)
+            VALUES (?, 'daily_kills', 50, ?, CASE WHEN ? >= 50 THEN 1 ELSE 0 END, ?)
             ON CONFLICT(user_id, challenge_type, date) DO UPDATE SET
                 current_value = current_value + excluded.current_value,
-                completed = CASE WHEN current_value >= target_value THEN 1 ELSE 0 END
-        ''', (user_id, enemies_killed, today))
+                completed = CASE WHEN current_value + excluded.current_value >= target_value THEN 1 ELSE 0 END
+        ''', (user_id, enemies_killed, enemies_killed, today))
 
     def get_user_stats(self, user_id: int, use_cache: bool = True) -> Optional[Dict]:
         """Получить статистику пользователя с кэшированием"""
@@ -447,8 +455,8 @@ class Database:
 
             try:
                 cursor.execute('''
-                    SELECT u.first_name, u.username, s.best_score, s.games_played, 
-                           u.is_premium
+                    SELECT u.user_id, u.first_name, u.username, s.best_score,
+                           s.games_played, u.is_premium, s.max_level
                     FROM user_stats s
                     JOIN users u ON s.user_id = u.user_id
                     WHERE s.best_score > 0
@@ -459,10 +467,12 @@ class Database:
                 results = cursor.fetchall()
                 return [
                     {
-                        'name': row[0] or row[1] or 'Аноним',
-                        'score': row[2],
-                        'games_played': row[3],
-                        'is_premium': bool(row[4])
+                        'user_id': row[0],
+                        'name': row[1] or row[2] or 'Аноним',
+                        'score': row[3],
+                        'games_played': row[4],
+                        'is_premium': bool(row[5]),
+                        'max_level': row[6]
                     }
                     for row in results
                 ]

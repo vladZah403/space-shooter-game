@@ -4,27 +4,34 @@ Space Shooter Telegram Bot v2.0
 """
 
 import logging
+import logging.handlers
 import json
+import threading
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, BotCommand
 from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler, 
+    Application, CommandHandler, CallbackQueryHandler,
     ContextTypes, MessageHandler, filters
 )
 from telegram.error import TelegramError
 
 from database import db, DatabaseError
+from api import run_api_server
 from config import (
     BOT_TOKEN, GAME_URL, DIFFICULTIES, ACHIEVEMENTS,
-    Messages, BOT_COMMANDS, LEADERBOARD_SIZE
+    Messages, BOT_COMMANDS, LEADERBOARD_SIZE, ADMIN_CHAT_ID,
+    LOG_FILE, LOG_LEVEL, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
+    API_HOST, API_PORT
 )
 
-# Настройка расширенного логирования
+# Настройка расширенного логирования (с ротацией, чтобы файл не рос бесконечно)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8'),
+        logging.handlers.RotatingFileHandler(
+            LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding='utf-8'
+        ),
         logging.StreamHandler()
     ]
 )
@@ -683,10 +690,7 @@ async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         # ── Пересылаем предложение администратору ──
-        # Укажи свой Telegram ID в ADMIN_CHAT_ID ниже.
-        # Узнать свой ID: напиши боту @userinfobot
-        ADMIN_CHAT_ID = 307592252  # ← ВСТАВЬ СВОЙ TELEGRAM ID СЮДА, например: 123456789
-
+        # ADMIN_CHAT_ID задаётся через переменную окружения (см. config.py и .env.example)
         if ADMIN_CHAT_ID:
             try:
                 admin_msg = (
@@ -706,7 +710,7 @@ async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             except Exception as e:
                 logger.warning(f"Не удалось переслать предложение: {e}")
         else:
-            logger.warning("⚠️  ADMIN_CHAT_ID не задан — предложение не переслано. Укажи свой Telegram ID в bot.py")
+            logger.warning("⚠️  ADMIN_CHAT_ID не задан — предложение не переслано. Укажи свой Telegram ID в .env")
 
         logger.info(f"💡 Предложение от {user.id} ({user.first_name}): [{category}] {suggestion_text[:50]}...")
 
@@ -802,6 +806,13 @@ def main() -> None:
 
         # Обработчик ошибок
         application.add_error_handler(error_handler)
+
+        # HTTP API лидерборда (api.py) — в отдельном потоке, чтобы игра (WebApp)
+        # могла получать реальный рейтинг игроков из этой же БД по сети.
+        api_thread = threading.Thread(
+            target=run_api_server, args=(API_HOST, API_PORT), daemon=True
+        )
+        api_thread.start()
 
         # Запуск бота
         logger.info("🚀 Space Shooter Bot v2.0 запущен!")
