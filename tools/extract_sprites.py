@@ -16,12 +16,18 @@ from collections import deque
 from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы
+# листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы,
+# 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли)
 SHEET_FILES = [
     '1e686660-f0c5-45ad-b686-2c52b70b7c31.png',
     'cbe8f71c5f0f1e02f95103d6.png',
     'e684480d1e02f95105ba02d6.png',
     '58950900f95105ba2e3301d6.png',
+    '474146f9cc384056462ba0e9.png',
+    'f6d4464578889a1640491feb.png',
+    'e97e246221c488d4b7615ad4.png',
+    '51531b61c7e2336021c45cd4.png',
+    '21ffd0e0336021c488d45bd4.png',
 ]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -30,7 +36,8 @@ PREV = sys.argv[1] if len(sys.argv) > 1 else None
 SHEETS = [Image.open(os.path.join(ROOT, f)).convert('RGB').load() for f in SHEET_FILES]
 SPX = SHEETS[0]
 
-# имя: ((x0, y0, x1, y1) включительно, режим)
+# имя: ((x0, y0, x1, y1) включительно, режим[, лист[, опции]])
+# опции: rot — 180 разворачивает спрайт носом вверх; max — предел большей стороны в пикселях
 SPRITES = {
     # корабли игрока (нарисованное пламя отрезано по низу корпуса)
     'ship1': ((44, 95, 153, 217), 'solid'),
@@ -103,6 +110,51 @@ SPRITES = {
     'b_battleship2':  ((820, 123, 1076, 541), 'solid', 3),
     'b_mothership':   ((20, 605, 579, 908), 'solid', 3),
     'b_heavycruiser': ((610, 609, 1085, 908), 'solid', 3),
+
+    # ── лист 4: классические боссы (свои спрайты вместо перекраски) ──
+    'b_sniper':  ((98, 56, 348, 407), 'solid', 4),
+    'b_kraken':  ((434, 76, 828, 407), 'solid', 4),
+    'b_dread':   ((874, 75, 1219, 407), 'solid', 4),
+    'b_phoenix': ((9, 462, 440, 798), 'solid', 4),
+    'b_necro':   ((446, 468, 824, 790), 'solid', 4),
+    'b_queen':   ((865, 466, 1227, 788), 'solid', 4),
+
+    # ── лист 5: боссы 2.1 ──
+    'b_inquisitor': ((14, 106, 533, 535), 'solid', 5, {'max': 440}),
+    'b_chaos':      ((558, 116, 1074, 535), 'solid', 5, {'max': 440}),
+    'b_overlord':   ((308, 569, 795, 905), 'solid', 5, {'max': 440}),
+
+    # ── лист 6: враги 2.1 ──
+    'e_biomech':   ((25, 78, 311, 300), 'solid', 6, {'max': 200}),
+    'e_crystal':   ((335, 70, 565, 301), 'solid', 6, {'max': 170}),
+    'e_bug':       ((585, 81, 810, 299), 'solid', 6, {'max': 150}),
+    'e_platform':  ((837, 78, 1066, 299), 'solid', 6, {'max': 190}),
+    'e_minelayer': ((18, 371, 315, 572), 'solid', 6, {'max': 210}),
+    'e_ghost':     ((325, 359, 575, 583), 'solid', 6, {'max': 180}),
+    'e_orbit':     ((592, 366, 802, 578), 'solid', 6, {'max': 170}),
+    'e_ram':       ((828, 350, 1080, 595), 'solid', 6, {'max': 190}),
+    'e_swarm':     ((66, 646, 257, 910), 'solid', 6, {'max': 180}),
+    'e_parasite':  ((313, 653, 564, 910), 'solid', 6, {'max': 180}),
+    'e_ion':       ((573, 650, 822, 912), 'solid', 6, {'max': 180}),
+    'e_crab':      ((835, 656, 1073, 911), 'solid', 6, {'max': 190}),
+
+    # ── лист 7: корабли игрока 2.1 (нарисованное пламя отрезано; часть кораблей развёрнута носом вверх) ──
+    'ship7':  ((68, 182, 240, 391), 'solid', 7, {'max': 230}),               # Перехватчик
+    'ship8':  ((455, 652, 645, 780), 'solid', 7, {'rot': 180, 'max': 230}),  # Манёвренный разведчик
+    'ship9':  ((288, 240, 574, 405), 'solid', 7, {'rot': 180, 'max': 260}),  # Тяжёлый бомбардировщик
+    'ship10': ((590, 205, 800, 399), 'solid', 7, {'max': 230}),              # Стелс-истребитель
+    'ship11': ((826, 245, 1062, 422), 'solid', 7, {'rot': 180, 'max': 240}), # Крылатый штурмовик
+    'ship12': ((70, 602, 378, 808), 'solid', 7, {'rot': 180, 'max': 270}),   # Двухфюзеляжный
+    'ship13': ((768, 532, 972, 842), 'solid', 7, {'max': 280}),              # Линейный крейсер
+
+    # ── лист 8: базовый корабль в разных цветах (раскраски «Сокола» и дроны-напарники) ──
+    'c_blue':   ((45, 141, 149, 249), 'solid', 8),
+    'c_red':    ((195, 141, 299, 249), 'solid', 8),
+    'c_green':  ((346, 141, 450, 249), 'solid', 8),
+    'c_gold':   ((497, 141, 601, 249), 'solid', 8),
+    'c_purple': ((651, 141, 755, 249), 'solid', 8),
+    'c_white':  ((801, 141, 905, 249), 'solid', 8),
+    'c_orange': ((951, 141, 1055, 249), 'solid', 8),
 }
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
@@ -113,6 +165,21 @@ NOZZLES = {
     'ship4': [(301, 450, 0.9), (357, 450, 0.9)],
     'ship5': [(549, 425, 0.55), (582, 432, 0.9), (641, 432, 0.9), (674, 425, 0.55)],
     'ship6': [(849, 444, 0.8), (891, 444, 0.8), (953, 444, 0.8), (999, 444, 0.8)],
+    # координаты листа до разворота — для развёрнутых спрайтов пересчитываются автоматически
+    'ship7': [(152, 391, 1.0), (107, 390, 0.45), (197, 390, 0.45)],
+    'ship8': [(508, 652, 0.7), (590, 652, 0.7)],
+    'ship9': [(380, 240, 0.85), (473, 240, 0.85)],
+    'ship10': [(660, 399, 0.55), (727, 399, 0.55)],
+    'ship11': [(910, 245, 0.8), (977, 245, 0.8)],
+    'ship12': [(163, 602, 0.85), (280, 602, 0.85)],
+    'ship13': [(868, 822, 0.9), (842, 834, 0.45), (896, 834, 0.45)],
+    'c_blue': [(97, 249, 1.0), (74, 247, 0.5), (120, 247, 0.5)],
+    'c_red': [(247, 249, 1.0), (224, 247, 0.5), (270, 247, 0.5)],
+    'c_green': [(398, 249, 1.0), (375, 247, 0.5), (421, 247, 0.5)],
+    'c_gold': [(549, 249, 1.0), (526, 247, 0.5), (572, 247, 0.5)],
+    'c_purple': [(703, 249, 1.0), (680, 247, 0.5), (726, 247, 0.5)],
+    'c_white': [(853, 249, 1.0), (830, 247, 0.5), (876, 247, 0.5)],
+    'c_orange': [(1003, 249, 1.0), (980, 247, 0.5), (1026, 247, 0.5)],
 }
 
 
@@ -144,7 +211,12 @@ def bg_estimate(x0, y0, x1, y1):
 CLOSE = {'boss': 5, 'interceptor': 2, 'assault': 2, 'techno': 2, 'bomber': 2, 'shielder': 2,
          'e_heavyfighter': 3, 'e_redoubt': 3, 'e_bombardier': 3, 'e_destroyer': 4, 'e_cruiser_h': 4, 'e_cruiser': 4,
          'b_spider': 5, 'b_battleship': 5, 'b_battleship2': 5, 'b_mothership': 5, 'b_heavycruiser': 5,
-         'ship4': 2, 'ship5': 2, 'ship6': 2}
+         'ship4': 2, 'ship5': 2, 'ship6': 2,
+         'b_sniper': 5, 'b_kraken': 5, 'b_dread': 5, 'b_phoenix': 4, 'b_necro': 5, 'b_queen': 5,
+         'b_inquisitor': 5, 'b_chaos': 5, 'b_overlord': 5,
+         'e_biomech': 3, 'e_crystal': 2, 'e_bug': 3, 'e_platform': 3, 'e_minelayer': 3, 'e_ghost': 3,
+         'e_orbit': 3, 'e_ram': 3, 'e_swarm': 3, 'e_parasite': 3, 'e_ion': 3, 'e_crab': 3,
+         'ship7': 2, 'ship8': 2, 'ship9': 2, 'ship10': 2, 'ship11': 2, 'ship12': 2, 'ship13': 2}
 
 
 def flood_outside(x0, y0, w, h, trav, blocked=None):
@@ -276,6 +348,35 @@ def extract_add(x0, y0, x1, y1):
     return out
 
 
+def despeckle(img, min_area=30):
+    """Убирает мелкие оторванные пятна (звёзды фона), чтобы они не раздували рамку кадра."""
+    w, h = img.size
+    ap = img.getchannel('A').load()
+    seen = bytearray(w * h)
+    px = img.load()
+    for sy in range(h):
+        for sx in range(w):
+            i = sy * w + sx
+            if seen[i] or ap[sx, sy] <= 24:
+                continue
+            comp = [(sx, sy)]
+            seen[i] = 1
+            k = 0
+            while k < len(comp):
+                x, y = comp[k]
+                k += 1
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1)):
+                    if 0 <= nx < w and 0 <= ny < h:
+                        j = ny * w + nx
+                        if not seen[j] and ap[nx, ny] > 24:
+                            seen[j] = 1
+                            comp.append((nx, ny))
+            if len(comp) < min_area:
+                for x, y in comp:
+                    px[x, y] = (0, 0, 0, 0)
+    return img
+
+
 def trim(img):
     bb = img.getchannel('A').point(lambda a: 255 if a > 6 else 0).getbbox()
     return (img.crop(bb), bb) if bb else (img, (0, 0, img.width, img.height))
@@ -294,16 +395,34 @@ def centroid(img):
     return (sx / s, sy / s) if s else (img.width / 2, img.height / 2)
 
 
+def shrink(img, limit):
+    """Уменьшает спрайт до предела большей стороны (через premultiplied alpha — без тёмной каймы)."""
+    k = limit / max(img.width, img.height)
+    if k >= 1:
+        return img
+    size = (max(1, round(img.width * k)), max(1, round(img.height * k)))
+    return img.convert('RGBa').resize(size, Image.LANCZOS).convert('RGBA')
+
+
 def main():
     global SPX
-    images, offsets = {}, {}
+    images, offsets, opts, sizes0 = {}, {}, {}, {}
     for name, spec in SPRITES.items():
         box, mode = spec[0], spec[1]
         SPX = SHEETS[spec[2] if len(spec) > 2 else 0]
+        opt = spec[3] if len(spec) > 3 else {}
         img = extract_solid(*box, close_r=CLOSE.get(name, 0)) if mode == 'solid' else extract_add(*box)
+        if mode == 'solid':
+            img = despeckle(img)
         img, bb = trim(img)
-        images[name] = (img, mode)
         offsets[name] = (box[0] + bb[0], box[1] + bb[1])
+        sizes0[name] = (img.width, img.height)
+        if opt.get('rot') == 180:
+            img = img.rotate(180)
+        if opt.get('max'):
+            img = shrink(img, opt['max'])
+        images[name] = (img, mode)
+        opts[name] = opt
 
     # кадры взрыва выравниваем по центру яркости в общей клетке
     cell_size = 136
@@ -343,8 +462,15 @@ def main():
     nozzles = {}
     for n, lst in NOZZLES.items():
         ox, oy = offsets[n]
-        w, h = rects[n][2], rects[n][3]
-        nozzles[n] = [[round((px - ox) / w, 3), round((py - oy) / h, 3), s] for px, py, s in lst]
+        w, h = sizes0[n]
+        rot = opts.get(n, {}).get('rot') == 180
+        out = []
+        for px, py, sz in lst:
+            u, v = (px - ox) / w, (py - oy) / h
+            if rot:
+                u, v = 1 - u, 1 - v
+            out.append([round(u, 3), round(v, 3), sz])
+        nozzles[n] = out
     with open(OUT_JS, 'w', encoding='utf-8') as f:
         f.write('// Автогенерация: python tools/extract_sprites.py — не редактировать вручную.\n')
         f.write('// frames: имя -> [x, y, w, h, additive]; nozzles: сопла (доли ширины/высоты спрайта)\n')

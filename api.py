@@ -196,7 +196,8 @@ async def _notify_admin(text: str):
                 if resp.status != 200:
                     logger.warning(f'Не удалось переслать предложение администратору: HTTP {resp.status}')
     except Exception as e:  # сеть недоступна и т.п. — предложение уже сохранено в БД
-        logger.warning(f'Не удалось переслать предложение администратору: {e}')
+        # текст ошибки может содержать адрес запроса с токеном, поэтому маскируем его
+        logger.warning('Не удалось переслать предложение администратору: %s', str(e).replace(BOT_TOKEN, '<BOT_TOKEN>'))
 
 
 async def suggestion_handler(request: web.Request) -> web.Response:

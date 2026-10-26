@@ -29,6 +29,7 @@
       lb: [],
       seenIntro: false,
       notes: [],
+      patch: 21,
     };
   }
 
@@ -59,7 +60,7 @@
       let raw = null;
       try { raw = localStorage.getItem(KEY); } catch (e) { /* приватный режим */ }
       if (raw) {
-        try { this.s = merge(defaults(), JSON.parse(raw)); }
+        try { const data = JSON.parse(raw); this.s = merge(defaults(), data); this.patchNotes(data); }
         catch (e) { console.warn('[store] повреждённое сохранение, начинаем заново', e); this.s = defaults(); }
       } else {
         this.s = defaults();
@@ -106,6 +107,13 @@
       clearTimeout(this._cloudTimer);
       this._cloudTimer = setTimeout(() => SS.tg.cloudSave(JSON.stringify(this.s), this.s.updated), 2500);
     },
+    // игрок версии 2.0 один раз увидит, что нового в обновлении 2.1
+    patchNotes(data) {
+      if (data && !(data.patch >= 21) && data.stats && data.stats.games > 0) {
+        if (!this.s.notes.some((n) => n.type === 'v21' || n.type === 'v2')) this.s.notes.push({ type: 'v21' });
+      }
+      this.s.patch = 21;
+    },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
       try {
@@ -113,6 +121,7 @@
         if (!data || data.v !== 2) return false;
         if ((data.updated || 0) <= (this.s.updated || 0)) return false;
         this.s = merge(defaults(), data);
+        this.patchNotes(data);
         this.sanitize();
         try { localStorage.setItem(KEY, JSON.stringify(this.s)); } catch (e) {}
         return true;
@@ -390,8 +399,8 @@
       if (!this.canPrestige()) return false;
       const s = this.s;
       s.prestige = (s.prestige || 0) + 1;
+      // прокачка оружия и корабля сохраняется — сбрасываются только уровень и навыки
       s.shipLvl = 1; s.shipXP = 0; s.skills = {};
-      s.general = {}; s.weapons.ups = {};
       this.unlock('prestige1');
       store.save();
       return true;
@@ -404,6 +413,7 @@
         case 'bossTypes': return st.bossTypes.length;
         case 'weaponsOwned': return s.weapons.owned.length;
         case 'skillsLearned': return Object.keys(s.skills).length;
+        case 'shipsOwned': return s.ship.models.filter((m) => D.SHIPS[m]).length;
         case 'shipLvl': return s.shipLvl;
         default: return st[stat] || 0;
       }

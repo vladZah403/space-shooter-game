@@ -35,6 +35,10 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+# httpx на уровне INFO пишет в лог полный адрес запроса, а в нём токен бота.
+# Оставляем от него только предупреждения и ошибки.
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 

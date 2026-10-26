@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-// SPACE SHOOTER 2.0 — игровой контент
+// SPACE SHOOTER 2.1 — игровой контент
 // Здесь всё, что можно настраивать без изменения логики:
 // сложности, оружие, враги, боссы, бонусы, улучшения, навыки,
 // корабли, раскраски, достижения, ежедневные задания, секторы.
@@ -38,7 +38,7 @@
     shotgun: {
       name: 'ДРОБОВИК', color: '#ffc83d', price: 600,
       desc: 'Веер дроби в упор. Идеален против роя.',
-      base: { dmg: 8, cd: 0.5, speed: 820, pellets: 5, life: 0.5 },
+      base: { dmg: 9, cd: 0.48, speed: 860, pellets: 5, life: 0.52 },
       ups: [
         { id: 'dmg', name: 'Мощность', max: 8, step: 0.12, unit: '% урона', costs: C([70, 120, 190, 290, 430, 630, 900, 1300]) },
         { id: 'pellets', name: 'Дробинки', max: 4, step: 1, unit: ' дробинки', abs: true, costs: C([250, 550, 1000, 1700]) },
@@ -48,7 +48,7 @@
     rocket: {
       name: 'РАКЕТЫ', color: '#ff8a3d', price: 900,
       desc: 'Самонаводящиеся ракеты со взрывом. Не промахиваются.',
-      base: { dmg: 22, aoe: 16, radius: 52, cd: 0.46, speed: 520, salvo: 1 },
+      base: { dmg: 26, aoe: 18, radius: 56, cd: 0.44, speed: 540, salvo: 1 },
       ups: [
         { id: 'dmg', name: 'Боеголовка', max: 8, step: 0.12, unit: '% урона', costs: C([80, 130, 210, 320, 480, 700, 1000, 1450]) },
         { id: 'aoe', name: 'Радиус взрыва', max: 5, step: 0.15, unit: '% радиуса', costs: C([150, 260, 420, 640, 950]) },
@@ -58,7 +58,7 @@
     arc: {
       name: 'ДУГА', color: '#7ff6ff', price: 1200,
       desc: 'Электрическая дуга бьёт всех врагов впереди корабля.',
-      base: { dmg: 24, cd: 0.42, range: 190, angle: 0.9 },
+      base: { dmg: 26, cd: 0.42, range: 225, angle: 0.95 },
       ups: [
         { id: 'dmg', name: 'Напряжение', max: 8, step: 0.12, unit: '% урона', costs: C([90, 150, 240, 360, 540, 780, 1100, 1600]) },
         { id: 'range', name: 'Дальность', max: 5, step: 0.12, unit: '% дальности', costs: C([160, 280, 450, 680, 1000]) },
@@ -68,7 +68,7 @@
     plasma: {
       name: 'ПЛАЗМА', color: '#ff5cf0', price: 1500,
       desc: 'Медленный шар с огромным взрывом. Лучший урон по площади.',
-      base: { dmg: 38, aoe: 30, radius: 72, cd: 0.72, speed: 380 },
+      base: { dmg: 34, aoe: 28, radius: 72, cd: 0.72, speed: 430 },
       ups: [
         { id: 'dmg', name: 'Заряд', max: 8, step: 0.12, unit: '% урона', costs: C([100, 160, 260, 390, 580, 840, 1200, 1700]) },
         { id: 'aoe', name: 'Радиус взрыва', max: 5, step: 0.15, unit: '% радиуса', costs: C([170, 290, 460, 700, 1050]) },
@@ -78,7 +78,7 @@
     lightning: {
       name: 'МОЛНИЯ', color: '#fff36b', price: 2500,
       desc: 'Цепная молния сама находит цели и прыгает между врагами.',
-      base: { dmg: 15, cd: 0.32, chain: 3, range: 150, falloff: 0.85 },
+      base: { dmg: 14, cd: 0.32, chain: 3, range: 150, falloff: 0.8 },
       ups: [
         { id: 'dmg', name: 'Разряд', max: 8, step: 0.12, unit: '% урона', costs: C([110, 180, 290, 440, 650, 940, 1350, 1900]) },
         { id: 'chain', name: 'Прыжки', max: 4, step: 1, unit: ' прыжок', abs: true, costs: C([300, 650, 1200, 2000]) },
@@ -107,6 +107,7 @@
     { id: 'shield',  name: 'Генератор щита',   ico: '🛡️', max: 3,  step: 1,    unit: '',              abs: true, costs: [600, 1400, 2800],
       levelText: ['Щит на старте', 'Щит восстанавливается каждые 40 с', 'Восстановление каждые 25 с'] },
     { id: 'magnet',  name: 'Магнит',           ico: '🧲', max: 6,  step: 0.2,  unit: '% радиус сбора', costs: [100, 170, 260, 380, 550, 800] },
+    { id: 'engine',  name: 'Двигатели',        ico: '🚀', max: 5,  step: 0.04, unit: '% скорости',     costs: [150, 260, 420, 650, 950] },
     { id: 'greed',   name: 'Сборщик',          ico: '💰', max: 8,  step: 0.06, unit: '% монет',        costs: [150, 240, 360, 520, 750, 1050, 1450, 2000] },
     { id: 'bombs',   name: 'Бомбовый отсек',   ico: '💣', max: 3,  step: 1,    unit: ' бомба на старте', abs: true, costs: [300, 800, 1800] },
     { id: 'bombdmg', name: 'Мощность бомбы',   ico: '☢️', max: 5,  step: 0.25, unit: '% урона бомбы',  costs: [200, 350, 550, 800, 1150] },
@@ -122,6 +123,7 @@
     drone:       { name: 'Дрон',           sprite: 'drone', alt: 'e_drone2', w: 34, hp: 12, spd: 150, score: 60, coins: 1, xp: 1, ai: 'formation', wave: 2, weight: 16 },
     shooter:     { name: 'Стрелок',        sprite: 'shooter',     w: 50, hp: 42,  spd: 95,  score: 220, coins: 2, xp: 2, ai: 'hover',     wave: 2,  weight: 15,
       fire: { kind: 'aimed3', cd: 2.3, bullet: 'bolt', spd: 220 } },
+    bug:         { name: 'Жук-дрон',       sprite: 'e_bug',       w: 30, hp: 10,  spd: 165, score: 70,  coins: 1, xp: 1, ai: 'swarm',     wave: 3,  weight: 9 },
     assault:     { name: 'Штурмовик',      sprite: 'assault', alt: 'e_assault2', w: 48, hp: 46, spd: 95, score: 240, coins: 2, xp: 2, ai: 'zigzag', wave: 4, weight: 14,
       fire: { kind: 'burst', cd: 2.4, count: 3, bullet: 'bolt', spd: 260 } },
     kamikaze:    { name: 'Камикадзе',      sprite: 'kamikaze', alt: 'e_kamikaze2', w: 32, hp: 18, spd: 110, score: 160, coins: 1, xp: 1, ai: 'kamikaze', wave: 5, weight: 11 },
@@ -129,44 +131,71 @@
       fire: { kind: 'aimed', cd: 1.9, bullet: 'orb', spd: 230 } },
     heavy:       { name: 'Тяжёлый',        sprite: 'heavy',       w: 62, hp: 150, spd: 48,  score: 520, coins: 5, xp: 4, ai: 'tank',      wave: 7,  weight: 8,
       fire: { kind: 'fan', cd: 2.7, count: 5, spread: 0.9, bullet: 'orb', spd: 170 } },
+    ram:         { name: 'Таран',          sprite: 'e_ram',       w: 54, hp: 75,  spd: 70,  score: 320, coins: 3, xp: 2, ai: 'ram',       wave: 7,  weight: 6 },
     splitter:    { name: 'Делитель',       sprite: 'scout', tint: 120, w: 50, hp: 40, spd: 95, score: 260, coins: 2, xp: 2, ai: 'dive', wave: 8, weight: 6, split: true },
     bomber:      { name: 'Бомбардировщик', sprite: 'bomber',      w: 74, hp: 120, spd: 70,  score: 480, coins: 4, xp: 3, ai: 'bomber',    wave: 8,  weight: 7,
       fire: { kind: 'mine', cd: 1.5 } },
     sniper:      { name: 'Снайпер',        sprite: 'sniper', alt: 'e_sniper2', w: 46, hp: 60, spd: 75, score: 380, coins: 3, xp: 3, ai: 'sniper', wave: 9, weight: 7,
       fire: { kind: 'snipe', cd: 3.4, bullet: 'long', spd: 520 } },
+    swarm:       { name: 'Рой',            sprite: 'e_swarm',     w: 46, hp: 90,  spd: 60,  score: 420, coins: 4, xp: 3, ai: 'carrier',   wave: 9,  weight: 4, brood: 4 },
     shielder:    { name: 'Щитоносец',      sprite: 'shielder',    w: 58, hp: 90, shield: 80, spd: 55, score: 480, coins: 4, xp: 3, ai: 'hover', wave: 10, weight: 6,
       fire: { kind: 'ring', cd: 3.6, count: 8, bullet: 'orb', spd: 140 } },
+    crystal:     { name: 'Кристалл',       sprite: 'e_crystal',   w: 50, hp: 65,  spd: 55,  score: 380, coins: 3, xp: 3, ai: 'drift',     wave: 10, weight: 5,
+      fire: { kind: 'fan', cd: 2.6, count: 3, spread: 0.5, bullet: 'shard', spd: 200 }, death: { n: 8, bullet: 'shard', spd: 165 } },
     techno:      { name: 'Технодрон',      sprite: 'techno',      w: 58, hp: 75,  spd: 60,  score: 420, coins: 3, xp: 3, ai: 'teleport',  wave: 11, weight: 6,
       fire: { kind: 'ring', cd: 0, count: 10, bullet: 'dot', spd: 160 } },
-    hunter:      { name: 'Охотник',        sprite: 'hunter',      w: 54, hp: 80,  spd: 85,  score: 420, coins: 3, xp: 3, ai: 'hunter',    wave: 12, weight: 6 },
-    armored:     { name: 'Броненосец',     sprite: 'armored',     w: 64, hp: 280, spd: 36,  score: 750, coins: 7, xp: 5, ai: 'tank',      wave: 13, weight: 5,
-      fire: { kind: 'twin', cd: 1.7, bullet: 'bolt', spd: 250 } },
     heavyfighter:{ name: 'Тяжёлый истребитель', sprite: 'e_heavyfighter', w: 62, hp: 120, spd: 62, score: 560, coins: 5, xp: 4, ai: 'tank', wave: 11, weight: 7,
       fire: { kind: 'aimed3', cd: 2.0, bullet: 'bolt', spd: 240 } },
+    minelayer:   { name: 'Миноукладчик',   sprite: 'e_minelayer', w: 80, hp: 120, spd: 72,  score: 520, coins: 4, xp: 3, ai: 'bomber',    wave: 17, weight: 4, horizontal: true,
+      fire: { kind: 'mine', cd: 1.5 } },
+    hunter:      { name: 'Охотник',        sprite: 'hunter',      w: 54, hp: 80,  spd: 85,  score: 420, coins: 3, xp: 3, ai: 'hunter',    wave: 12, weight: 6 },
     bombardier:  { name: 'Бомбардир',      sprite: 'e_bombardier', w: 62, hp: 170, spd: 45, score: 640, coins: 6, xp: 4, ai: 'tank', wave: 12, weight: 5,
       fire: { kind: 'mine', cd: 2.4 }, fire2: { kind: 'fan', cd: 3.2, count: 6, spread: 1.1, bullet: 'orb', spd: 160 } },
+    armored:     { name: 'Броненосец',     sprite: 'armored',     w: 64, hp: 280, spd: 36,  score: 750, coins: 7, xp: 5, ai: 'tank',      wave: 13, weight: 5,
+      fire: { kind: 'twin', cd: 1.7, bullet: 'bolt', spd: 250 } },
+    platform:    { name: 'Платформа',      sprite: 'e_platform',  w: 64, hp: 200, spd: 45,  score: 680, coins: 6, xp: 4, ai: 'turret',    wave: 13, weight: 4 },
     redoubt:     { name: 'Редут',          sprite: 'e_redoubt', w: 66, hp: 160, spd: 50, score: 700, coins: 6, xp: 5, ai: 'redoubt', wave: 14, weight: 5,
       fire: { kind: 'ring', cd: 0, count: 12, bullet: 'violet', spd: 140 } },
+    ghost:       { name: 'Призрак',        sprite: 'e_ghost',     w: 54, hp: 70,  spd: 90,  score: 460, coins: 4, xp: 3, ai: 'phase',     wave: 14, weight: 5, rot: Math.PI / 2,
+      fire: { kind: 'burst', cd: 0, count: 3, bullet: 'needle', spd: 280 } },
+    orbit:       { name: 'Орбита',         sprite: 'e_orbit',     w: 52, hp: 130, spd: 60,  score: 560, coins: 5, xp: 4, ai: 'orbit',     wave: 16, weight: 4,
+      fire: { kind: 'aimed', cd: 1.5, bullet: 'orb', spd: 220 }, death: { n: 12, bullet: 'orb', spd: 145 } },
     cruiser:     { name: 'Крейсер',        sprite: 'e_cruiser', w: 78, hp: 380, spd: 32, score: 1100, coins: 10, xp: 7, ai: 'tank', wave: 16, weight: 3,
       fire: { kind: 'twin', cd: 1.5, bullet: 'bolt', spd: 250 }, fire2: { kind: 'ring', cd: 3.6, count: 10, bullet: 'orb', spd: 140 } },
-    // мини-боссы — появляются по очереди на волнах 8, 13, 18, 23…
-    gunship:     { name: 'Ганшип',         sprite: 'gunship',     w: 104, hp: 850, spd: 45, score: 3000, coins: 30, xp: 14, ai: 'gunship', wave: 8, weight: 0, mini: true },
-    destroyer:   { name: 'Эсминец',        sprite: 'e_destroyer', w: 88, hp: 1200, spd: 40, score: 4000, coins: 40, xp: 18, ai: 'destroyer', wave: 13, weight: 0, mini: true },
-    cruiser_h:   { name: 'Рейдер',         sprite: 'e_cruiser_h', w: 210, hp: 1000, spd: 75, score: 3600, coins: 36, xp: 16, ai: 'flyby', wave: 18, weight: 0, mini: true, horizontal: true },
+    parasite:    { name: 'Паразит',        sprite: 'e_parasite',  w: 56, hp: 110, spd: 55,  score: 540, coins: 5, xp: 4, ai: 'hover',     wave: 16, weight: 4, brood: 3, larva: true,
+      fire: { kind: 'fan', cd: 2.6, count: 4, spread: 0.7, bullet: 'green', spd: 170 } },
+    ion:         { name: 'Ионный',         sprite: 'e_ion',       w: 52, hp: 120, spd: 75,  score: 600, coins: 5, xp: 4, ai: 'ion',       wave: 18, weight: 4 },
+    crab:        { name: 'Крабоход',       sprite: 'e_crab',      w: 66, hp: 280, spd: 55,  score: 820, coins: 7, xp: 5, ai: 'crab',      wave: 21, weight: 4,
+      fire: { kind: 'pincer', cd: 1.8, bullet: 'bolt', spd: 240 } },
+    biomech:     { name: 'Био-мех',        sprite: 'e_biomech',   w: 86, hp: 230, spd: 58,  score: 900, coins: 8, xp: 5, ai: 'bomber',    wave: 23, weight: 3, horizontal: true, weave: 38,
+      fire: { kind: 'fan', cd: 1.3, count: 5, spread: 0.9, bullet: 'green', spd: 160, down: true } },
+    // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
+    gunship:     { name: 'Ганшип',          sprite: 'gunship',       w: 104, hp: 850,  spd: 45, score: 3000, coins: 30, xp: 14, ai: 'gunship',    wave: 8,  weight: 0, mini: true },
+    destroyer:   { name: 'Эсминец',         sprite: 'e_destroyer',   w: 88,  hp: 1200, spd: 40, score: 4000, coins: 40, xp: 18, ai: 'destroyer',  wave: 13, weight: 0, mini: true },
+    cruiser_h:   { name: 'Рейдер',          sprite: 'e_cruiser_h',   w: 210, hp: 1000, spd: 75, score: 3600, coins: 36, xp: 16, ai: 'flyby',      wave: 18, weight: 0, mini: true, horizontal: true },
+    battleship:  { name: 'Линкор',          sprite: 'b_battleship',  w: 92,  hp: 1500, spd: 34, score: 4600, coins: 46, xp: 20, ai: 'battleship', wave: 23, weight: 0, mini: true },
+    frigate:     { name: 'Ракетный фрегат', sprite: 'b_battleship2', w: 86,  hp: 1350, spd: 50, score: 4400, coins: 44, xp: 19, ai: 'frigate',    wave: 28, weight: 0, mini: true },
   };
+  D.MINI_ORDER = ['gunship', 'destroyer', 'cruiser_h', 'battleship', 'frigate'];
 
   // ── Боссы ────────────────────────────────────────────────────
-  // hue — перекраска спрайта (null = оригинальные цвета)
-  // sprite — кадр атласа; rot — поворот (PI = носом вниз); wf/wmax — ширина: доля поля и предел в px
+  // sprite — кадр атласа; rot — поворот (PI = носом вниз); hue — перекраска (null = оригинальные цвета)
+  // wf/wmax — ширина: доля поля и предел в px; hp — множитель прочности
+  // Боссы идут по кругу каждые 5 волн, после 13-го круг повторяется сильнее.
   D.BOSSES = [
-    { id: 'guardian',    name: 'СТРАЖ',               sprite: 'boss',           hue: null, color: '#ff3d5a', wf: 0.46, wmax: 176, hp: 1.0,  title: 'Хранитель первого рубежа' },
-    { id: 'sniper',      name: 'СНАЙПЕР',             sprite: 'b_battleship2',  rot: Math.PI, color: '#ff9f3d', wf: 0.36, wmax: 146, hp: 1.0, title: 'Видит каждый ваш манёвр' },
-    { id: 'spider',      name: 'ПАУК-РЕАКТОР',        sprite: 'b_spider',       rot: Math.PI, color: '#c06bff', wf: 0.74, wmax: 300, hp: 1.1, title: 'Реактор в сердце стальной паутины' },
-    { id: 'dreadnought', name: 'ДРЕДНОУТ',            sprite: 'b_battleship',   rot: Math.PI, color: '#3db8ff', wf: 0.4,  wmax: 156, hp: 1.15, title: 'Энергощит — ракеты и рельса бьют сильнее', shield: 0.6 },
-    { id: 'phoenix',     name: 'ФЕНИКС',              sprite: 'boss',           hue: 18,   color: '#ff6a2a', wf: 0.46, wmax: 176, hp: 1.1,  title: 'Возрождается из пепла' },
-    { id: 'mothership',  name: 'МАТЕРИНСКИЙ КОРАБЛЬ', sprite: 'b_mothership',   color: '#3dff7a', wf: 0.94, wmax: 520, hp: 1.2,  title: 'Её дети повсюду' },
-    { id: 'necro',       name: 'НЕКРОМАНТ',           sprite: 'boss',           hue: 268,  color: '#9d4dff', wf: 0.48, wmax: 184, hp: 1.25, title: 'Повелитель павших' },
+    { id: 'guardian',    name: 'СТРАЖ',               sprite: 'boss',           hue: null,    color: '#ff3d5a', wf: 0.46, wmax: 176, hp: 1.0,  title: 'Хранитель первого рубежа' },
+    { id: 'sniper',      name: 'СНАЙПЕР',             sprite: 'b_sniper',       rot: Math.PI, color: '#ff9f3d', wf: 0.36, wmax: 150, hp: 1.0,  title: 'Видит каждый ваш манёвр' },
+    { id: 'kraken',      name: 'КРАКЕН',              sprite: 'b_kraken',       color: '#3dffd2', wf: 0.62, wmax: 260, hp: 1.05, title: 'Щупальца из глубин туманности' },
+    { id: 'phoenix',     name: 'ФЕНИКС',              sprite: 'b_phoenix',      rot: Math.PI, color: '#ff6a2a', wf: 0.72, wmax: 300, hp: 1.0,  title: 'Возрождается из пепла' },
+    { id: 'spider',      name: 'ПАУК-РЕАКТОР',        sprite: 'b_spider',       rot: Math.PI, color: '#c06bff', wf: 0.74, wmax: 300, hp: 1.1,  title: 'Реактор в сердце стальной паутины' },
+    { id: 'dreadnought', name: 'ДРЕДНОУТ',            sprite: 'b_dread',        rot: Math.PI, color: '#3db8ff', wf: 0.52, wmax: 216, hp: 1.1,  title: 'Энергощит — ракеты и рельса бьют сильнее', shield: 0.6 },
+    { id: 'inquisitor',  name: 'ИНКВИЗИТОР',          sprite: 'b_inquisitor',   color: '#ffd23d', wf: 0.72, wmax: 300, hp: 1.15, title: 'Перекрестье лазеров и огонь гатлингов' },
+    { id: 'queen',       name: 'КОРОЛЕВА РОЯ',        sprite: 'b_queen',        color: '#a6ff3d', wf: 0.58, wmax: 240, hp: 1.15, title: 'Её дети повсюду' },
+    { id: 'necro',       name: 'НЕКРОМАНТ',           sprite: 'b_necro',        color: '#7dff6b', wf: 0.6,  wmax: 250, hp: 1.2,  title: 'Повелитель павших' },
+    { id: 'mothership',  name: 'МАТЕРИНСКИЙ КОРАБЛЬ', sprite: 'b_mothership',   color: '#3dff7a', wf: 0.94, wmax: 520, hp: 1.25, title: 'Флот внутри одного корабля' },
+    { id: 'chaos',       name: 'ХАОС',                sprite: 'b_chaos',        color: '#ff7a2a', wf: 0.72, wmax: 300, hp: 1.25, title: 'Непредсказуем. Иногда перегревается' },
     { id: 'cruiser',     name: 'ТЯЖЁЛЫЙ КРЕЙСЕР',     sprite: 'b_heavycruiser', color: '#ff9f3d', wf: 0.72, wmax: 340, hp: 1.3,  title: 'Бортовые залпы и рой ракет' },
+    { id: 'overlord',    name: 'ОВЕРЛОРД',            sprite: 'b_overlord',     color: '#c03dff', wf: 0.78, wmax: 330, hp: 1.4,  title: 'Глаз, что видит всё. Последний рубеж' },
   ];
 
   // ── Бонусы (выпадают из врагов) ─────────────────────────────
@@ -192,7 +221,7 @@
   D.PERKS = [
     { id: 'dmg',       ico: '🔥', name: 'МОЩЬ',            rar: 'common', max: 6,  desc: '+15% урона всем оружием' },
     { id: 'rate',      ico: '⚡', name: 'СКОРОСТРЕЛЬНОСТЬ', rar: 'common', max: 5,  desc: '+12% темп стрельбы' },
-    { id: 'multi',     ico: '🔱', name: 'МУЛЬТИВЫСТРЕЛ',   rar: 'rare',   max: 3,  desc: '+1 снаряд в каждом залпе' },
+    { id: 'multi',     ico: '🔱', name: 'МУЛЬТИВЫСТРЕЛ',   rar: 'rare',   max: 3,  desc: 'Ещё один снаряд в залпе с 60% урона. Молния: +1 прыжок и +15% урона, дуга: шире и +20% урона' },
     { id: 'crit',      ico: '🎯', name: 'КРИТ',            rar: 'common', max: 4,  desc: '+8% шанс критического удара (×2 урон)' },
     { id: 'pierce',    ico: '🔩', name: 'БРОНЕБОЙ',        rar: 'rare',   max: 3,  desc: 'Снаряды пробивают ещё одного врага' },
     { id: 'magnet',    ico: '🧲', name: 'ГРАВИЗАХВАТ',     rar: 'common', max: 3,  desc: '+50% радиус сбора монет и кристаллов' },
@@ -208,6 +237,8 @@
     { id: 'speed',     ico: '🚀', name: 'ФОРСАЖ',          rar: 'common', max: 2,  desc: '+15% скорость корабля и +5% уклонение' },
     { id: 'vamp',      ico: '🧛', name: 'ВАМПИРИЗМ',       rar: 'epic',   max: 1,  desc: 'Каждые 40 уничтоженных врагов — +1 жизнь' },
     { id: 'luck',      ico: '🍀', name: 'УДАЧА',           rar: 'common', max: 2,  desc: '+40% шанс выпадения бонусов' },
+    { id: 'titan',     ico: '🏹', name: 'ОХОТНИК НА ТИТАНОВ', rar: 'rare', max: 2,  desc: '+25% урона по боссам и мини-боссам' },
+    { id: 'critdmg',   ico: '💢', name: 'СМЕРТЕЛЬНЫЙ УДАР', rar: 'rare',   max: 2,  desc: 'Критический удар наносит ещё +50% урона' },
   ];
 
   // ── Навыки (дерево за очки навыков) ─────────────────────────
@@ -244,15 +275,25 @@
   D.MAX_ACTIVE = 2;
 
   // ── Корабли ──────────────────────────────────────────────────
+  // stats: dmg/rate/speed — доли бонуса; lives/bombs — штуки; crit/dodge — шанс; critMul — к множителю крита;
+  // magnet — к радиусу сбора; bombdmg — к урону бомб; multi — снаряды в залпе; wings — бортовые пушки;
+  // shieldRegen — щит восстанавливается каждые N секунд
   D.SHIPS = {
-    ship1: { name: 'СОКОЛ',  sprite: 'ship1', price: 0,    lvl: 1,  desc: 'Надёжный перехватчик',               stats: {},                             perks: ['Базовые характеристики'] },
-    ship2: { name: 'ЯСТРЕБ', sprite: 'ship2', price: 2500, lvl: 5,  desc: 'Форсированные двигатели и орудия',   stats: { rate: 0.10, speed: 0.08 },    perks: ['+10% темп стрельбы', '+8% скорость'] },
-    ship3: { name: 'ФЕНИКС', sprite: 'ship3', price: 7000, lvl: 12, desc: 'Флагман с усиленной бронёй',          stats: { dmg: 0.12, rate: 0.05, lives: 1 }, perks: ['+12% урон', '+5% темп', '+1 жизнь'] },
-    ship4: { name: 'КОНДОР', sprite: 'ship4', price: 12000, lvl: 16, scale: 1.08, desc: 'Модернизированный перехватчик', stats: { dmg: 0.1, rate: 0.15, speed: 0.05 }, perks: ['+10% урон', '+15% темп', '+5% скорость'] },
-    ship5: { name: 'ГРИФОН', sprite: 'ship5', price: 18000, lvl: 22, scale: 1.1, desc: 'Тяжёлый штурмовик с бронёй', stats: { dmg: 0.15, rate: 0.05, lives: 2, speed: -0.05 }, perks: ['+15% урон', '+5% темп', '+2 жизни', '-5% скорость'] },
-    ship6: { name: 'АБСОЛЮТ', sprite: 'ship6', price: 30000, lvl: 28, scale: 1.22, desc: 'Абсолютный флагман галактики', stats: { dmg: 0.25, rate: 0.15, lives: 1, speed: 0.1 }, perks: ['+25% урон', '+15% темп', '+1 жизнь', '+10% скорость'] },
+    ship1:  { name: 'СОКОЛ',    sprite: 'ship1',  price: 0,     lvl: 1,  desc: 'Надёжный перехватчик', stats: {}, perks: ['Базовые характеристики'] },
+    ship7:  { name: 'СТРИЖ',    sprite: 'ship7',  price: 1500,  lvl: 3,  scale: 0.95, desc: 'Лёгкий и точный перехватчик', stats: { speed: 0.12, crit: 0.05, rate: 0.04 }, perks: ['+12% скорость', '+5% шанс крита', '+4% темп'] },
+    ship2:  { name: 'ЯСТРЕБ',   sprite: 'ship2',  price: 2500,  lvl: 5,  desc: 'Форсированные двигатели и орудия', stats: { rate: 0.10, speed: 0.08 }, perks: ['+10% темп стрельбы', '+8% скорость'] },
+    ship8:  { name: 'ОСА',      sprite: 'ship8',  price: 4500,  lvl: 8,  desc: 'Вёрткий разведчик: уклоняется и собирает всё вокруг', stats: { speed: 0.16, dodge: 0.08, magnet: 0.5, rate: 0.05 }, perks: ['+16% скорость', '8% шанс уклонения', '+50% радиус сбора', '+5% темп'] },
+    ship3:  { name: 'ФЕНИКС',   sprite: 'ship3',  price: 7000,  lvl: 11, desc: 'Флагман с усиленной бронёй', stats: { dmg: 0.12, rate: 0.05, lives: 1 }, perks: ['+12% урон', '+5% темп', '+1 жизнь'] },
+    ship9:  { name: 'МОЛОТ',    sprite: 'ship9',  price: 10000, lvl: 14, scale: 1.15, desc: 'Тяжёлый бомбардировщик', stats: { dmg: 0.12, bombs: 2, bombdmg: 0.5, speed: -0.06 }, perks: ['+12% урон', '+2 бомбы на старте', '+50% урон бомб', '−6% скорость'] },
+    ship4:  { name: 'КОНДОР',   sprite: 'ship4',  price: 12000, lvl: 16, scale: 1.08, desc: 'Модернизированный перехватчик', stats: { dmg: 0.1, rate: 0.15, speed: 0.05 }, perks: ['+10% урон', '+15% темп', '+5% скорость'] },
+    ship10: { name: 'ТЕНЬ',     sprite: 'ship10', price: 15000, lvl: 19, scale: 1.05, desc: 'Стелс-истребитель: бьёт из засады', stats: { crit: 0.12, critMul: 0.5, dodge: 0.12, rate: 0.05 }, perks: ['+12% шанс крита', 'Криты +50% урона', '12% шанс уклонения', '+5% темп'] },
+    ship5:  { name: 'ГРИФОН',   sprite: 'ship5',  price: 18000, lvl: 22, scale: 1.1, desc: 'Тяжёлый штурмовик с бронёй', stats: { dmg: 0.18, rate: 0.05, lives: 2, speed: -0.05 }, perks: ['+18% урон', '+5% темп', '+2 жизни', '−5% скорость'] },
+    ship11: { name: 'ВИХРЬ',    sprite: 'ship11', price: 22000, lvl: 25, scale: 1.1, desc: 'Крылатый штурмовик с бортовыми пушками', stats: { wings: 1, rate: 0.12, dmg: 0.06 }, perks: ['Две бортовые пушки', '+12% темп', '+6% урон'] },
+    ship12: { name: 'БЛИЗНЕЦЫ', sprite: 'ship12', price: 27000, lvl: 28, scale: 1.15, desc: 'Два корпуса — двойной залп', stats: { multi: 1, dmg: -0.12, lives: 1, speed: -0.04 }, perks: ['+1 снаряд в залпе', '−12% урон снаряда', '+1 жизнь', '−4% скорость'] },
+    ship6:  { name: 'АБСОЛЮТ',  sprite: 'ship6',  price: 33000, lvl: 31, scale: 1.22, desc: 'Абсолютный флагман галактики', stats: { dmg: 0.3, rate: 0.15, lives: 1, speed: 0.1 }, perks: ['+30% урон', '+15% темп', '+1 жизнь', '+10% скорость'] },
+    ship13: { name: 'ТИТАН',    sprite: 'ship13', price: 42000, lvl: 35, desc: 'Линейный крейсер: живучий и смертоносный', stats: { dmg: 0.3, lives: 3, shieldRegen: 18, speed: -0.1 }, perks: ['+30% урон', '+3 жизни', 'Щит каждые 18 с', '−10% скорость'] },
   };
-  D.SHIP_ORDER = ['ship1', 'ship2', 'ship3', 'ship4', 'ship5', 'ship6'];
+  D.SHIP_ORDER = ['ship1', 'ship7', 'ship2', 'ship8', 'ship3', 'ship9', 'ship4', 'ship10', 'ship5', 'ship11', 'ship12', 'ship6', 'ship13'];
 
   // ── Раскраски (перекраска спрайта корабля по тону) ──────────
   // cond(s) — проверка по сохранению; раскраска открывается навсегда
@@ -273,6 +314,8 @@
     { id: 'rainbow',    name: 'РАДУГА',         rar: 'legendary', hue: 'rainbow', req: '25 достижений',     cond: (s) => Object.keys(s.achievements).length >= 25 },
     { id: 'darkmatter', name: 'ТЁМНАЯ МАТЕРИЯ', rar: 'legendary', hue: 272, dark: 0.62, req: 'Рекорд 250 000 очков', cond: (s) => s.stats.bestScore >= 250000 },
   ];
+  // для «Сокола» у части раскрасок есть нарисованные цветные версии корпуса
+  D.SHIP_VARIANTS = { ship1: { fire: 'c_red', alien: 'c_green', gold: 'c_gold', dragon: 'c_purple', ghost: 'c_white', phoenix2: 'c_orange' } };
   D.RARITY_NAMES = { common: 'ОБЫЧНАЯ', uncommon: 'НЕОБЫЧНАЯ', rare: 'РЕДКАЯ', epic: 'ЭПИЧЕСКАЯ', legendary: 'ЛЕГЕНДАРНАЯ' };
 
   // ── Пламя двигателя ─────────────────────────────────────────
@@ -298,7 +341,8 @@
     { id: 'kill5000',        ico: '☄️', name: 'Гроза галактики',     desc: 'Уничтожьте 5 000 врагов',           reward: 800, stat: 'kills', goal: 5000 },
     { id: 'boss1',           ico: '👾', name: 'Убийца боссов',       desc: 'Победите босса',                    reward: 100, stat: 'bosses', goal: 1 },
     { id: 'boss10',          ico: '🏹', name: 'Охотник на титанов',  desc: 'Победите 10 боссов',                reward: 400, stat: 'bosses', goal: 10 },
-    { id: 'boss_all',        ico: '🏆', name: 'Коллекция трофеев',   desc: 'Победите всех 8 разных боссов',     reward: 800, stat: 'bossTypes', goal: 8 },
+    { id: 'boss_all',        ico: '🏆', name: 'Коллекция трофеев',   desc: 'Победите всех 13 разных боссов',    reward: 1200, stat: 'bossTypes', goal: 13 },
+    { id: 'overlord',        ico: '👁️', name: 'Конец тирании',       desc: 'Победите Оверлорда',                reward: 1000 },
     { id: 'no_damage_boss',  ico: '🛡️', name: 'Неуязвимый охотник',  desc: 'Победите босса, не получив урона',  reward: 250 },
     { id: 'combo5',          ico: '⚡', name: 'Комбо-мастер',        desc: 'Наберите комбо ×20',                reward: 50,  stat: 'maxCombo', goal: 20 },
     { id: 'combo10',         ico: '🌟', name: 'Легенда комбо',       desc: 'Наберите комбо ×50',                reward: 150, stat: 'maxCombo', goal: 50 },
@@ -310,6 +354,7 @@
     { id: 'survive5',        ico: '💪', name: 'Выживший',            desc: 'Дойдите до волны 10',               reward: 80,  stat: 'bestWave', goal: 10 },
     { id: 'wave20',          ico: '🚀', name: 'Ветеран',             desc: 'Дойдите до волны 20',               reward: 200, stat: 'bestWave', goal: 20 },
     { id: 'wave40',          ico: '🌌', name: 'Покоритель галактики', desc: 'Дойдите до волны 40',              reward: 500, stat: 'bestWave', goal: 40 },
+    { id: 'wave65',          ico: '🌠', name: 'Край вселенной',      desc: 'Дойдите до волны 65',               reward: 1200, stat: 'bestWave', goal: 65 },
     { id: 'nightmare10',     ico: '😱', name: 'Кошмарный сон',       desc: 'Волна 10 на сложности «Кошмар»',    reward: 300 },
     { id: 'god_mode_clear',  ico: '☠️', name: 'Бессмертный',         desc: 'Волна 15 на сложности «Бог войны»', reward: 500 },
     { id: 'shield',          ico: '🔰', name: 'Под защитой',         desc: 'Подберите щит',                     reward: 20 },
@@ -325,6 +370,7 @@
     { id: 'ship_lvl20',      ico: '🛸', name: 'Ветеран космоса',     desc: 'Корабль 20 уровня',                 reward: 350, stat: 'shipLvl', goal: 20 },
     { id: 'ship3',           ico: '🦅', name: 'Флагман',             desc: 'Получите корабль «Феникс»',          reward: 300 },
     { id: 'ship6',           ico: '👑', name: 'Абсолютная власть',   desc: 'Получите корабль «Абсолют»',         reward: 1500 },
+    { id: 'ships_all',       ico: '🛸', name: 'Адмирал флота',       desc: 'Соберите все 13 кораблей',          reward: 2500, stat: 'shipsOwned', goal: 13 },
     { id: 'coins10k',        ico: '💰', name: 'Магнат',              desc: 'Заработайте 10 000 монет',          reward: 200, stat: 'coinsEarned', goal: 10000 },
     { id: 'games50',         ico: '🎮', name: 'Завсегдатай',         desc: 'Сыграйте 50 игр',                   reward: 150, stat: 'games', goal: 50 },
     { id: 'daily3',          ico: '📅', name: 'Дисциплина',          desc: 'Выполните все 3 задания дня',       reward: 100 },
@@ -364,12 +410,17 @@
     { name: 'ИЗУМРУДНЫЕ ПОЛЯ',    sky: ['#010805', '#06301f'], neb: ['#2dff8a', '#3dd2ff', '#1a8a5c'], star: '#dcffe9', planet: 145 },
     { name: 'ГОРИЗОНТ СОБЫТИЙ',   sky: ['#030108', '#16082e'], neb: ['#7a3dff', '#ff3d8b', '#2a1a8a'], star: '#e8dcff', planet: 265 },
     { name: 'СЕРДЦЕ ГАЛАКТИКИ',   sky: ['#080501', '#2e1a05'], neb: ['#ffc83d', '#ff6b3d', '#ff3d8b'], star: '#fff3d6', planet: 45 },
+    { name: 'КРИСТАЛЬНЫЙ ПОЯС',   sky: ['#020809', '#082a2e'], neb: ['#3dffd2', '#3d9bff', '#b0fff0'], star: '#dcfffb', planet: 170 },
+    { name: 'УЛЕЙ',               sky: ['#050801', '#1c2a06'], neb: ['#a6ff3d', '#3dff7a', '#6b8a1a'], star: '#efffd6', planet: 95 },
+    { name: 'ПУСТОШЬ ХАОСА',      sky: ['#0a0502', '#2e1405'], neb: ['#ff7a2a', '#c0461a', '#ffb03d'], star: '#ffe9d6', planet: 20 },
+    { name: 'ЦИТАДЕЛЬ ИНКВИЗИЦИИ', sky: ['#08070a', '#2a2410'], neb: ['#ffe08a', '#ff3d3d', '#fff3d6'], star: '#fff8e6', planet: 50 },
+    { name: 'ТРОН ОВЕРЛОРДА',     sky: ['#050108', '#1f0626'], neb: ['#b03dff', '#ff3d6b', '#3d1a8a'], star: '#f0dcff', planet: 285 },
   ];
 
   // Цена воскрешения за монеты (один раз за забег)
   D.reviveCost = (wave) => 120 + wave * 35;
   // Опыт корабля: сколько нужно до следующего уровня
-  D.shipXpNeed = (lvl) => Math.round(150 * Math.pow(lvl, 1.35));
+  D.shipXpNeed = (lvl) => Math.round(110 * Math.pow(lvl, 1.15) + 30);
   // Порог опыта забега для нового уровня (выбор улучшения)
   D.perkXpNeed = (lvl) => Math.round(6 + lvl * 5 + lvl * lvl * 0.9);
   // Престиж доступен с этого уровня корабля

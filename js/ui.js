@@ -695,7 +695,7 @@
         const lvlOk = s.shipLvl >= d.lvl;
         const card = document.createElement('button');
         card.className = 'item-card' + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
-        card.appendChild(spriteCard((x, sz) => { const cv = game.shipCanvas(id, s.ship.skin); const f = G.frame(d.sprite); const w = sz * 0.8, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
+        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(id, s.ship.skin), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.8, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
         card.insertAdjacentHTML('beforeend', '<b>' + d.name + '</b><small>' + d.desc + '</small>' +
           (owned ? '' : lvlOk ? '<span class="price">' + ic('coin') + U.fmt(d.price) + '</span>' : '<span class="req">' + ic('lock') + 'Корабль ур. ' + d.lvl + '</span>'));
         card.addEventListener('click', () => {
@@ -715,7 +715,7 @@
         const owned = s.ship.skins.includes(sk.id), sel = s.ship.skin === sk.id;
         const card = document.createElement('button');
         card.className = 'item-card rar-' + sk.rar + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
-        card.appendChild(spriteCard((x, sz) => { const sp = D.SHIPS[s.ship.model].sprite; const cv = sk.hue === 'rainbow' ? G.tinted(sp, { hue: 300 }) : (G.tinted(sp, sk) || null); const f = G.frame(sp); const w = sz * 0.78, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
+        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(s.ship.model, sk.id, true), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.78, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
         card.insertAdjacentHTML('beforeend', '<span class="rar">' + D.RARITY_NAMES[sk.rar] + '</span><b>' + sk.name + '</b>' + (owned ? '' : '<span class="req">' + ic('lock') + U.escape(sk.req) + '</span>'));
         card.addEventListener('click', () => {
           if (!owned) { A.play('error'); ui._preview = { model: s.ship.model, skin: sk.id, trail: s.ship.trail }; ui.toast({ ico: '🔒', title: sk.name, text: sk.req, info: true }); return; }
@@ -755,7 +755,7 @@
       b.className = 'btn gold wide';
       b.style.marginTop = '14px';
       b.innerHTML = ic('star') + 'ПРЕСТИЖ ' + ((s.prestige || 0) + 1);
-      b.addEventListener('click', () => ui.dialog({ ico: 'star', title: 'ПРЕСТИЖ', text: 'Уровень корабля, прокачка и навыки сбросятся.' + NL + 'Навсегда: +8% монет и +4% урона за каждый престиж.' + NL + 'Оружие, корабли, раскраски и монеты останутся.', ok: 'ПРЕСТИЖ', onOk: () => { if (M.doPrestige()) { A.play('levelup'); ui.toast({ ico: '🌠', title: 'ПРЕСТИЖ ' + s.prestige, text: 'Добро пожаловать в новый цикл!' }); ui.renderHangar(tab); } } }));
+      b.addEventListener('click', () => ui.dialog({ ico: 'star', title: 'ПРЕСТИЖ', text: 'Уровень корабля и навыки сбросятся.' + NL + 'Навсегда: +8% монет и +4% урона за каждый престиж.' + NL + 'Прокачка, оружие, корабли, раскраски и монеты останутся.', ok: 'ПРЕСТИЖ', onOk: () => { if (M.doPrestige()) { A.play('levelup'); ui.toast({ ico: '🌠', title: 'ПРЕСТИЖ ' + s.prestige, text: 'Добро пожаловать в новый цикл!' }); ui.renderHangar(tab); } } }));
       extra.appendChild(b);
     } else if (s.shipLvl >= 10) {
       extra.innerHTML = '<div class="hint-txt">Престиж откроется на ' + D.PRESTIGE_LVL + ' уровне корабля: постоянный бонус к монетам и урону</div>';

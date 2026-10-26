@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════
-// SPACE SHOOTER 2.0 — враги и боссы
+// SPACE SHOOTER 2.1 — враги и боссы
 //  поведение (ИИ), схемы стрельбы, группы и строи,
-//  3 мини-босса и 8 боссов с тремя фазами атак
+//  5 мини-боссов и 13 боссов с тремя фазами атак
 // ════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -14,18 +14,23 @@
     scout: '#ff5c4d', drone: '#5cff7a', shooter: '#c06bff', assault: '#3dffd0', kamikaze: '#ff9f3d', interceptor: '#cfd8ff',
     heavy: '#ffd23d', splitter: '#7dff6b', bomber: '#aab4d8', sniper: '#5cb8ff', shielder: '#7fd8ff', techno: '#ff5c7a',
     hunter: '#b06bff', armored: '#ff9f3d', heavyfighter: '#ff4d5e', bombardier: '#ffb03d', redoubt: '#c48bff', cruiser: '#ff5c7a',
-    gunship: '#ff4d4d', destroyer: '#ff8a3d', cruiser_h: '#ff4d6d',
+    bug: '#9dff5c', ram: '#ff6a2a', swarm: '#a6ff3d', crystal: '#3dffd2', minelayer: '#ff5c4d', platform: '#ffc83d',
+    ghost: '#7ff6ff', orbit: '#ff7a3d', parasite: '#b06bff', ion: '#7fe7ff', crab: '#ff9f3d', biomech: '#ff5cf0',
+    gunship: '#ff4d4d', destroyer: '#ff8a3d', cruiser_h: '#ff4d6d', battleship: '#ff6a3d', frigate: '#ffb03d',
   };
 
   // стоимость врага в «бюджете» волны
   const COST = { scout: 1, drone: 0.55, shooter: 2, assault: 2, kamikaze: 1.2, interceptor: 2.5, heavy: 5, splitter: 2.2,
     bomber: 4, sniper: 3, shielder: 4.5, techno: 3.5, hunter: 3.5, armored: 8, heavyfighter: 4.5, bombardier: 5, redoubt: 5.5,
-    cruiser: 9, gunship: 0, destroyer: 0, cruiser_h: 0 };
+    cruiser: 9, bug: 0.5, ram: 2.5, swarm: 4, crystal: 3, minelayer: 4, platform: 5.5, ghost: 3.5, orbit: 4.5, parasite: 4.5,
+    ion: 5, crab: 7, biomech: 7, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0 };
 
-  // эллиптические хитбоксы для крупных вытянутых кораблей (доли ширины/высоты спрайта)
+  // эллиптические хитбоксы для крупных кораблей (доли ширины/высоты спрайта)
   const HITBOX = {
     boss: [0.4, 0.38], b_spider: [0.3, 0.34], b_battleship: [0.4, 0.43], b_battleship2: [0.4, 0.43],
     b_mothership: [0.45, 0.32], b_heavycruiser: [0.45, 0.32], e_destroyer: [0.38, 0.44], e_cruiser_h: [0.45, 0.3],
+    b_sniper: [0.3, 0.42], b_kraken: [0.33, 0.36], b_dread: [0.42, 0.42], b_phoenix: [0.3, 0.36], b_necro: [0.36, 0.38],
+    b_queen: [0.4, 0.4], b_inquisitor: [0.38, 0.4], b_chaos: [0.38, 0.38], b_overlord: [0.3, 0.36],
   };
 
   const E = {
@@ -47,15 +52,17 @@
 
   E.hpScale = function () {
     const w = game.wave ? game.wave.n : 1;
-    return game.diff.hp * (1 + (w - 1) * 0.14) * (1 + Math.max(0, w - 20) * 0.05);
+    // после 30-й волны прочность растёт круче: туда доходят только сильные сборки
+    return game.diff.hp * (1 + (w - 1) * 0.14) * (1 + Math.max(0, w - 20) * 0.05) * (1 + Math.max(0, w - 30) * 0.06);
   };
 
+  // o: x, y, scale, hpMul, tint, child, noElite, elite, idx, amp, side, larva
   E.spawn = function (type, o) {
     o = o || {};
     const def = D.ENEMIES[type];
     if (!def) return null;
     const S = G.S, wn = game.wave ? game.wave.n : 1, diff = game.diff;
-    const elite = !def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004;
+    const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004);
     // в дальних секторах флот противника обновляется — новые облики кораблей
     const sprite = def.alt && wn > 10 && Math.random() < 0.6 ? def.alt : def.sprite;
     const scale = (elite ? 1.12 : 1) * (o.scale || 1);
@@ -68,13 +75,13 @@
       y: o.y !== undefined ? o.y : -w * asp * 0.6,
       vx: 0, vy: 0, w, h: w * asp, r: w * 0.4, rx: 0, ry: 0,
       hp, maxHp: hp, score: def.score, coins: def.coins, xp: def.xp,
-      elite, isChild: !!o.child,
+      elite, isChild: !!o.child, larva: !!o.larva,
       tint: elite ? { hue: 44, bright: 0.08 } : (o.tint !== undefined ? { hue: o.tint } : def.tint !== undefined ? { hue: def.tint } : null),
       cv: null, age: 0, phase: Math.random() * U.TAU, st: 0, t: 0, n: 0,
       fireT: U.rand(0.9, 1.8), fireT2: U.rand(1.6, 2.8), flash: 0, frozen: 0, alpha: 1, bank: 0, lastX: 0, leaving: false, barrier: 0,
       shield: def.shield ? def.shield * E.hpScale() : 0, shieldMax: def.shield ? def.shield * E.hpScale() : 0, shieldHitT: 0, shieldRegenWait: 0,
       spd: def.spd * S * diff.spd * (1 + Math.min(wn, 30) * 0.01) * (elite ? 1.08 : 1),
-      ty: 0, baseX: 0, amp: 0, dir: 0, face: 1,
+      ty: 0, baseX: 0, amp: 0, dir: 0, face: 1, spinAng: undefined,
     };
     if (def.mini) setHitbox(e, sprite);
     e.lastX = e.x;
@@ -105,8 +112,24 @@
     teleport(e) { e.x = U.rand(e.w, G.FW - e.w); e.y = U.rand(minY(e), Math.max(minY(e) + 20, G.H * 0.45)); e.alpha = 0; e.hittable = false; },
     hunter(e) { e.ty = U.rand(0.14, 0.22) * G.H; },
     redoubt(e) { e.ty = U.rand(0.14, 0.3) * G.H; e.stay = U.rand(15, 19); e.cyc = 0; },
+    // ── 2.1 ──
+    swarm(e, o) { e.idx = o.idx || 0; e.amp = (o.amp !== undefined ? o.amp : 56) * G.S; e.jx = 0; if (e.larva) e.dir = Math.PI / 2; },
+    ram(e) { e.ty = U.rand(0.1, 0.2) * G.H; },
+    carrier(e) { e.ty = U.rand(0.12, 0.28) * G.H; e.stay = U.rand(12, 15); e.spawnT = 2.4; e.spawned = 0; },
+    drift(e) { e.vx = U.rand(-32, 32) * G.S; e.spinAng = Math.random() * U.TAU; e.spin = U.rand(0.6, 1.2) * U.sign(Math.random() - 0.5); },
+    turret(e) { e.ty = U.rand(0.14, 0.28) * G.H; e.stay = U.rand(14, 17); e.spinAng = 0; e.cyc = 1.4; e.on = false; e.shotT = 0; },
+    phase(e) { e.ty = U.rand(0.12, 0.3) * G.H; },
+    orbit(e) {
+      e.ax = U.rand(0.25, 0.75) * G.FW; e.ay = U.rand(0.18, 0.32) * G.H;
+      e.R = U.rand(50, 80) * G.S; e.ang = -Math.PI / 2; e.w0 = (Math.random() < 0.5 ? -1 : 1) * 1.4; e.stay = 16;
+      e.x = e.ax; e.spinAng = 0;
+    },
+    ion(e) { e.ty = U.rand(0.12, 0.26) * G.H; e.stay = U.rand(13, 16); e.chargeT = U.rand(1.6, 2.4); },
+    crab(e) { e.ty = U.rand(0.16, 0.3) * G.H; e.stay = U.rand(15, 18); e.dirx = Math.random() < 0.5 ? -1 : 1; e.stepT = 0.7; e.walking = false; e.volley = 0; },
     gunship(e) { e.ty = 0.17 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.6; e.pat = 0; e.patT = 2; },
     destroyer(e) { e.ty = 0.16 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.5; e.pat = 0; e.patT = 2.2; },
+    battleship(e) { e.ty = 0.16 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.5; e.pat = 0; e.patT = 2.4; },
+    frigate(e) { e.ty = 0.18 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.7; e.pat = 0; e.patT = 2.0; e.run = 0; },
     flyby(e) {
       e.face = Math.random() < 0.5 ? 1 : -1;
       e.x = e.face > 0 ? -e.w * 0.55 : G.FW + e.w * 0.55;
@@ -117,6 +140,15 @@
     },
   };
 
+  // новые враги первые две волны после появления встречаются чаще, дешёвые — со временем реже
+  function weightOf(k, wn) {
+    const d = D.ENEMIES[k];
+    let w = d.weight;
+    if (wn - d.wave <= 1 && d.wave > 2) w *= 1.4;
+    if (COST[k] <= 2.2) w *= Math.max(0.3, 1 - (wn - d.wave) * 0.03);
+    return w;
+  }
+
   // группы и строи
   E.spawnGroup = function (wn, budgetLeft) {
     const pool = Object.keys(D.ENEMIES).filter((k) => {
@@ -124,7 +156,7 @@
       return d.weight > 0 && d.wave <= wn && COST[k] <= Math.max(budgetLeft, 1.2);
     });
     if (!pool.length) return 1;
-    const type = U.pickWeighted(pool, (k) => D.ENEMIES[k].weight * (k === 'scout' ? Math.max(0.35, 1 - wn * 0.04) : 1));
+    const type = U.pickWeighted(pool, (k) => weightOf(k, wn));
     const S = G.S, FW = G.FW;
     let cost = 0;
     if (type === 'drone') {
@@ -137,6 +169,12 @@
         E.spawn('drone', { x: U.clamp(cx + off * 34 * S, 20 * S, FW - 20 * S), y: -30 * S - (vee ? Math.abs(off) * 26 * S : i * 30 * S), idx: i, amp: vee ? 26 : 50 });
       }
       cost = n * COST.drone;
+    } else if (type === 'bug') {
+      // рой жуков
+      const n = U.randi(5, Math.min(9, 5 + Math.floor(wn / 6)));
+      const cx = U.rand(0.3, 0.7) * FW;
+      for (let i = 0; i < n; i++) E.spawn('bug', { x: U.clamp(cx + U.rand(-50, 50) * S, 20 * S, FW - 20 * S), y: -24 * S - i * 18 * S, idx: i });
+      cost = n * COST.bug;
     } else if (type === 'scout' && Math.random() < (wn >= 2 ? 0.45 : 0.3)) {
       // линия разведчиков
       const n = U.randi(3, Math.min(5, 3 + Math.floor(wn / 5)));
@@ -148,6 +186,10 @@
       // пара по краям
       E.spawn(type, { x: FW * 0.22 }); E.spawn(type, { x: FW * 0.78 });
       cost = COST[type] * 2;
+    } else if (type === 'ram' && wn >= 12 && Math.random() < 0.4) {
+      // два тарана с разных сторон
+      E.spawn('ram', { x: FW * 0.25 }); E.spawn('ram', { x: FW * 0.75 });
+      cost = COST.ram * 2;
     } else {
       E.spawn(type);
       cost = COST[type];
@@ -155,9 +197,9 @@
     return Math.max(cost, 0.5);
   };
 
-  // мини-боссы по очереди: Ганшип → Эсминец → Рейдер
+  // мини-боссы по очереди: Ганшип → Эсминец → Рейдер → Линкор → Ракетный фрегат
   E.spawnMini = function (wn) {
-    const order = ['gunship', 'destroyer', 'cruiser_h'];
+    const order = D.MINI_ORDER;
     const k = Math.max(0, Math.floor((wn - 8) / 5)) % order.length;
     const e = E.spawn(order[k], { x: G.FW / 2 });
     if (e) SS.emit('toast', { ico: '⚠️', title: 'МИНИ-БОСС', text: e.def.name + ' приближается!', info: true, dur: 1800 });
@@ -171,6 +213,14 @@
       if (c) { c.vx = side * 120 * S; c.splitVx = side * 120 * S; }
     }
   };
+
+  // выводок жуков (рой, паразит, королева, кракен); личинки ползут к игроку
+  function brood(x, y, n, larva, spread) {
+    const S = G.S;
+    for (let i = 0; i < n; i++) {
+      E.spawn('bug', { x: U.clamp(x + (i - (n - 1) / 2) * (spread || 16) * S, 16 * S, G.FW - 16 * S), y: y + U.rand(-6, 6) * S, child: true, noElite: true, idx: i, amp: 30, larva, hpMul: larva ? 0.7 : 1 });
+    }
+  }
 
   // ════════════════════════════════════════════════════════════
   // СТРЕЛЬБА
@@ -188,13 +238,17 @@
     else if (k === 'aimed3') { for (const a of [-0.17, 0, 0.17]) game.aimAt(mx, my, f.spd, f.bullet, a); }
     else if (k === 'burst') { for (let i = 0; i < f.count; i++) game.after(i * 0.12, () => { if (e.alive && canShoot(e)) game.aimAt(e.x, e.y + e.h * 0.32, f.spd, f.bullet, U.rand(-0.05, 0.05)); }); }
     else if (k === 'fan') {
-      const p = game.player, base = Math.atan2(p.y - my, p.x - mx);
+      const p = game.player, base = f.down ? Math.PI / 2 : Math.atan2(p.y - my, p.x - mx);
       for (let i = 0; i < f.count; i++) { const a = base + (i / (f.count - 1) - 0.5) * f.spread; const s = game.bspd(f.spd); game.ebullet(mx, my, Math.cos(a) * s, Math.sin(a) * s, f.bullet); }
     } else if (k === 'ring') {
       const s = game.bspd(f.spd);
       for (let i = 0; i < f.count; i++) { const a = i / f.count * U.TAU + e.age; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, f.bullet); }
     } else if (k === 'twin') { for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.28, my, f.spd, f.bullet); }
-    else if (k === 'mine') { game.ebullet(e.x, e.y + e.h * 0.1, e.vx * 0.2, 50 * S, 'mine', { fuse: 1.9, life: 6 }); A.play('mine'); return; }
+    else if (k === 'pincer') {
+      // клешни: пары снарядов сходятся в точке игрока
+      for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd, f.bullet);
+      for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd * 0.8, f.bullet, -sd * 0.18);
+    } else if (k === 'mine') { game.ebullet(e.x, e.y + e.h * 0.1, e.vx * 0.2, 50 * S, 'mine', { fuse: 1.9, life: 6 }); A.play('mine'); return; }
     A.play('enemyShot');
   }
   function tickFire(e, dt) {
@@ -216,6 +270,10 @@
       }
     }
   }
+  // вертикальный луч с предупреждением; если владелец погиб до выстрела — луч гаснет
+  function beam(x, y0, w, warn, dur, color, owner) {
+    game.ov.beams.push({ x, y0, w, warn, dur, t: 0, color, hitDone: false, owner: owner || null });
+  }
 
   // ════════════════════════════════════════════════════════════
   // ПОВЕДЕНИЕ
@@ -225,6 +283,10 @@
     e.x += e.vx * dt;
     const m = e.w * (k || 0.6);
     if (e.x < m || e.x > G.FW - m) { e.vx = -e.vx; e.x = U.clamp(e.x, m, G.FW - m); }
+  }
+  function arrive(e, dt, k) {
+    e.y = U.damp(e.y, e.ty, k || 2.2, dt) + 10 * G.S * dt;
+    return e.y >= e.ty - 6 * G.S;
   }
 
   const AI = {
@@ -240,8 +302,7 @@
     },
     hover(e, dt) {
       if (e.st === 0) {
-        e.y = U.damp(e.y, e.ty, 2.2, dt) + 12 * G.S * dt;
-        if (e.y >= e.ty - 6 * G.S) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.55; }
+        if (arrive(e, dt)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.55; }
       } else if (e.st === 1) {
         e.t += dt;
         strafe(e, dt);
@@ -283,8 +344,7 @@
     dasher(e, dt) {
       const p = game.player, S = G.S;
       if (e.st === 0) {
-        e.y = U.damp(e.y, e.ty, 2.4, dt) + 10 * S * dt;
-        if (e.y >= e.ty - 6 * S) { e.st = 1; e.t = 0.5; }
+        if (arrive(e, dt, 2.4)) { e.st = 1; e.t = 0.5; }
       } else if (e.st === 1) {
         e.t -= dt;
         if (e.t <= 0) {
@@ -307,8 +367,7 @@
     },
     tank(e, dt) {
       if (e.st === 0) {
-        e.y = U.damp(e.y, e.ty, 1.2, dt) + 8 * G.S * dt;
-        if (e.y >= e.ty - 6 * G.S) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.6; }
+        if (arrive(e, dt, 1.2)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.6; }
       } else if (e.st === 1) {
         e.t += dt;
         strafe(e, dt);
@@ -319,15 +378,14 @@
     },
     bomber(e, dt) {
       e.x += e.vx * dt;
-      e.y = e.baseY + Math.sin(e.age * 1.8) * 10 * G.S;
+      e.y = e.baseY + Math.sin(e.age * (e.def.weave ? 1.3 : 1.8)) * (e.def.weave || 10) * G.S;
       tickFire(e, dt);
       if ((e.vx > 0 && e.x > G.FW + e.w) || (e.vx < 0 && e.x < -e.w)) { e.leaving = true; e.alive = false; }
     },
     sniper(e, dt) {
       const p = game.player, S = G.S, f = e.def.fire;
       if (e.st === 0) {
-        e.y = U.damp(e.y, e.ty, 2, dt) + 10 * S * dt;
-        if (e.y >= e.ty - 5 * S) { e.st = 1; e.t = 1.2; }
+        if (arrive(e, dt, 2)) { e.st = 1; e.t = 1.2; }
       } else if (e.st === 1) {
         e.t -= dt;
         e.aim = Math.atan2(p.y - e.y, p.x - e.x);
@@ -397,8 +455,7 @@
     // Редут: периодически поднимает энергобарьер (неуязвим), без барьера бьёт кольцом
     redoubt(e, dt) {
       if (e.st === 0) {
-        e.y = U.damp(e.y, e.ty, 1.6, dt) + 8 * G.S * dt;
-        if (e.y >= e.ty - 6 * G.S) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.5; e.barrier = 1.6; }
+        if (arrive(e, dt, 1.6)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.5; e.barrier = 1.6; }
       } else if (e.st === 1) {
         e.t += dt;
         strafe(e, dt);
@@ -411,6 +468,185 @@
           if (e.cyc <= 0) { e.barrier = 1.8; A.play('shieldHit', { vol: 0.4, rate: 1.3 }); }
         }
         if (e.t > e.stay) { e.st = 2; e.barrier = 0; }
+      } else leave(e, dt);
+    },
+    // Жук-дрон: рой с рывками; личинка паразита медленно ползёт к игроку
+    swarm(e, dt) {
+      const S = G.S, p = game.player;
+      if (e.larva) {
+        const want = Math.atan2(p.y - e.y, p.x - e.x);
+        e.dir += U.clamp(U.angleDiff(e.dir, want), -1.6 * dt, 1.6 * dt);
+        const v = e.spd * 0.62;
+        e.x += Math.cos(e.dir) * v * dt; e.y += Math.sin(e.dir) * v * dt;
+        if (e.age > 9 || e.y > G.H + e.h) { e.leaving = true; e.alive = false; }
+        return;
+      }
+      e.y += e.spd * 0.85 * dt;
+      e.jx = U.damp(e.jx, U.rand(-1, 1) * 26 * S, 3, dt);
+      e.x = U.clamp(e.baseX + Math.sin(e.age * 3.1 + e.idx * 0.8) * e.amp + e.jx, e.w * 0.5, G.FW - e.w * 0.5);
+    },
+    // Таран: целится, показывает полосу удара и проносится вниз
+    ram(e, dt) {
+      const p = game.player, S = G.S;
+      if (e.st === 0) {
+        if (arrive(e, dt, 2.4)) { e.st = 1; e.t = 0.8; }
+      } else if (e.st === 1) {
+        e.t -= dt;
+        e.x = U.damp(e.x, U.clamp(p.x, e.w * 0.5, G.FW - e.w * 0.5), 2.2, dt);
+        if (e.t <= 0) { e.st = 2; e.t = 0.75; e.lane = e.x; A.play('railCharge', { vol: 0.3, rate: 1.6 }); }
+      } else if (e.st === 2) {
+        e.t -= dt;
+        e.x = e.lane + U.rand(-2, 2) * S;
+        if (e.t <= 0) { e.st = 3; e.v = e.spd; e.x = e.lane; }
+      } else {
+        e.v = Math.min(900 * S * game.diff.spd, e.v + 1800 * S * dt);
+        e.y += e.v * dt;
+        if (Math.random() < 0.8) FX.glowPuff(e.x + U.rand(-0.3, 0.3) * e.w, e.y - e.h * 0.5, '#ff9f3d', 18 * S, 0.22);
+        if (e.y > G.H + e.h) {
+          e.n++;
+          if (e.n >= 2) { e.leaving = true; e.alive = false; return; }
+          e.y = -e.h; e.st = 0; e.ty = Math.max(U.rand(0.1, 0.2) * G.H, minY(e));
+        }
+      }
+    },
+    // Рой: висит и выпускает жуков
+    carrier(e, dt) {
+      if (e.st === 0) {
+        if (arrive(e, dt, 1.8)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.45; }
+      } else if (e.st === 1) {
+        e.t += dt;
+        strafe(e, dt);
+        e.y = e.ty + Math.sin(e.age * 1.3 + e.phase) * 6 * G.S;
+        e.spawnT -= dt;
+        if (e.spawnT <= 0 && e.spawned < 2 && canShoot(e)) {
+          e.spawnT = 4.2; e.spawned++;
+          brood(e.x, e.y + e.h * 0.3, 3, false, 20);
+          A.play('teleport', { vol: 0.35, rate: 1.4 });
+        }
+        if (e.t > e.stay) e.st = 2;
+      } else leave(e, dt);
+    },
+    // Кристалл: медленно дрейфует и вращается; при гибели разлетается осколками
+    drift(e, dt) {
+      e.y += e.spd * 0.55 * dt;
+      e.x += e.vx * dt;
+      if (e.x < e.w * 0.6 || e.x > G.FW - e.w * 0.6) { e.vx = -e.vx; e.x = U.clamp(e.x, e.w * 0.6, G.FW - e.w * 0.6); }
+      e.spinAng += e.spin * dt;
+      tickFire(e, dt);
+    },
+    // Платформа: турель — вращается и поливает четырьмя струями
+    turret(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        if (arrive(e, dt, 1.6)) e.st = 1;
+      } else if (e.st === 1) {
+        e.t += dt;
+        e.y = e.ty + Math.sin(e.age * 0.9 + e.phase) * 4 * S;
+        e.spinAng += (e.on ? 1.3 : 0.5) * dt;
+        e.cyc -= dt;
+        if (e.cyc <= 0) { e.on = !e.on; e.cyc = e.on ? 1.9 : 1.8 / Math.pow(fireRate(), 0.5); }
+        if (e.on && canShoot(e)) {
+          e.shotT -= dt;
+          if (e.shotT <= 0) {
+            e.shotT = 0.3;
+            const s = game.bspd(150);
+            for (let k = 0; k < 4; k++) { const a = e.spinAng + k * Math.PI / 2; game.ebullet(e.x + Math.cos(a) * e.w * 0.4, e.y + Math.sin(a) * e.w * 0.4, Math.cos(a) * s, Math.sin(a) * s, 'orb'); }
+            A.play('enemyShot', { vol: 0.35, rate: 1.3 });
+          }
+        }
+        if (e.t > e.stay) e.st = 2;
+      } else leave(e, dt);
+    },
+    // Призрак: становится почти невидимым, переносится к игроку и бьёт очередью
+    phase(e, dt) {
+      const S = G.S, p = game.player;
+      if (e.st === 0) {
+        if (arrive(e, dt, 2.4)) { e.st = 1; e.t = 0.45; }
+      } else if (e.st === 1) {
+        e.t -= dt;
+        if (e.t <= 0) { if (canShoot(e)) doFire(e, e.def.fire); e.st = 2; e.t = 0.9; }
+      } else if (e.st === 2) {
+        e.t -= dt;
+        if (e.t <= 0) { e.st = 3; A.play('teleport', { vol: 0.3, rate: 1.5 }); }
+      } else if (e.st === 3) {
+        e.alpha = Math.max(0.12, e.alpha - dt * 3);
+        e.hittable = e.alpha > 0.4;
+        if (e.alpha <= 0.12) {
+          e.n++;
+          if (e.n >= 4) { e.leaving = true; e.alive = false; return; }
+          e.tx = U.clamp(p.x + U.rand(-90, 90) * S, e.w * 0.6, G.FW - e.w * 0.6);
+          e.ty2 = U.rand(minY(e), Math.max(minY(e) + 30, G.H * 0.4));
+          e.st = 4;
+        }
+      } else if (e.st === 4) {
+        e.x = U.damp(e.x, e.tx, 5, dt); e.y = U.damp(e.y, e.ty2, 5, dt);
+        if (Math.abs(e.x - e.tx) < 6 * S && Math.abs(e.y - e.ty2) < 6 * S) e.st = 5;
+      } else {
+        e.alpha = Math.min(1, e.alpha + dt * 3);
+        e.hittable = e.alpha > 0.4;
+        if (e.alpha >= 1) { e.st = 1; e.t = 0.35; }
+      }
+    },
+    // Орбита: кружит вокруг точки, которая медленно следует за игроком
+    orbit(e, dt) {
+      if (e.st === 0) {
+        e.y = U.damp(e.y, e.ay - e.R * 0.7, 2.2, dt) + 10 * G.S * dt;
+        if (e.y >= e.ay - e.R * 0.7 - 6 * G.S) e.st = 1;
+      } else if (e.st === 1) {
+        e.t += dt;
+        e.ax = U.damp(e.ax, U.clamp(game.player.x, e.R + e.w * 0.6, G.FW - e.R - e.w * 0.6), 0.35, dt);
+        e.ang += e.w0 * dt;
+        e.x = e.ax + Math.cos(e.ang) * e.R;
+        e.y = Math.max(minY(e), e.ay + Math.sin(e.ang) * e.R * 0.7);
+        e.spinAng += dt * 2;
+        tickFire(e, dt);
+        if (e.t > e.stay) e.st = 2;
+      } else leave(e, dt);
+    },
+    // Ионный: заряжается и бьёт ионным лучом в своей колонне
+    ion(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        if (arrive(e, dt, 2)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.5; }
+      } else if (e.st === 1) {
+        e.t += dt;
+        strafe(e, dt);
+        e.y = e.ty + Math.sin(e.age * 1.4 + e.phase) * 5 * S;
+        e.chargeT -= dt;
+        if (e.chargeT <= 0 && canShoot(e)) {
+          e.st = 2; e.charge = 0.85;
+          beam(e.x, e.y + e.h * 0.45, 12 * S, 0.85, 0.45, '#7ff6ff', e);
+          A.play('railCharge', { vol: 0.35, rate: 1.4 });
+        }
+        if (e.t > e.stay) e.st = 3;
+      } else if (e.st === 2) {
+        e.charge -= dt;
+        if (e.charge <= 0) { e.st = 1; e.chargeT = U.rand(2.8, 3.6) / Math.pow(fireRate(), 0.6); A.play('laser', { rate: 0.7, vol: 0.6 }); }
+      } else leave(e, dt);
+    },
+    // Крабоход: ходит боком рывками и бьёт клешнями
+    crab(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        if (arrive(e, dt, 1.4)) e.st = 1;
+      } else if (e.st === 1) {
+        e.t += dt;
+        e.stepT -= dt;
+        if (e.walking) {
+          e.x += e.dirx * e.spd * 1.7 * dt;
+          if (e.x < e.w * 0.6 || e.x > G.FW - e.w * 0.6) { e.dirx = -e.dirx; e.x = U.clamp(e.x, e.w * 0.6, G.FW - e.w * 0.6); }
+        }
+        if (e.stepT <= 0) {
+          e.walking = !e.walking;
+          e.stepT = e.walking ? 0.5 : 0.65;
+          if (!e.walking && canShoot(e)) {
+            e.volley++;
+            doFire(e, e.def.fire);
+            if (e.volley % 3 === 0) doFire(e, { kind: 'fan', count: 5, spread: 0.9, bullet: 'orb', spd: 165 });
+          }
+        }
+        e.y = e.ty + Math.abs(Math.sin(e.age * 7)) * (e.walking ? 3 : 0) * S;
+        if (e.t > e.stay) e.st = 2;
       } else leave(e, dt);
     },
     gunship(e, dt) {
@@ -449,6 +685,67 @@
         if (k === 0) { for (let i = 0; i < 3; i++) game.after(i * 0.22, () => { if (e.alive) { game.aimAt(e.x, e.y + e.h * 0.46, 420, 'long'); A.play('laser', { rate: 0.55, vol: 0.6 }); } }); }
         else if (k === 1) { for (const sd of [-1, 1]) { const s = game.bspd(165); for (let i = 0; i < 5; i++) { const a = Math.PI / 2 + sd * (0.25 + i * 0.16); game.ebullet(e.x + sd * e.w * 0.35, e.y, Math.cos(a) * s, Math.sin(a) * s, 'orb'); } } A.play('enemyShot'); }
         else { for (const sd of [-1, 1]) { const s = game.bspd(120); game.ebullet(e.x + sd * e.w * 0.3, e.y - e.h * 0.1, sd * s * 0.6, s * 0.5, 'fire', { homing: 1.4, life: 5 }); } A.play('rocket', { rate: 0.7, vol: 0.6 }); }
+      }
+    },
+    // Линкор: бортовые завесы, двойные лучи, кольцо с прицельным выстрелом
+    battleship(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        e.y = U.damp(e.y, e.ty, 1.2, dt) + 8 * S * dt;
+        if (e.y >= e.ty - 6 * S) e.st = 1;
+        return;
+      }
+      strafe(e, dt, 0.6);
+      e.y = e.ty + Math.sin(e.age * 0.6) * 8 * S;
+      e.patT -= dt;
+      if (e.patT <= 0 && canShoot(e)) {
+        e.patT = 2.9 / Math.pow(fireRate(), 0.7);
+        const k = e.pat++ % 3;
+        if (k === 0) {
+          for (let i = 0; i < 4; i++) game.after(i * 0.16, () => { if (!e.alive) return; const s = game.bspd(200); for (const sd of [-1, 1]) game.ebullet(e.x + sd * e.w * 0.42, e.y + e.h * 0.1, sd * 22 * S, s, 'bolt'); });
+          A.play('enemyShot');
+        } else if (k === 1) {
+          const px = game.player.x;
+          for (const off of [-60, 60]) beam(U.clamp(px + off * S, 14 * S, G.FW - 14 * S), e.y + e.h * 0.45, 16 * S, 0.9, 0.5, '#ff8a3d', e);
+          A.play('railCharge', { vol: 0.45, rate: 1.2 });
+        } else {
+          const s = game.bspd(140);
+          for (let i = 0; i < 16; i++) { const a = i / 16 * U.TAU + e.age; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, 'orb'); }
+          game.aimAt(e.x, e.y + e.h * 0.46, 430, 'long');
+          A.play('laser', { rate: 0.6, vol: 0.6 });
+        }
+      }
+    },
+    // Ракетный фрегат: рои ракет, проходы с пулемётом, прицельный веер
+    frigate(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        e.y = U.damp(e.y, e.ty, 1.4, dt) + 8 * S * dt;
+        if (e.y >= e.ty - 6 * S) e.st = 1;
+        return;
+      }
+      strafe(e, dt, 0.55);
+      e.y = e.ty + Math.sin(e.age * 1.1) * 8 * S;
+      if (e.run > 0) {
+        e.run -= dt;
+        e.runT = (e.runT || 0) - dt;
+        if (e.runT <= 0 && canShoot(e)) { e.runT = 0.09; game.ebullet(e.x, e.y + e.h * 0.45, 0, game.bspd(320), 'needle'); }
+        if (e.run <= 0) e.vx = U.sign(e.vx) * e.spd * 0.7;
+      }
+      e.patT -= dt;
+      if (e.patT <= 0 && canShoot(e)) {
+        e.patT = 2.6 / Math.pow(fireRate(), 0.7);
+        const k = e.pat++ % 3;
+        if (k === 0) {
+          for (let i = 0; i < 4; i++) game.after(i * 0.14, () => { if (!e.alive) return; const sd = i % 2 ? 1 : -1, s = game.bspd(115); game.ebullet(e.x + sd * e.w * 0.35, e.y, sd * s * 0.7, s * 0.4, 'fire', { homing: 1.25, life: 5 }); });
+          A.play('rocket', { rate: 0.75, vol: 0.6 });
+        } else if (k === 1) {
+          e.run = 1.3; e.vx = U.sign(e.vx || 1) * e.spd * 2.4;
+        } else {
+          const p = game.player, base = Math.atan2(p.y - e.y, p.x - e.x), s = game.bspd(175);
+          for (let i = 0; i < 9; i++) { const a = base + (i / 8 - 0.5) * 1.2; game.ebullet(e.x, e.y + e.h * 0.3, Math.cos(a) * s, Math.sin(a) * s, 'orb'); }
+          A.play('enemyShot');
+        }
       }
     },
     // Рейдер: проходит по экрану горизонтально, бортовые залпы вниз; после трёх проходов уходит
@@ -537,6 +834,15 @@
     A.play(size > 1.5 ? 'explodeM' : 'explodeS', { vol: size > 1.5 ? 0.8 : 0.6 });
     if (size > 1.5) FX.shake(e.mini ? 0.45 : 0.18);
     if (e.mini) { FX.flash('#ffd9a0', 0.25); SS.tg.haptic('heavy'); }
+    // посмертные эффекты: осколки кристалла, кольцо орбиты, выводок роя и паразита
+    // (бомба и нова их гасят, чтобы зачистка экрана оставалась зачисткой)
+    const quiet = src === 'bomb' || src === 'nova';
+    const d = e.def;
+    if (d.death && !quiet && game.player.alive) {
+      const s = game.bspd(d.death.spd), off = Math.random() * U.TAU;
+      for (let i = 0; i < d.death.n; i++) { const a = off + i / d.death.n * U.TAU; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, d.death.bullet); }
+    }
+    if (d.brood && !quiet && !e.isChild) brood(e.x, e.y, d.brood, !!d.larva, 18);
     game.onEnemyKilled(e, src);
   };
 
@@ -559,9 +865,10 @@
     const num = Math.max(1, Math.round(n / 5));
     const bdef = D.BOSSES[(num - 1) % D.BOSSES.length];
     const cycle = Math.floor((num - 1) / D.BOSSES.length);
-    const S = G.S, diff = game.diff;
-    // первый босс мягче — это первое серьёзное испытание для новичка
-    const hp = 2400 * bdef.hp * diff.hp * (1 + (num - 1) * 0.6) * (1 + cycle * 0.5) * (num === 1 ? 0.75 : 1);
+    const S = G.S;
+    // прочность растёт вместе с прочностью обычных врагов; первые два босса — разминка
+    const ramp = num === 1 ? 0.92 : num === 2 ? 1.6 : 2 + (num - 3) * 0.2;
+    const hp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3);
     const w = Math.min(G.FW * bdef.wf, bdef.wmax * S);
     const asp = G.aspect(bdef.sprite);
     const h = w * asp;
@@ -574,7 +881,7 @@
       cv: bdef.hue !== undefined && bdef.hue !== null ? G.tinted(bdef.sprite, { hue: bdef.hue }) : null,
       // корпус целиком ниже полосы босса, но не ниже середины экрана
       baseY: Math.max(G.H * 0.2, Math.min((SS.ui ? SS.ui.topInset() : 120) + h * 0.5 + 4 * S, G.H * 0.52 - h * 0.5)), reborn: false, cycle, num,
-      pt: {}, orbs: [], spin: 0, aim: null, dive: null, dash: null,
+      pt: {}, orbs: [], spin: 0, aim: null, dive: null, dash: null, vuln: 0,
     };
     setHitbox(b, bdef.sprite);
     if (bdef.id === 'phoenix') for (let i = 0; i < 3; i++) b.orbs.push({ a: i / 3 * U.TAU });
@@ -604,12 +911,37 @@
     const s = game.bspd(spd);
     for (let i = 0; i < n; i++) { const a = b0 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * spread); game.ebullet(x, y, Math.cos(a) * s, Math.sin(a) * s, type); }
   }
+  // перья: разлетаются веером, замирают и бросаются в игрока
+  function feathers(x, y, n, dir, spd) {
+    const s = game.bspd(spd || 150);
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI / 2 + dir * (0.35 + i * 0.22);
+      game.ebullet(x, y, Math.cos(a) * s, Math.sin(a) * s, 'feather', { redir: 0.65 + i * 0.05, redirSpd: game.bspd(280), life: 6 });
+    }
+  }
+
+  // атаки Хаоса выбираются случайно
+  const CHAOS_MOVES = [
+    (b) => { // шрапнель с рикошетом
+      for (let i = 0; i < 14; i++) { const a = Math.PI / 2 + U.rand(-1.2, 1.2), s = game.bspd(U.rand(140, 230)); game.ebullet(b.x + U.rand(-0.3, 0.3) * b.w, b.y + b.h * 0.2, Math.cos(a) * s, Math.sin(a) * s, 'junk', { bounce: 1 }); }
+      A.play('explodeS', { vol: 0.6 });
+    },
+    (b) => { ring(b.x, b.y, 12, 150, 'junk', Math.random()); A.play('enemyShot'); },
+    (b) => { for (const sd of [-1, 0, 1]) { const s = game.bspd(120); game.ebullet(b.x + sd * b.w * 0.3, b.y + b.h * 0.2, sd * s * 0.5, s, 'fire', { homing: 1.1, life: 5 }); } A.play('rocket', { rate: 0.8 }); },
+    (b) => {
+      game.laser({ owner: b, ox: 0, oy: 0.05, ang: Math.PI / 2 + U.rand(-0.7, 0.7), spin: U.rand(0.35, 0.6) * U.sign(Math.random() - 0.5), warn: 0.7, dur: 1.0, w: 12 * G.S, color: '#ff7a2a' });
+      A.play('railCharge', { vol: 0.4, rate: 1.5 });
+    },
+    (b) => { for (let i = 0; i < 2; i++) E.spawn('scout', { x: U.clamp(b.x + (i ? 1 : -1) * b.w * 0.4, 20 * G.S, G.FW - 20 * G.S), y: b.y, tint: 25, hpMul: 0.7, noElite: true }); },
+  ];
 
   const BOSS = {
     guardian(b) {
-      if (timer(b, 'fan', bcd(b, 1.7), 1)) { fan(b.x, b.y + b.h * 0.35, [5, 7, 9][b.phase - 1], 0.95, 210, 'bolt'); A.play('enemyShot'); }
-      if (b.phase >= 2 && timer(b, 'ring', bcd(b, 2.6))) { b.spin += 0.3; ring(b.x, b.y, 14, 150, 'orb', b.spin); }
-      if (b.phase >= 3 && timer(b, 'rain', bcd(b, 1.0))) { for (let i = 0; i < 3; i++) game.ebullet(U.rand(0.05, 0.95) * G.FW, -10, 0, game.bspd(170), 'fire'); }
+      // первая встреча — вводный бой: меньше пуль в залпах
+      const intro = b.num === 1;
+      if (timer(b, 'fan', bcd(b, 1.7), 1)) { fan(b.x, b.y + b.h * 0.35, (intro ? [3, 5, 6] : [5, 7, 9])[b.phase - 1], 0.95, 210, 'bolt'); A.play('enemyShot'); }
+      if (b.phase >= 2 && timer(b, 'ring', bcd(b, 2.6))) { b.spin += 0.3; ring(b.x, b.y, intro ? 10 : 14, 150, 'orb', b.spin); }
+      if (b.phase >= 3 && timer(b, 'rain', bcd(b, intro ? 1.6 : 1.0))) { for (let i = 0; i < (intro ? 2 : 3); i++) game.ebullet(U.rand(0.05, 0.95) * G.FW, -10, 0, game.bspd(170), 'fire'); }
     },
     sniper(b) {
       if (!b.aim && timer(b, 'snipe', bcd(b, 2.4), 1.2)) b.aim = { t: 0.95 };
@@ -633,8 +965,37 @@
         b.flashTele = 0.3;
         ring(b.x, b.y, 10, 160, 'dot', U.rand(0, 1));
       }
+      // рельсотрон: луч по колонне игрока
+      if (b.phase >= 3 && timer(b, 'rail', bcd(b, 5), 2)) { beam(game.player.x, b.y + b.h * 0.4, 16 * G.S, 0.9, 0.45, '#ff9f3d', b); A.play('railCharge', { vol: 0.45 }); }
     },
-    // Паук-реактор: вращающиеся спирали из «лап» и выводок дронов
+    // Кракен: щупальца раскачивают завесы пуль, чернильные кляксы разрываются кольцами
+    kraken(b) {
+      const S = G.S;
+      const active = (b.age % 4.6) < 3;
+      if (active && timer(b, 'tent', b.phase >= 3 ? 0.15 : 0.2)) {
+        const sw = b.phase >= 2 ? 1.9 : 1.4;
+        for (const sd of [-1, 1]) {
+          const a = Math.PI / 2 + sd * (0.2 + 0.6 * (0.5 + 0.5 * Math.sin(b.age * sw + (sd > 0 ? Math.PI : 0))));
+          const s = game.bspd(160);
+          game.ebullet(b.x + sd * b.w * 0.34, b.y + b.h * 0.36, Math.cos(a) * s, Math.sin(a) * s, 'violet');
+        }
+      }
+      if (timer(b, 'ink', bcd(b, 3.2), 1.8)) {
+        const n = 1 + b.phase;
+        for (let i = 0; i < n; i++) {
+          const a = Math.PI / 2 + (i - (n - 1) / 2) * 0.55, s = game.bspd(115);
+          game.ebullet(b.x, b.y + b.h * 0.25, Math.cos(a) * s, Math.sin(a) * s, 'ink', { fuse: 1.25 + i * 0.12, burst: { n: 10, type: 'dot', spd: 145 }, life: 6 });
+        }
+        A.play('enemyShot', { rate: 0.6 });
+      }
+      if (b.phase >= 2 && timer(b, 'whirl', bcd(b, 2.8))) { b.spin += 0.4; ring(b.x, b.y, 16, 135, 'violet', b.spin); }
+      if (b.phase >= 3 && !b.dash && timer(b, 'grab', 6.5, 2.5)) {
+        b.dash = { t: 0, x0: b.x, y0: b.y, tx: U.clamp(game.player.x, b.w * 0.45, G.FW - b.w * 0.45), dy: 50 * S };
+        A.play('bossRoar', { vol: 0.4, rate: 1.3 });
+      }
+      if (b.phase >= 3 && timer(b, 'spawn', bcd(b, 7.5), 3)) brood(b.x, b.y + b.h * 0.3, 3, false, 24);
+    },
+    // Паук-реактор: вращающиеся спирали из «лап», паутина и выводок дронов
     spider(b) {
       b.spinCycle = (b.spinCycle || 0) + b._dt;
       const cyc = b.spinCycle % 4;
@@ -646,6 +1007,11 @@
       if (timer(b, 'spawn', bcd(b, 6.5), 3)) {
         for (let i = 0; i < 2 + b.phase; i++) E.spawn('drone', { x: b.x + (i - (1 + b.phase) / 2) * 30 * G.S, y: b.y + b.h * 0.3, idx: i, amp: 30, noElite: true });
       }
+      // паутина: медленное кольцо с проходами
+      if (b.phase >= 2 && timer(b, 'web', bcd(b, 4.6))) {
+        const n = 24, s = game.bspd(105), gap = U.randi(0, 5), off = Math.random() * 0.3;
+        for (let i = 0; i < n; i++) { if ((i + gap) % 6 < 2) continue; const a = off + i / n * U.TAU; game.ebullet(b.x, b.y, Math.cos(a) * s, Math.sin(a) * s, 'dot'); }
+      }
       if (b.phase >= 3 && timer(b, 'tent', bcd(b, 2.8))) { for (const sd of [-1, 1]) for (let k = 0; k < 4; k++) game.after(k * 0.1, () => { if (b.alive) game.aimAt(b.x + sd * b.w * 0.35, b.y + b.h * 0.25, 230, 'needle'); }); }
     },
     dreadnought(b) {
@@ -653,7 +1019,7 @@
       if (timer(b, 'beam', bcd(b, 3.4), 1.5)) {
         const xs = [game.player.x];
         if (b.phase >= 3) xs.push(U.clamp(game.player.x + U.pick([-1, 1]) * U.rand(90, 150) * S, 20 * S, G.FW - 20 * S));
-        for (const x of xs) game.ov.beams.push({ x, y0: b.y + b.h * 0.35, w: 22 * S, warn: 1.0, dur: 0.6, t: 0, color: '#3db8ff', hitDone: false });
+        for (const x of xs) beam(x, b.y + b.h * 0.35, 22 * S, 1.0, 0.6, '#3db8ff', b);
         A.play('railCharge', { vol: 0.5, rate: 1.3 });
       }
       if (b.phase >= 2 && timer(b, 'missile', bcd(b, 3.0))) {
@@ -671,14 +1037,72 @@
       const S = G.S, p = game.player;
       const want = 2 + b.phase + (b.reborn ? 1 : 0);
       while (b.orbs.length < want) b.orbs.push({ a: Math.random() * U.TAU });
-      const R = b.w * 0.64;
+      const R = b.w * 0.5;
       for (const o of b.orbs) {
         o.a += b._dt * (1.4 + b.phase * 0.25);
         o.x = b.x + Math.cos(o.a) * R; o.y = b.y + Math.sin(o.a) * R * 0.8;
         if (p.alive && Math.hypot(o.x - p.x, o.y - p.y) < 14 * S + p.r) game.hitPlayer(o.x, o.y);
       }
-      if (timer(b, 'burst', bcd(b, 1.9), 1.2)) { b.spin += 0.4; ring(b.x, b.y, [10, 14, 18][b.phase - 1], 150, b.phase >= 3 ? 'fire' : 'orb', b.spin); }
+      if (timer(b, 'burst', bcd(b, 2.1), 1.2)) { b.spin += 0.4; ring(b.x, b.y, [10, 14, 18][b.phase - 1], 150, b.phase >= 3 ? 'fire' : 'orb', b.spin); }
+      // огненные перья с крыльев
+      if (timer(b, 'feather', bcd(b, 3.4), 2.4)) {
+        for (const sd of [-1, 1]) feathers(b.x + sd * b.w * 0.38, b.y, 3 + b.phase, sd, 150);
+        A.play('enemyShot', { rate: 1.2 });
+      }
       if (b.phase >= 2 && !b.dive && timer(b, 'dive', 5.5)) b.dive = { t: 0, x0: b.x, y0: b.y, tx: p.x, ty: Math.min(p.y - 140 * S, G.H * 0.55) };
+      if ((b.phase >= 3 || b.reborn) && timer(b, 'rain', bcd(b, 1.3))) { for (let i = 0; i < 3; i++) game.ebullet(U.rand(0.05, 0.95) * G.FW, -10, 0, game.bspd(170), 'fire'); }
+    },
+    // Инквизитор: гатлинги, перекрестье лазеров, столпы света, перья
+    inquisitor(b) {
+      const S = G.S, p = game.player;
+      if (!b.gat && timer(b, 'gat', bcd(b, 2.5), 1.4)) { b.gatSide = -(b.gatSide || 1); b.gat = { n: 0, t: 0 }; }
+      if (b.gat) {
+        b.gat.t -= b._dt;
+        if (b.gat.t <= 0) {
+          b.gat.t = 0.075;
+          game.aimAt(b.x + b.gatSide * b.w * 0.36, b.y + b.h * 0.36, 300, 'bolt', U.rand(-0.07, 0.07));
+          A.play('enemyShot', { vol: 0.35, rate: 1.5 });
+          if (++b.gat.n >= (b.phase >= 3 ? 12 : 9)) b.gat = null;
+        }
+      }
+      // крест правосудия: два луча сходятся от краёв к центру
+      if (timer(b, 'cross', bcd(b, 6.8), 3.5)) {
+        const spin = 0.32 * (b.phase >= 2 ? 1.3 : 1);
+        game.laser({ owner: b, ox: 0, oy: 0.05, ang: Math.PI / 2 - 0.85, spin, warn: 0.9, dur: 1.6, w: 14 * S, color: '#ff3d3d' });
+        game.laser({ owner: b, ox: 0, oy: 0.05, ang: Math.PI / 2 + 0.85, spin: -spin, warn: 0.9, dur: 1.6, w: 14 * S, color: '#ff3d3d' });
+        A.play('railCharge', { vol: 0.5 });
+      }
+      if (b.phase >= 2 && timer(b, 'pillar', bcd(b, 4.4))) {
+        const xs = [p.x, U.rand(0.1, 0.9) * G.FW, U.rand(0.1, 0.9) * G.FW];
+        for (const x of xs) beam(x, b.y + b.h * 0.4, 20 * S, 1.0, 0.5, '#ffd23d', b);
+        A.play('railCharge', { vol: 0.4, rate: 1.2 });
+      }
+      if (b.phase >= 3 && timer(b, 'wings', bcd(b, 3.6))) {
+        for (const sd of [-1, 1]) feathers(b.x + sd * b.w * 0.42, b.y - b.h * 0.05, 5, sd, 160);
+        A.play('enemyShot', { rate: 1.3 });
+      }
+    },
+    // Королева роя: выводки жуков, кислота, яйца и спираль
+    queen(b) {
+      if (timer(b, 'brood', bcd(b, 4.6), 2)) { brood(b.x, b.y + b.h * 0.3, 3 + b.phase, false, 22); A.play('teleport', { rate: 0.6, vol: 0.5 }); }
+      if (timer(b, 'spit', bcd(b, 1.9))) { fan(b.x, b.y + b.h * 0.35, 5, 0.7, 200, 'green'); A.play('enemyShot'); }
+      if (b.phase >= 2 && timer(b, 'eggs', bcd(b, 3.3))) {
+        for (let i = 0; i < 3; i++) {
+          const a = Math.PI / 2 + (i - 1) * 0.6, s = game.bspd(110);
+          game.ebullet(b.x + (i - 1) * b.w * 0.25, b.y + b.h * 0.3, Math.cos(a) * s, Math.sin(a) * s, 'egg', { fuse: 1.2 + i * 0.2, burst: { n: 6, type: 'green', spd: 150 }, life: 6 });
+        }
+      }
+      if (b.phase >= 3 && (b.age % 5) < 3 && timer(b, 'spiral', 0.17)) { b.spin += 0.29; ring(b.x, b.y, 3, 150, 'green', b.spin); }
+    },
+    necro(b) {
+      if (timer(b, 'spiral', bcd(b, 1.5), 1)) { b.spin += 0.35; ring(b.x, b.y, [5, 8, 12][b.phase - 1], 150, 'violet', b.spin); }
+      if (timer(b, 'summon', bcd(b, 5.5), 3)) { for (let i = 0; i < 1 + b.phase; i++) E.spawn('scout', { tint: 110, hpMul: 0.6, noElite: true }); A.play('bossRoar', { vol: 0.4, rate: 1.4 }); }
+      if (b.phase >= 2 && timer(b, 'cross', bcd(b, 2.3))) ring(b.x, b.y, 8, 190, 'needle', b.phase >= 3 ? Math.PI / 8 : 0);
+      // души: разлетаются и бросаются в игрока
+      if (b.phase >= 3 && timer(b, 'souls', bcd(b, 2.2))) {
+        const s = game.bspd(140);
+        for (let i = 0; i < 6; i++) { const a = Math.PI / 2 + (i - 2.5) * 0.4; game.ebullet(b.x, b.y + b.h * 0.2, Math.cos(a) * s, Math.sin(a) * s, 'green', { redir: 0.8, redirSpd: game.bspd(230), life: 6 }); }
+      }
     },
     // Материнский корабль: выводки дронов, кислотный дождь, стена с проходом
     mothership(b) {
@@ -695,11 +1119,31 @@
         A.play('enemyShot');
       }
     },
-    necro(b) {
-      if (timer(b, 'spiral', bcd(b, 1.5), 1)) { b.spin += 0.35; ring(b.x, b.y, [5, 8, 12][b.phase - 1], 150, 'violet', b.spin); }
-      if (timer(b, 'summon', bcd(b, 5.5), 3)) { for (let i = 0; i < 1 + b.phase; i++) E.spawn('scout', { tint: 275, hpMul: 0.6, noElite: true }); A.play('bossRoar', { vol: 0.4, rate: 1.4 }); }
-      if (b.phase >= 2 && timer(b, 'cross', bcd(b, 2.3))) ring(b.x, b.y, 8, 190, 'needle', b.phase >= 3 ? Math.PI / 8 : 0);
-      if (b.phase >= 3 && timer(b, 'souls', bcd(b, 1.3))) { for (const a of [-0.25, 0, 0.25]) game.aimAt(b.x, b.y + b.h * 0.3, 150, 'dot', a, { homing: 0.7, life: 5 }); }
+    // Хаос: случайные атаки, глитч-телепорты и перегрев (окно уязвимости)
+    chaos(b) {
+      const S = G.S;
+      if (b.vuln > 0) {
+        b.vuln -= b._dt;
+        if (Math.random() < b._dt * 18) FX.smoke(b.x + U.rand(-0.3, 0.3) * b.w, b.y + U.rand(-0.3, 0.2) * b.h, 1, 16 * S);
+        if (b.vuln <= 0) { FX.ring(b.x, b.y, b.r, b.r * 2.4, '#ff7a2a', 0.4, 4); A.play('bossRoar', { vol: 0.5, rate: 1.4 }); }
+        return;
+      }
+      if (b.phase >= 2 && timer(b, 'heat', 9.5, 6)) {
+        b.vuln = 2.4;
+        FX.text(b.x, b.y - b.h * 0.3, 'ПЕРЕГРЕВ! УРОН ×1.5', '#ffb03d', 16, 1.4, -40);
+        A.play('explodeM', { vol: 0.6 });
+        return;
+      }
+      if (timer(b, 'act', bcd(b, b.phase >= 3 ? 1.6 : 2.1), 1.2)) {
+        const n = b.phase >= 3 ? 2 : 1;
+        for (let i = 0; i < n; i++) CHAOS_MOVES[U.randi(0, CHAOS_MOVES.length - 1)](b);
+      }
+      if (timer(b, 'glitch', 5.5, 4)) {
+        FX.glowPuff(b.x, b.y, '#ff7a2a', b.w * 1.2, 0.35);
+        b.mtOff = U.rand(0, U.TAU);
+        b.flashTele = 0.25;
+        A.play('teleport', { rate: 0.8 });
+      }
     },
     // Тяжёлый крейсер: бортовые залпы, рои ракет, таранные проходы и мины
     cruiser(b) {
@@ -724,6 +1168,28 @@
       if (b.dash && timer(b, 'dashfire', 0.22)) game.ebullet(b.x, b.y + b.h * 0.3, 0, game.bspd(230), 'needle');
       if (b.phase >= 3 && timer(b, 'mines', bcd(b, 3.6))) { for (const sd of [-1, 1]) game.ebullet(b.x + sd * b.w * 0.3, b.y + b.h * 0.3, sd * 30 * S, 45 * S, 'mine', { fuse: 2.2, life: 6 }); A.play('mine'); }
     },
+    // Оверлорд: следящий луч из глаза, батарея пушек, элитная стража, тёмная нова
+    overlord(b) {
+      const S = G.S, p = game.player;
+      if (timer(b, 'eye', bcd(b, 6.2), 2.5)) {
+        const n = b.phase >= 3 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const a0 = Math.atan2(p.y - b.y, p.x - b.x) + (n > 1 ? (i ? 0.45 : -0.45) : 0);
+          game.laser({ owner: b, ox: 0, oy: 0.02, ang: a0, track: 0.5, warn: 1.0, dur: 2.4, w: 18 * S, color: '#ff3d6b' });
+        }
+        A.play('railCharge', { vol: 0.6, rate: 0.8 });
+      }
+      if ((b.age % 5) < 2.8 && timer(b, 'array', [0.2, 0.18, 0.16][b.phase - 1])) {
+        b.spin += 0.37;
+        ring(b.x, b.y, 2 + b.phase, 130, 'eye', b.spin);
+      }
+      if (b.phase >= 2 && timer(b, 'guard', bcd(b, 9), 3)) {
+        for (let i = 0; i < 2; i++) E.spawn(U.pick(['heavyfighter', 'assault', 'interceptor', 'ghost']), { x: U.clamp(b.x + (i ? 1 : -1) * b.w * 0.45, 30 * S, G.FW - 30 * S), elite: true, hpMul: 0.6 });
+        A.play('bossRoar', { vol: 0.4, rate: 1.2 });
+      }
+      if (b.phase >= 2 && timer(b, 'nova', bcd(b, 5.6))) { for (let k = 0; k < 3; k++) game.after(k * 0.18, () => { if (b.alive) ring(b.x, b.y, 18, 115 + k * 30, 'violet', k * 0.17); }); }
+      if (b.phase >= 3 && timer(b, 'pillar', bcd(b, 4.2))) { for (const x of [p.x, U.rand(0.1, 0.9) * G.FW]) beam(x, b.y + b.h * 0.4, 20 * S, 1.0, 0.5, '#c03dff', b); }
+    },
   };
 
   function updateBoss(b, edt, dt) {
@@ -745,7 +1211,7 @@
       FX.flash(b.bdef.color, 0.25);
       FX.shake(0.45);
       A.play('bossRoar');
-      ring(b.x, b.y, 16, 160, 'orb', Math.random());
+      ring(b.x, b.y, b.num === 1 ? 10 : 16, 160, 'orb', Math.random());
       SS.emit('bossPhase', b);
     }
     // движение
@@ -764,8 +1230,10 @@
       if (d.t >= 1.5) { b.dash = null; b.mt = Math.asin(U.clamp((b.x - G.FW / 2) / Math.max(1, (G.FW / 2 - b.w * 0.5) * 0.85), -1, 1)) / 0.55; }
     } else {
       b.mt += edt;
-      const speed = b.bdef.id === 'mothership' ? 0.3 : b.bdef.id === 'cruiser' ? 0.4 : 0.55;
-      const tx = G.FW / 2 + Math.sin(b.mt * speed + (b.mtOff || 0)) * Math.max(0, G.FW / 2 - b.w * 0.5) * 0.85;
+      const id = b.bdef.id;
+      const speed = id === 'mothership' || id === 'overlord' ? 0.3 : id === 'cruiser' || id === 'queen' ? 0.4 : id === 'chaos' ? 0.7 : 0.55;
+      let tx = G.FW / 2 + Math.sin(b.mt * speed + (b.mtOff || 0)) * Math.max(0, G.FW / 2 - b.w * 0.5) * 0.85;
+      if (id === 'chaos') tx += Math.sin(b.age * 7.3) * 12 * S;
       const ty = b.baseY + Math.sin(b.mt * 1.1) * G.H * 0.03;
       b.x = U.damp(b.x, tx, b.flashTele > 0 ? 30 : 3, dt);
       b.y = U.damp(b.y, ty, 3, dt);
@@ -777,11 +1245,6 @@
     if (b.flashTele > 0) b.flashTele -= dt;
     if (b.frozen > 0) b.frozen -= dt;
     if (game.player.alive) BOSS[b.bdef.id](b);
-    // лучи дредноута наносят урон
-    const p = game.player;
-    for (const bm of game.ov.beams) {
-      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; game.hitPlayer(p.x, p.y); }
-    }
     // искры повреждённого босса
     if (b.phase >= 2 && Math.random() < dt * (b.phase === 3 ? 8 : 3)) {
       const x = b.x + U.rand(-0.35, 0.35) * b.w, y = b.y + U.rand(-0.3, 0.3) * b.h;
@@ -806,11 +1269,12 @@
     E.corpses.push({ x: b.x, y: b.y, w: b.w, h: b.h, cv: b.cv, sprite: b.sprite, rot: b.bdef.rot || 0, flip: b.fx < 0 ? -1 : 1, t: 0, dur: 1.6, color: b.bdef.color });
     FX.shake(0.7);
     SS.tg.haptic('success');
+    if (b.bdef.id === 'overlord') SS.meta.unlock('overlord');
     game.onBossDefeated(b);
     SS.emit('intensity');
   }
 
-  // горизонтальные спрайты: «смотрят» влево (босс) или вправо (Рейдер) — отражаем по ходу движения
+  // горизонтальные спрайты: «смотрят» влево (босс) или вправо (Рейдер, миноукладчик, био-мех) — отражаем по ходу движения
   function horizFlip(e) {
     if (e.boss) return (e.sprite === 'b_mothership' || e.sprite === 'b_heavycruiser') && e.face > 0 ? -1 : 1;
     if (e.horiz) return e.vx < 0 ? -1 : 1;
@@ -842,6 +1306,15 @@
       if (e.boss) { drawBoss(ctx, e); continue; }
       const def = e.def;
       if (e.tint && !e.cv) e.cv = G.tinted(e.sprite, e.tint);
+      // полоса удара тарана
+      if (def.ai === 'ram' && e.st === 2) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.16 + 0.14 * Math.abs(Math.sin(e.age * 20));
+        ctx.fillStyle = '#ff3d3d';
+        ctx.fillRect(e.lane - e.w * 0.35, e.y, e.w * 0.7, G.H - e.y);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
       ctx.save();
       ctx.translate(e.x, e.y);
       ctx.globalAlpha = e.alpha;
@@ -863,11 +1336,23 @@
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = e.alpha;
       }
+      // заряд ионного луча
+      if (def.ai === 'ion' && e.st === 2) {
+        ctx.globalCompositeOperation = 'lighter';
+        const k = 1 - Math.max(0, e.charge) / 0.85, gs = e.w * (0.6 + k * 1.2);
+        ctx.globalAlpha = 0.5 + 0.5 * k;
+        ctx.drawImage(G.glow('#7ff6ff', 64), -gs / 2, e.h * 0.4 - gs / 2, gs, gs);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = e.alpha;
+      }
       if (e.horiz) {
         if (horizFlip(e) < 0) ctx.scale(-1, 1);
+      } else if (e.spinAng !== undefined) {
+        ctx.rotate(e.spinAng);
       } else {
-        let rot = Math.PI + e.bank;
+        let rot = (def.rot !== undefined ? def.rot : Math.PI) + e.bank;
         if ((def.ai === 'kamikaze' || def.ai === 'hunter') && e.st >= 1 && e.dir !== undefined) rot = e.dir - Math.PI / 2;
+        if (e.larva) rot = e.dir - Math.PI / 2;
         ctx.rotate(rot);
       }
       drawFrame(ctx, e.sprite, e.cv, e.w, e.h);
@@ -948,19 +1433,19 @@
     }
     ctx.save();
     ctx.translate(b.x, b.y + Math.sin(t * 1.6) * 3 * S);
-    // свечение ядра
+    // свечение ядра (у перегретого Хаоса — красное и пульсирующее)
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 4);
+    ctx.globalAlpha = b.vuln > 0 ? 0.55 + 0.35 * Math.sin(t * 18) : 0.35 + 0.15 * Math.sin(t * 4);
     const gs = Math.max(b.w, b.h) * 1.15;
-    ctx.drawImage(G.soft(col, 64), -gs / 2, -gs / 2, gs, gs);
+    ctx.drawImage(G.soft(b.vuln > 0 ? '#ff3d1a' : col, 64), -gs / 2, -gs / 2, gs, gs);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = b.entering ? 0.85 : 1;
     ctx.rotate((b.bdef.rot || 0) + Math.sin(t * 0.8) * 0.03);
     if (b.fx !== 1) ctx.scale((b.fx < 0 ? -1 : 1) * Math.max(0.12, Math.abs(b.fx)), 1);
     drawFrame(ctx, b.sprite, b.cv, b.w, b.h);
-    if (b.flash > 0 || b.entering || b.flashTele > 0) {
+    if (b.flash > 0 || b.entering || b.flashTele > 0 || b.vuln > 0) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = b.entering ? 0.25 + 0.15 * Math.sin(t * 12) : Math.min(1, b.flash * 10) * 0.55;
+      ctx.globalAlpha = b.entering ? 0.25 + 0.15 * Math.sin(t * 12) : b.vuln > 0 ? 0.2 + 0.2 * Math.abs(Math.sin(t * 12)) : Math.min(1, b.flash * 10) * 0.55;
       const wh = G.white(b.sprite);
       if (wh) ctx.drawImage(wh, -b.w / 2, -b.h / 2, b.w, b.h);
     }

@@ -24,7 +24,7 @@
     buffs: {}, blasts: [],
     keys: {},
     pointer: { id: null, x: 0, y: 0, downT: 0, downX: 0, downY: 0, moved: 0, lastTap: 0, lastTapX: 0, lastTapY: 0 },
-    ov: { rail: null, hole: null, arcs: [], beams: [] },
+    ov: { rail: null, hole: null, arcs: [], beams: [], lasers: [] },
     attract: { t: 0 },
     hudDirty: true,
     timers: [],
@@ -75,7 +75,8 @@
     p.maxLives = this.diff.lives + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
     p.lives = p.maxLives;
     p.shield = M.generalLevel('shield') >= 1;
-    p.bombs = 1 + M.generalLevel('bombs');
+    p.bombs = 1 + M.generalLevel('bombs') + (D.SHIPS[s.ship.model].stats.bombs || 0);
+    p.wingCd = 0.2;
     this.buffs = {};
     this.wave = null;
     this.t = 0; this.timeScale = 1; this.slowT = 0;
@@ -95,7 +96,7 @@
     this.enemies.length = 0; this.drones.length = 0; this.blasts.length = 0;
     this.boss = null;
     this.timers = [];
-    this.ov = { rail: null, hole: null, arcs: [], beams: [] };
+    this.ov = { rail: null, hole: null, arcs: [], beams: [], lasers: [] };
     SS.enemies.corpses.length = 0;
     FX.clear();
   };
@@ -131,19 +132,23 @@
     const S = G.S;
     let shieldRegen = gl('shield') >= 3 ? 25 : gl('shield') >= 2 ? 40 : 0;
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
+    if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
       dmg: (1 + gl('power') * 0.07) * (1 + (ship.dmg || 0)) * pres.dmg * (1 + pk('dmg') * 0.15) * (sk('sk_sniper') ? 1.5 : 1),
       rate: (1 + gl('rate') * 0.05) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
-      crit: 0.03 + gl('crit') * 0.04 + pk('crit') * 0.08,
+      crit: 0.03 + gl('crit') * 0.04 + pk('crit') * 0.08 + (ship.crit || 0),
+      critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5,
       pierce: pk('pierce'),
-      multi: pk('multi'),
-      magnet: sk('sk_magnet') ? 9999 : 120 * S * (1 + gl('magnet') * 0.2) * (1 + pk('magnet') * 0.5),
+      multi: pk('multi') + (ship.multi || 0),
+      wings: ship.wings || 0,
+      magnet: sk('sk_magnet') ? 9999 : 120 * S * (1 + gl('magnet') * 0.2) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
       coins: this.diff.coins * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1),
       luck: (1 + gl('luck') * 0.12) * (1 + pk('luck') * 0.4),
-      speed: (1 + (ship.speed || 0)) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
-      dodge: (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05,
+      speed: (1 + (ship.speed || 0)) * (1 + gl('engine') * 0.04) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
+      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0)),
       cdMul: 1 - pk('cooldown') * 0.15,
-      bomb: 1 + gl('bombdmg') * 0.25,
+      bomb: 1 + gl('bombdmg') * 0.25 + (ship.bombdmg || 0),
+      bossDmg: 1 + pk('titan') * 0.25,
       shieldRegen,
       cryo: pk('cryo') * 0.12,
       nova: pk('nova'),
@@ -341,6 +346,15 @@
       p.wcd[wid] += cd;
     }
     if (p.wcd[wid] < -cd) p.wcd[wid] = 0;
+    // бортовые пушки стреляют независимо от выбранного оружия
+    if (this.st.wings) {
+      p.wingCd -= dt * this.rateMul();
+      if (p.wingCd <= 0) {
+        p.wingCd = 0.26;
+        const S = G.S, dmg = 4.5 * this.dmgMul();
+        for (const sd of [-1, 1]) shot({ x: p.x + sd * p.w * 0.4, y: p.y - p.w * 0.05, vx: sd * 30 * S, vy: -980 * S, dmg, r: 4 * S, kind: 'laser', sprite: 'pb_bolt_s', w: 10 * S, pierce: this.st.pierce, wid: 'wings', life: 1.4 });
+      }
+    }
   };
 
   function shot(o) {
@@ -360,6 +374,8 @@
     const def = D.WEAPONS[wid], base = def.base;
     const dmgMul = this.dmgMul() * (1 + wl(wid, 'dmg') * 0.12);
     const multi = st.multi + (this.buffs.multi > 0 ? 2 : 0);
+    // дополнительные снаряды бьют слабее основного: ×1.6 за первый, ×2.8 за три
+    const mk = (1 + multi * 0.6) / (1 + multi);
     const spread = this.buffs.spread > 0;
     const nose = p.y - p.w * 0.42;
     this.run.shots++;
@@ -372,7 +388,7 @@
       const spd = base.speed * S;
       for (let i = 0; i < n; i++) {
         const ox = (i - (n - 1) / 2) * gap;
-        shot({ x: p.x + ox, y: nose, vx: 0, vy: -spd, dmg: base.dmg * dmgMul, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
+        shot({ x: p.x + ox, y: nose, vx: 0, vy: -spd, dmg: base.dmg * dmgMul * mk, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
       }
       if (spread) for (const a of [-0.22, 0.22]) shot({ x: p.x, y: nose, vx: Math.sin(a) * spd, vy: -Math.cos(a) * spd, dmg: base.dmg * dmgMul * 0.8, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
       A.play('laser');
@@ -394,7 +410,7 @@
         p.side = -p.side;
         const out = p.side * (0.55 + i * 0.12) + (spread ? p.side * 0.3 : 0);
         shot({ x: p.x + p.side * p.w * 0.3, y: p.y - p.w * 0.05, vx: Math.sin(out) * 260 * S, vy: -Math.cos(out) * 260 * S,
-          dmg: base.dmg * dmgMul, aoe: base.aoe * dmgMul, aoeR: radius, r: 7 * S, kind: 'rocket', w: 11 * S,
+          dmg: base.dmg * dmgMul * mk, aoe: base.aoe * dmgMul * mk, aoeR: radius, r: 7 * S, kind: 'rocket', w: 11 * S,
           homing: 6.5, acc: 900 * S, maxSpd: base.speed * S, wid, life: 2.4 });
       }
       A.play('rocket');
@@ -404,7 +420,7 @@
       const n = 1 + multi;
       for (let i = 0; i < n; i++) {
         const a = (i - (n - 1) / 2) * 0.16 + (spread && i === 0 ? 0 : 0);
-        shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul, aoe: base.aoe * dmgMul, aoeR: radius,
+        shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * mk, aoe: base.aoe * dmgMul * mk, aoeR: radius,
           r: 12 * S, kind: 'plasma', cv, w: 40 * S, wid, life: 2.6 });
       }
       if (spread) for (const a of [-0.35, 0.35]) shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * 0.6, aoe: base.aoe * dmgMul * 0.6, aoeR: radius * 0.8, r: 10 * S, kind: 'plasma', cv, w: 30 * S, wid, life: 2.6 });
@@ -412,13 +428,14 @@
     } else if (wid === 'lightning') {
       const jumps = base.chain + wl(wid, 'chain') + (this.skill('sk_conductor') ? 2 : 0) + multi;
       const range = base.range * S * (1 + wl(wid, 'range') * 0.15);
-      this.chainLightning(p.x, nose, base.dmg * dmgMul, jumps, range, 360 * S);
-      if (spread) this.chainLightning(p.x, nose, base.dmg * dmgMul * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
+      const ldmg = base.dmg * dmgMul * (1 + multi * 0.15);
+      this.chainLightning(p.x, nose, ldmg, jumps, range, 360 * S);
+      if (spread) this.chainLightning(p.x, nose, ldmg * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
       A.play('zap');
     } else if (wid === 'arc') {
       const range = base.range * S * (1 + wl(wid, 'range') * 0.12);
-      const half = base.angle * 0.5 + multi * 0.08 + (spread ? 0.3 : 0);
-      this.arcStrike(p.x, p.y - p.w * 0.2, range, half, base.dmg * dmgMul);
+      const half = base.angle * 0.5 + multi * 0.12 + (spread ? 0.3 : 0);
+      this.arcStrike(p.x, p.y - p.w * 0.2, range, half, base.dmg * dmgMul * (1 + multi * 0.2));
       A.play('arc');
     } else if (wid === 'darkmatter') {
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
@@ -426,8 +443,8 @@
       const n = 1 + multi + (spread ? 2 : 0);
       for (let i = 0; i < n; i++) {
         const a = (i - (n - 1) / 2) * 0.42;
-        shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul, r: radius, kind: 'dark',
-          w: radius * 1.1, tickT: base.tick, pull, burst: base.burst * dmgMul, burstR: radius * 1.25, wid, life: base.life });
+        shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * mk, r: radius, kind: 'dark',
+          w: radius * 1.1, tickT: base.tick, pull, burst: base.burst * dmgMul * mk, burstR: radius * 1.25, wid, life: base.life });
       }
       A.play('dark');
     }
@@ -664,7 +681,9 @@
       }
     }
     let crit = false;
-    if (o.crit && Math.random() < this.st.crit) { dmg *= 2; crit = true; }
+    if (o.crit && Math.random() < this.st.crit) { dmg *= this.st.critMul; crit = true; }
+    if (e.boss || e.mini) dmg *= this.st.bossDmg;
+    if (e.vuln > 0) dmg *= 1.5;
     if (this.skill('sk_executioner') && e.hp < e.maxHp * 0.25) dmg *= 2;
     if (e.frozen > 0) dmg *= 1.15;
     // щит щитоносца / дредноута
@@ -1051,7 +1070,47 @@
       }
     }
     for (let i = ov.arcs.length - 1; i >= 0; i--) { ov.arcs[i].life -= dt; if (ov.arcs[i].life <= 0) ov.arcs.splice(i, 1); }
-    for (let i = ov.beams.length - 1; i >= 0; i--) { ov.beams[i].t += dt; if (ov.beams[i].t >= ov.beams[i].warn + ov.beams[i].dur) ov.beams.splice(i, 1); }
+    for (let i = ov.beams.length - 1; i >= 0; i--) {
+      const bm = ov.beams[i];
+      bm.t += dt;
+      // луч гаснет, если стрелок погиб до выстрела, и после окончания
+      if ((bm.owner && !bm.owner.alive && bm.t < bm.warn) || bm.t >= bm.warn + bm.dur) ov.beams.splice(i, 1);
+    }
+    // вертикальные лучи (дредноут, ионный, инквизитор) ранят один раз
+    for (const bm of ov.beams) {
+      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(p.x, p.y); }
+    }
+    // поворотные лазеры: прикреплены к владельцу, могут следить за игроком
+    const edt = dt * this.enemySlow();
+    for (let i = ov.lasers.length - 1; i >= 0; i--) {
+      const L = ov.lasers[i];
+      if (L.owner && !L.owner.alive) { ov.lasers.splice(i, 1); continue; }
+      L.t += edt;
+      if (L.t >= L.warn + L.dur) { ov.lasers.splice(i, 1); continue; }
+      const o = this.laserOrigin(L);
+      if (L.track && p.alive) {
+        const want = Math.atan2(p.y - o.y, p.x - o.x);
+        const rate = L.t < L.warn ? L.track * 1.6 : L.track;
+        L.ang += U.clamp(U.angleDiff(L.ang, want), -rate * edt, rate * edt);
+      }
+      if (L.t >= L.warn) L.ang += (L.spin || 0) * edt;
+      if (L.t >= L.warn + 0.05 && p.alive && p.inv <= 0) {
+        const dx = Math.cos(L.ang), dy = Math.sin(L.ang);
+        const tt = U.clamp((p.x - o.x) * dx + (p.y - o.y) * dy, 0, L.len);
+        const qx = o.x + dx * tt, qy = o.y + dy * tt;
+        if (Math.hypot(p.x - qx, p.y - qy) < L.w * 0.45 + p.r) this.hitPlayer(p.x, p.y);
+      }
+    }
+  };
+  // L: { owner, ox, oy — доли размера владельца, ang, spin, track, warn, dur, w, len, color }
+  game.laser = function (o) {
+    const L = Object.assign({ t: 0, ox: 0, oy: 0, spin: 0, track: 0, warn: 0.8, dur: 1.2, w: 16 * G.S, len: 1800 * G.S, color: '#ff3d5a' }, o);
+    this.ov.lasers.push(L);
+    return L;
+  };
+  game.laserOrigin = function (L) {
+    const w = L.owner;
+    return w ? { x: w.x + L.ox * w.w, y: w.y + L.oy * w.h } : { x: L.x, y: L.y };
   };
 
   // ════════════════════════════════════════════════════════════
@@ -1068,6 +1127,12 @@
     violet: { sprite: 'eb_orb',    w: 15, r: 5.5, color: '#b06bff', tint: 275 },
     blue:   { sprite: 'eb_orb',    w: 15, r: 5.5, color: '#4cc9ff', tint: 200 },
     mine:   { proc: 'mine',        w: 24, r: 9,   color: '#ff3d5a' },
+    shard:   { sprite: 'eb_needle', w: 16, r: 5,   color: '#3dffd2', tint: 165, rotate: true },
+    feather: { sprite: 'eb_bolt_l', w: 14, r: 5,   color: '#ffd23d', tint: 40, rotate: true },
+    ink:     { sprite: 'eb_orb',    w: 30, r: 11,  color: '#8a5cff', tint: 255 },
+    egg:     { sprite: 'eb_orb',    w: 26, r: 9,   color: '#a6ff3d', tint: 95 },
+    junk:    { sprite: 'eb_fire',   w: 18, r: 7,   color: '#ff8a3d', tint: 20 },
+    eye:     { sprite: 'eb_orb',    w: 17, r: 6,   color: '#ff3dd2', tint: 320 },
   };
   game.EB = EB;
 
@@ -1082,6 +1147,8 @@
     b.life = (o && o.life) || 9; b.age = 0; b.dead = false;
     b.accel = (o && o.accel) || 0; b.homing = (o && o.homing) || 0; b.fuse = (o && o.fuse) || 0;
     b.maxSpd = (o && o.maxSpd) || 0;
+    b.redirT = (o && o.redir) || 0; b.redirSpd = (o && o.redirSpd) || 0; b.redone = false;
+    b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0;
     this.ebullets.push(b);
     return b;
   };
@@ -1112,7 +1179,28 @@
         const sp = Math.hypot(b.vx, b.vy);
         b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
       }
+      // «перо»: тормозит, замирает и бросается в игрока
+      if (b.redirT > 0 && !b.redone) {
+        b.vx *= Math.exp(-4 * dt); b.vy *= Math.exp(-4 * dt);
+        if (b.age >= b.redirT) {
+          b.redone = true;
+          const a = Math.atan2(p.y - b.y, p.x - b.x), sp = b.redirSpd || 220 * S;
+          b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
+        }
+      }
       b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.bounce > 0 && (b.x < 4 || b.x > FW - 4)) { b.vx = -b.vx; b.x = U.clamp(b.x, 4, FW - 4); b.bounce--; }
+      // кладка/клякса: разрывается кольцом по таймеру
+      if (b.burst && b.type !== 'mine') {
+        b.fuse -= dt;
+        if (b.fuse <= 0) {
+          b.dead = true;
+          const bu = b.burst, sp = this.bspd(bu.spd), off = Math.random() * U.TAU;
+          for (let i = 0; i < bu.n; i++) { const a = off + i / bu.n * U.TAU; this.ebullet(b.x, b.y, Math.cos(a) * sp, Math.sin(a) * sp, bu.type); }
+          FX.glowPuff(b.x, b.y, b.color, 40 * S, 0.25);
+          continue;
+        }
+      }
       if (b.type === 'mine') {
         b.vx *= Math.exp(-1.5 * dt); b.vy = U.damp(b.vy, 45 * S, 2, dt);
         b.fuse -= dt;
@@ -1377,7 +1465,7 @@
     if (!run.bossDamaged) M.unlock('no_damage_boss');
     const pts = Math.round(6000 * (this.wave.n / 5) * this.diff.score);
     this.addScore(pts);
-    this.dropCoins(boss.x, boss.y, Math.round((40 + this.wave.n * 4) * this.st.coins));
+    this.dropCoins(boss.x, boss.y, Math.round((60 + this.wave.n * 8) * this.st.coins));
     this.dropXp(boss.x, boss.y, 18 + this.wave.n);
     this.dropPowerup(boss.x - 30 * S, boss.y, 'heal');
     this.dropPowerup(boss.x + 30 * S, boss.y);
@@ -1457,9 +1545,20 @@
     return G.tinted(sprite, sk) || null;
   };
 
+  // облик корабля: нарисованный цветной вариант или перекраска; preview — для карточек раскрасок
+  game.shipLook = function (model, skinId, preview) {
+    const variant = D.SHIP_VARIANTS[model] && D.SHIP_VARIANTS[model][skinId];
+    if (variant) return { sprite: variant, cv: null };
+    const sprite = D.SHIPS[model].sprite;
+    const sk = D.SKINS.find((k) => k.id === skinId) || D.SKINS[0];
+    if (preview && sk.hue === 'rainbow') return { sprite, cv: G.tinted(sprite, { hue: 300 }) };
+    return { sprite, cv: this.shipCanvas(model, skinId) };
+  };
+
   // корабль с пламенем: (x, y) — центр, w — ширина
   game.drawShip = function (ctx, model, skin, trail, x, y, w, tilt, t, boost) {
-    const sprite = D.SHIPS[model].sprite;
+    const variant = D.SHIP_VARIANTS[model] && D.SHIP_VARIANTS[model][skin];
+    const sprite = variant || D.SHIPS[model].sprite;
     const f = G.frame(sprite);
     if (!f) return;
     const h = w * f[3] / f[2];
@@ -1483,7 +1582,7 @@
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    const cv = this.shipCanvas(model, skin);
+    const cv = variant ? null : this.shipCanvas(model, skin);
     if (cv) ctx.drawImage(cv, -w / 2, -h / 2, w, h);
     else ctx.drawImage(G.img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
     ctx.restore();
@@ -1531,12 +1630,15 @@
     const s = M.s, S = G.S, t = this.attract.t;
     const slot = this.attract.slot;
     if (slot && slot.h < 44) return;
-    const size = slot ? U.clamp(slot.h * 0.66, 38, 92) : 70 * Math.min(1.3, S * 1.1);
+    const sh = D.SHIPS[s.ship.model] || D.SHIPS.ship1, fr = G.frame(sh.sprite);
+    let size = (slot ? U.clamp(slot.h * 0.66, 38, 92) : 70 * Math.min(1.3, S * 1.1)) * (sh.scale || 1);
+    // корабль вместе с пламенем помещается между логотипом и выбором сложности
+    if (slot && fr) size = Math.min(size, (slot.h / 2 + 10) / (fr[3] / fr[2] / 2 + 0.5));
     const x = G.W / 2 + Math.sin(t * 0.7) * 26 * S;
     const y = (slot ? slot.y : G.H * 0.36) + Math.sin(t * 1.3) * 6 * S;
     ctx.save();
     ctx.globalAlpha = 0.95;
-    this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, x, y, size * (D.SHIPS[s.ship.model].scale || 1), Math.cos(t * 0.7) * 0.12, t, 1.1);
+    this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, x, y, size, Math.cos(t * 0.7) * 0.12, t, 1.1);
     ctx.restore();
   };
 
@@ -1608,9 +1710,16 @@
   game.drawPlayer = function (ctx) {
     const p = this.player, s = M.s, S = G.S, run = this.run;
     // дроны
-    for (const d of this.drones) {
-      const cv = G.tinted('drone', { hue: 190 });
-      if (cv) { const w = 26 * S; ctx.drawImage(cv, d.x - w / 2, d.y - w / 2 * cv.height / cv.width, w, w * cv.height / cv.width); }
+    for (let i = 0; i < this.drones.length; i++) {
+      const d = this.drones[i], name = i ? 'c_gold' : 'c_white', f = G.frame(name);
+      if (!f) continue;
+      const w = 24 * S, h = w * f[3] / f[2];
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.7 + Math.random() * 0.3;
+      ctx.drawImage(G.glow(i ? '#ffc83d' : '#7fe7ff', 32), d.x - 7 * S, d.y + h * 0.38, 14 * S, 18 * S);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(G.img, f[0], f[1], f[2], f[3], d.x - w / 2, d.y - h / 2, w, h);
     }
     if (!p.alive) return;
     const blink = p.inv > 0 && this.state === 'play' && Math.floor(p.inv * 14) % 2 === 0;
@@ -1736,6 +1845,27 @@
         ctx.fillRect(bm.x - bm.w * 0.35, bm.y0, bm.w * 0.7, G.H - bm.y0);
       }
     }
+    // поворотные лазеры
+    ctx.lineCap = 'round';
+    for (const L of ov.lasers) {
+      const o = this.laserOrigin(L), ex = o.x + Math.cos(L.ang) * L.len, ey = o.y + Math.sin(L.ang) * L.len;
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(ex, ey);
+      if (L.t < L.warn) {
+        ctx.globalAlpha = 0.25 + 0.4 * Math.abs(Math.sin(L.t * 16));
+        ctx.strokeStyle = L.color; ctx.lineWidth = 2 * S; ctx.stroke();
+        const gs = (14 + 30 * L.t / L.warn) * S;
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(G.glow(L.color, 64), o.x - gs, o.y - gs, gs * 2, gs * 2);
+      } else {
+        const k = Math.min(1, (L.t - L.warn) * 8, (L.warn + L.dur - L.t) * 5);
+        ctx.globalAlpha = 0.3 * k; ctx.strokeStyle = L.color; ctx.lineWidth = L.w * 2.4; ctx.stroke();
+        ctx.globalAlpha = 0.8 * k; ctx.lineWidth = L.w; ctx.stroke();
+        ctx.globalAlpha = k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = L.w * 0.32; ctx.stroke();
+        const gs = L.w * 2.6;
+        ctx.drawImage(G.glow(L.color, 64), o.x - gs, o.y - gs, gs * 2, gs * 2);
+      }
+    }
+    ctx.lineCap = 'butt';
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   };
