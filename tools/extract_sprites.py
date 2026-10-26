@@ -1,12 +1,14 @@
 """Нарезка спрайтов из концепт-листов в атлас игры.
 
 Запуск (из корня проекта):
-    python tools/extract_sprites.py            # собрать assets/sprites.png и js/atlas.js
+    python tools/extract_sprites.py            # собрать assets/sprites*.png|webp и js/atlas.js
     python tools/extract_sprites.py <папка>    # плюс превью для проверки
 
 Режимы:
   solid — заливка фона от краёв -> непрозрачное тело + мягкий край (корабли, враги, бонусы)
   add   — свечение за вычетом фона, рисуется в режиме 'lighter' (пули, взрывы)
+  glow  — непрозрачное тело внутри яркого ореола (ракеты, мины): заливка проходит
+          тёмные и насыщенно-светящиеся пиксели и останавливается о металл корпуса
 """
 import json
 import os
@@ -17,7 +19,8 @@ from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы,
-# 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли)
+# 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли),
+# 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты)
 SHEET_FILES = [
     '1e686660-f0c5-45ad-b686-2c52b70b7c31.png',
     'cbe8f71c5f0f1e02f95103d6.png',
@@ -28,6 +31,7 @@ SHEET_FILES = [
     'e97e246221c488d4b7615ad4.png',
     '51531b61c7e2336021c45cd4.png',
     '21ffd0e0336021c488d45bd4.png',
+    'Neon Space Shooter VFX Sheet.png',
 ]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -155,7 +159,44 @@ SPRITES = {
     'c_purple': ((651, 141, 755, 249), 'solid', 8),
     'c_white':  ((801, 141, 905, 249), 'solid', 8),
     'c_orange': ((951, 141, 1055, 249), 'solid', 8),
+
+    # ── лист 9: эффекты (рамки с запасом под ореол, без подписей и рамок панелей) ──
+    'fx_charge':      ((328, 78, 413, 247), 'add', 9),     # заряд лазера на максимуме
+    'fx_super':       ((434, 69, 536, 256), 'add', 9),     # суперзаряд рельсы
+    'fx_rocket':      ((576, 156, 624, 246), 'glow', 9),
+    'fx_rocket2':     ((645, 139, 698, 252), 'glow', 9),
+    'fx_plasma2':     ((946, 94, 1073, 247), 'add', 9),    # плазменный шар (перекрашивается в цвет оружия)
+    'fx_storm':       ((1290, 78, 1403, 256), 'add', 9),   # заряд поворотного лазера босса
+    'fx_vortex':      ((1405, 78, 1515, 256), 'add', 9),   # тёмная материя, чёрная дыра
+    'fx_ex_s':        ((21, 463, 92, 543), 'add', 9),
+    'fx_ex_m':        ((97, 437, 194, 558), 'add', 9),
+    'fx_ex_l':        ((196, 418, 312, 563), 'add', 9),
+    'fx_ex_crit':     ((314, 401, 437, 567), 'add', 9),
+    'fx_ex_kill':     ((439, 384, 596, 568), 'add', 9),
+    'fx_sh_bubble':   ((768, 423, 888, 559), 'add', 9),
+    'fx_sh_break':    ((890, 427, 990, 557), 'add', 9),
+    'fx_sh_restore':  ((992, 413, 1092, 550), 'add', 9),
+    'fx_speed':       ((1114, 440, 1177, 556), 'add', 9),
+    'fx_regen':       ((1189, 434, 1265, 555), 'add', 9),
+    'fx_beam':        ((1268, 392, 1355, 566), 'add', 9),
+    'fx_crosshair':   ((1357, 437, 1442, 554), 'add', 9),
+    'fx_pickup':      ((1444, 434, 1521, 553), 'add', 9),
+    'fx_tr_engine':   ((31, 765, 86, 871), 'add', 9),
+    'fx_tr_rocket':   ((269, 721, 340, 896), 'add', 9),
+    'fx_mine':        ((464, 771, 506, 825), 'glow', 9),
+    'fx_mine2':       ((511, 760, 577, 835), 'glow', 9),
+    'fx_mine_spider': ((578, 740, 659, 858), 'glow', 9),
+    'fx_portal_in':   ((823, 744, 914, 887), 'add', 9),
+    'fx_portal_out':  ((917, 735, 1010, 889), 'add', 9),
+    'fx_rock':        ((1136, 737, 1231, 885), 'solid', 9, {'split': 6}),  # обломки -> fx_rock1..6
+    'fx_dust':        ((1232, 735, 1326, 880), 'add', 9),
+    'fx_warp':        ((1327, 740, 1430, 873), 'add', 9),
+    'fx_flare':       ((1431, 727, 1523, 885), 'add', 9),
 }
+
+# поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
+# (первый босс «Страж» нарисован спрайтом 'boss' и лежит в основном атласе)
+LATE = {n for n in SPRITES if n.startswith('b_')} | {'e_destroyer', 'e_cruiser_h'}
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
 NOZZLES = {
@@ -348,6 +389,77 @@ def extract_add(x0, y0, x1, y1):
     return out
 
 
+def extract_glow(x0, y0, x1, y1, dark=44, sat_t=0.5):
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+    bg = bg_estimate(x0, y0, x1, y1)
+    out = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    op = out.load()
+
+    def trav(c):
+        mx = max(c)
+        if mx < dark:
+            return True
+        return (mx - min(c)) / mx > sat_t
+
+    outside = flood_outside(x0, y0, w, h, trav)
+    for y in range(h):
+        for x in range(w):
+            c = SPX[x0 + x, y0 + y]
+            if not outside[y * w + x]:
+                op[x, y] = (c[0], c[1], c[2], 255)
+                continue
+            a = 0.0
+            for k in range(3):
+                if c[k] > bg[k]:
+                    a = max(a, (c[k] - bg[k]) / (255 - bg[k]))
+            a = (a - 0.04) / 0.96
+            if a <= 0:
+                continue
+            a = min(1.0, a)
+            col = [max(0, min(255, int(round(bg[k] + (c[k] - bg[k]) / a)))) for k in range(3)]
+            op[x, y] = (col[0], col[1], col[2], int(round(a * 255)))
+    return out
+
+
+def split_parts(img, n):
+    """Делит кадр на n самых крупных связных кусков (обломки летят по отдельности)."""
+    w, h = img.size
+    ap = img.getchannel('A').load()
+    label = [0] * (w * h)
+    comps = []
+    for sy in range(h):
+        for sx in range(w):
+            if label[sy * w + sx] or ap[sx, sy] <= 40:
+                continue
+            lid = len(comps) + 1
+            label[sy * w + sx] = lid
+            pts = [(sx, sy)]
+            k = 0
+            while k < len(pts):
+                x, y = pts[k]
+                k += 1
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1)):
+                    if 0 <= nx < w and 0 <= ny < h and not label[ny * w + nx] and ap[nx, ny] > 40:
+                        label[ny * w + nx] = lid
+                        pts.append((nx, ny))
+            comps.append((lid, pts))
+    comps.sort(key=lambda c: -len(c[1]))
+    parts = []
+    for lid, pts in comps[:n]:
+        xs = [x for x, _ in pts]
+        ys = [y for _, y in pts]
+        bx0, by0, bx1, by1 = max(0, min(xs) - 1), max(0, min(ys) - 1), min(w - 1, max(xs) + 1), min(h - 1, max(ys) + 1)
+        part = img.crop((bx0, by0, bx1 + 1, by1 + 1))
+        pp = part.load()
+        for y in range(part.height):
+            for x in range(part.width):
+                lab = label[(by0 + y) * w + bx0 + x]
+                if lab and lab != lid:
+                    pp[x, y] = (0, 0, 0, 0)
+        parts.append(part)
+    return parts
+
+
 def despeckle(img, min_area=30):
     """Убирает мелкие оторванные пятна (звёзды фона), чтобы они не раздували рамку кадра."""
     w, h = img.size
@@ -411,10 +523,17 @@ def main():
         box, mode = spec[0], spec[1]
         SPX = SHEETS[spec[2] if len(spec) > 2 else 0]
         opt = spec[3] if len(spec) > 3 else {}
-        img = extract_solid(*box, close_r=CLOSE.get(name, 0)) if mode == 'solid' else extract_add(*box)
         if mode == 'solid':
-            img = despeckle(img)
+            img = despeckle(extract_solid(*box, close_r=CLOSE.get(name, 0)))
+        elif mode == 'glow':
+            img = despeckle(extract_glow(*box), 12)
+        else:
+            img = extract_add(*box)
         img, bb = trim(img)
+        if opt.get('split'):
+            for i, part in enumerate(split_parts(img, opt['split'])):
+                images[name + str(i + 1)] = (part, mode)
+            continue
         offsets[name] = (box[0] + bb[0], box[1] + bb[1])
         sizes0[name] = (img.width, img.height)
         if opt.get('rot') == 180:
@@ -435,30 +554,40 @@ def main():
         images[n] = (cell, mode)
 
     # упаковка полками
-    order = sorted(images.keys(), key=lambda n: -images[n][0].height)
-    atlas_w, pad = 2048, 2
-    x = y = pad
-    shelf_h = 0
-    rects = {}
-    for n in order:
-        img = images[n][0]
-        if x + img.width + pad > atlas_w:
-            x = pad
-            y += shelf_h + pad
-            shelf_h = 0
-        rects[n] = (x, y, img.width, img.height)
-        x += img.width + pad
-        shelf_h = max(shelf_h, img.height)
-    atlas_h = y + shelf_h + pad
-    atlas = Image.new('RGBA', (atlas_w, atlas_h), (0, 0, 0, 0))
-    for n, (rx, ry, rw, rh) in rects.items():
-        atlas.paste(images[n][0], (rx, ry))
-    os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True)
-    atlas.save(OUT_PNG, optimize=True)
-    # WebP: в ~3.5 раза меньше, прозрачность без потерь; PNG остаётся запасным вариантом
-    atlas.save(OUT_PNG[:-4] + '.webp', 'WEBP', quality=90, alpha_quality=100, method=6)
+    def pack(names):
+        order = sorted(names, key=lambda n: -images[n][0].height)
+        aw, pad = 2048, 2
+        x = y = pad
+        shelf_h = 0
+        rects = {}
+        for n in order:
+            img = images[n][0]
+            if x + img.width + pad > aw:
+                x = pad
+                y += shelf_h + pad
+                shelf_h = 0
+            rects[n] = (x, y, img.width, img.height)
+            x += img.width + pad
+            shelf_h = max(shelf_h, img.height)
+        sheet = Image.new('RGBA', (aw, y + shelf_h + pad), (0, 0, 0, 0))
+        for n, (rx, ry, rw, rh) in rects.items():
+            sheet.paste(images[n][0], (rx, ry))
+        return sheet, rects
 
+    atlas, rects = pack([n for n in images if n not in LATE])
+    atlas2, rects2 = pack([n for n in images if n in LATE])
+    atlas_w, atlas_h = atlas.size
+    os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True)
+    # WebP: в ~5 раз меньше PNG, прозрачность без потерь; PNG остаётся запасным вариантом.
+    # Качество 80 на глаз не отличается от 90 даже при увеличении, а файлы на четверть меньше —
+    # атлас качается почти всё время загрузки
+    for sheet, base in ((atlas, OUT_PNG[:-4]), (atlas2, OUT_PNG[:-4] + '2')):
+        sheet.save(base + '.png', optimize=True)
+        sheet.save(base + '.webp', 'WEBP', quality=80, alpha_quality=100, method=6)
+
+    # кадр: [x, y, w, h, аддитивный, 1 — лежит в позднем атласе]
     frames = {n: [r[0], r[1], r[2], r[3], 1 if images[n][1] == 'add' else 0] for n, r in rects.items()}
+    frames.update({n: [r[0], r[1], r[2], r[3], 1 if images[n][1] == 'add' else 0, 1] for n, r in rects2.items()})
     nozzles = {}
     for n, lst in NOZZLES.items():
         ox, oy = offsets[n]
@@ -473,11 +602,12 @@ def main():
         nozzles[n] = out
     with open(OUT_JS, 'w', encoding='utf-8') as f:
         f.write('// Автогенерация: python tools/extract_sprites.py — не редактировать вручную.\n')
-        f.write('// frames: имя -> [x, y, w, h, additive]; nozzles: сопла (доли ширины/высоты спрайта)\n')
+        f.write('// frames: имя -> [x, y, w, h, additive, 1 = поздний атлас sprites2]; nozzles: сопла (доли ширины/высоты спрайта)\n')
         f.write('window.SS_ATLAS = ' + json.dumps(
-            {'size': [atlas_w, atlas_h], 'frames': frames, 'nozzles': nozzles},
+            {'size': [atlas_w, atlas_h], 'size2': list(atlas2.size), 'frames': frames, 'nozzles': nozzles},
             separators=(',', ':'), ensure_ascii=False) + ';\n')
-    print('atlas %dx%d, png %d bytes, webp %d bytes' % (atlas_w, atlas_h, os.path.getsize(OUT_PNG), os.path.getsize(OUT_PNG[:-4] + '.webp')))
+    for base, sheet in ((OUT_PNG[:-4], atlas), (OUT_PNG[:-4] + '2', atlas2)):
+        print('%s %dx%d, png %d bytes, webp %d bytes' % (os.path.basename(base), sheet.width, sheet.height, os.path.getsize(base + '.png'), os.path.getsize(base + '.webp')))
 
     if PREV:
         for fname, kind in (('prev_checker.png', 'checker'), ('prev_bright.png', 'bright')):

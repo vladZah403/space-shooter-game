@@ -157,8 +157,10 @@
   // ════════════════════════════════════════════════════════════
   const SUBS = { hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
 
-  ui.show = function (sel) { const el = $(sel); if (el) { el.classList.add('show'); } };
-  ui.hide = function (sel) { const el = $(sel); if (el) el.classList.remove('show'); };
+  // холст закрыт экраном меню (непрозрачный), окном с размытием или итогами — main.js его тогда не перерисовывает
+  function syncCover() { ui.covered = !!document.querySelector('.screen.show.sub, .screen.show.overlay, #scr-gameover.show'); }
+  ui.show = function (sel) { const el = $(sel); if (el) { el.classList.add('show'); syncCover(); } };
+  ui.hide = function (sel) { const el = $(sel); if (el) { el.classList.remove('show'); syncCover(); } };
   ui.isShown = function (sel) { const el = $(sel); return !!(el && el.classList.contains('show')); };
 
   ui.toMenu = function () {
@@ -392,6 +394,12 @@
     $('#hud').hidden = false;
     document.body.classList.add('in-game');
     ui.hudCache = {};
+    ui.hudEls = {
+      score: $('#hudScore'), wave: $('#hudWave'), coins: $('#hudCoins'), coinsBox: $('.hud-coins'), lives: $('#hudLives'),
+      plvl: $('#hudPowerLvl'), pfill: $('#hudPowerFill'), boss: $('#hudBoss'), bossName: $('#hudBossName'), bossFill: $('#hudBossFill'),
+      bossShield: $('#hudBossShield'), combo: $('#hudCombo'), comboMult: $('#hudComboMult'), comboLbl: $('#hudComboLbl'),
+      comboTimer: $('#hudComboTimer'), buffs: $('#hudBuffs'), bombs: $('#hudBombs'), bomb: $('#btnBomb'),
+    };
     ui.buildWeapons();
     ui.buildSkills();
     requestAnimationFrame(() => ui.measure());
@@ -423,6 +431,7 @@
       box.appendChild(b);
     });
     box.style.display = p.weapons.length > 1 ? '' : 'none';
+    ui._wBtns = Array.from(box.children);
   };
 
   ui.buildSkills = function () {
@@ -436,27 +445,36 @@
       b.dataset.sk = id;
       b.innerHTML = '<svg class="ring" viewBox="0 0 66 66"><circle class="rbg" cx="33" cy="33" r="30"/><circle class="rfg" cx="33" cy="33" r="30" stroke-dasharray="188.5" stroke-dashoffset="0"/></svg><span class="sk-emoji">' + sk.ico + '</span><span class="sk-cd"></span>';
       bindPress(b, () => game.useSkill(i));
+      b._id = id; b._rfg = b.querySelector('.rfg'); b._cd = b.querySelector('.sk-cd');
       box.appendChild(b);
     });
+    ui._skBtns = Array.from(box.children);
   };
+
+  // короткий всплеск масштаба: Web Animations не заставляют браузер пересчитывать раскладку,
+  // как приём «снять класс — прочитать offsetWidth — вернуть класс»
+  function pulse(el, cls, scale, ms) {
+    if (el.animate) { el.animate([{ transform: 'scale(1)' }, { transform: 'scale(' + scale + ')', offset: 0.4 }, { transform: 'scale(1)' }], { duration: ms, easing: 'ease' }); return; }
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  }
 
   // вызывается каждый кадр — меняет DOM только при изменении значений
   ui.updateHud = function () {
-    const g = game, p = g.player, run = g.run, c = ui.hudCache;
-    if (!p || !run) return;
-    if (c.score !== run.score) { c.score = run.score; $('#hudScore').textContent = U.fmt(run.score); }
-    const waveTxt = g.wave ? (g.boss ? 'БОСС • ВОЛНА ' + g.wave.n : 'ВОЛНА ' + g.wave.n) : '';
-    if (c.wave !== waveTxt) { c.wave = waveTxt; $('#hudWave').textContent = waveTxt; }
+    const g = game, p = g.player, run = g.run, c = ui.hudCache, el = ui.hudEls;
+    if (!p || !run || !el) return;
+    if (c.score !== run.score) { c.score = run.score; el.score.textContent = U.fmt(run.score); }
+    const waveKey = g.wave ? g.wave.n * 2 + (g.boss ? 1 : 0) : -1;
+    if (c.wave !== waveKey) { c.wave = waveKey; el.wave.textContent = g.wave ? (g.boss ? 'БОСС • ВОЛНА ' + g.wave.n : 'ВОЛНА ' + g.wave.n) : ''; }
     if (c.coins !== run.coins) {
       const bump = c.coins !== undefined;
-      c.coins = run.coins; $('#hudCoins').textContent = U.fmt(run.coins);
-      if (bump) { const el = $('.hud-coins'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+      c.coins = run.coins; el.coins.textContent = U.fmt(run.coins);
+      if (bump) pulse(el.coinsBox, 'bump', 1.15, 300);
     }
-    const livesKey = p.lives + '/' + p.maxLives + '/' + (p.shield ? 1 : 0) + '/' + (run.skillFx.sk_barrier > 0 ? 1 : 0);
+    const livesKey = p.lives * 10000 + p.maxLives * 10 + (p.shield ? 2 : 0) + (run.skillFx.sk_barrier > 0 ? 1 : 0);
     if (c.lives !== livesKey) {
       const lost = c.livesN !== undefined && p.lives < c.livesN;
       c.lives = livesKey; c.livesN = p.lives;
-      const box = $('#hudLives');
+      const box = el.lives;
       let h = '';
       const shown = Math.min(p.maxLives, 8);
       for (let i = 0; i < shown; i++) h += '<svg class="' + (i < p.lives ? '' : 'empty') + (lost && i === p.lives ? ' lose' : '') + '"><use href="#i-heart"/></svg>';
@@ -464,33 +482,36 @@
       if (p.shield) h += '<svg class="shield"><use href="#i-shield"/></svg>';
       box.innerHTML = h;
     }
-    if (c.plvl !== run.level) { c.plvl = run.level; $('#hudPowerLvl').textContent = run.level; }
+    if (c.plvl !== run.level) { c.plvl = run.level; el.plvl.textContent = run.level; }
     const pp = Math.round(Math.min(1, g.powerProgress()) * 200) / 200;
-    if (c.pp !== pp) { c.pp = pp; $('#hudPowerFill').style.width = (pp * 100).toFixed(1) + '%'; }
+    if (c.pp !== pp) { c.pp = pp; el.pfill.style.transform = 'scaleX(' + pp + ')'; }
     // босс
     const boss = g.boss;
     const bossOn = !!(boss && boss.alive);
-    if (c.bossOn !== bossOn) { c.bossOn = bossOn; $('#hudBoss').hidden = !bossOn; if (bossOn) $('#hudBossName').textContent = boss.bdef.name; }
+    if (c.bossOn !== bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; if (bossOn) el.bossName.textContent = boss.bdef.name; }
     if (bossOn) {
       const k = Math.max(0, boss.hp / boss.maxHp);
       const kk = Math.round(k * 400) / 400;
-      if (c.bossK !== kk) { c.bossK = kk; $('#hudBossFill').style.transform = 'scaleX(' + kk + ')'; }
+      if (c.bossK !== kk) { c.bossK = kk; el.bossFill.style.transform = 'scaleX(' + kk + ')'; }
       const sk = boss.shieldMax ? Math.round(boss.shield / boss.shieldMax * 100) / 100 : 0;
-      if (c.bossS !== sk) { c.bossS = sk; $('#hudBossShield').style.transform = 'scaleX(' + sk + ')'; }
+      if (c.bossS !== sk) { c.bossS = sk; el.bossShield.style.transform = 'scaleX(' + sk + ')'; }
     }
     // комбо
     const comboOn = run.combo >= 5;
-    if (c.comboOn !== comboOn) { c.comboOn = comboOn; $('#hudCombo').classList.toggle('show', comboOn); }
+    if (c.comboOn !== comboOn) { c.comboOn = comboOn; el.combo.classList.toggle('show', comboOn); }
     if (comboOn) {
-      const mult = 'x' + g.comboMul().toFixed(1);
-      if (c.mult !== mult) { c.mult = mult; const el = $('#hudComboMult'); el.textContent = mult; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
-      if (c.combo !== run.combo) { c.combo = run.combo; $('#hudComboLbl').textContent = 'КОМБО ' + run.combo; }
+      const m10 = Math.round(g.comboMul() * 10);
+      if (c.mult !== m10) { c.mult = m10; el.comboMult.textContent = 'x' + (m10 / 10).toFixed(1); pulse(el.comboMult, 'pop', 1.12, 200); }
+      if (c.combo !== run.combo) { c.combo = run.combo; el.comboLbl.textContent = 'КОМБО ' + run.combo; }
       const ct = Math.round(Math.max(0, run.comboT / 2.6) * 50) / 50;
-      if (c.ct !== ct) { c.ct = ct; $('#hudComboTimer').style.transform = 'scaleX(' + ct + ')'; }
-      if (c.fever !== run.fever) { c.fever = run.fever; $('#hudCombo').classList.toggle('fever', run.fever); }
+      if (c.ct !== ct) { c.ct = ct; el.comboTimer.style.transform = 'scaleX(' + ct + ')'; }
+      if (c.fever !== run.fever) { c.fever = run.fever; el.combo.classList.toggle('fever', run.fever); }
     }
     // бонусы
-    const buffKey = Object.keys(g.buffs).map((k) => k + Math.ceil(g.buffs[k])).join(',') + (run.skillFx.sk_overclock > 0 ? 'oc' + Math.ceil(run.skillFx.sk_overclock) : '') + (run.overload > 0 ? 'ol' + Math.ceil(run.overload) : '');
+    let buffKey = '';
+    for (const k in g.buffs) buffKey += k + Math.ceil(g.buffs[k]);
+    if (run.skillFx.sk_overclock > 0) buffKey += 'oc' + Math.ceil(run.skillFx.sk_overclock);
+    if (run.overload > 0) buffKey += 'ol' + Math.ceil(run.overload);
     if (c.buffs !== buffKey) {
       c.buffs = buffKey;
       const icons = { power: 'fire', spread: 'bolt', multi: 'plus', rapid: 'bolt', magnet: 'magnet', freeze: 'snow' };
@@ -498,32 +519,34 @@
       for (const k of Object.keys(g.buffs)) { const def = D.POWERUPS[k]; h += '<div class="buff" style="--bc:' + def.color + '">' + ic(icons[k] || 'star') + Math.ceil(g.buffs[k]) + 'с</div>'; }
       if (run.skillFx.sk_overclock > 0) h += '<div class="buff" style="--bc:#3de0ff">' + ic('bolt') + 'РАЗГОН ' + Math.ceil(run.skillFx.sk_overclock) + 'с</div>';
       if (run.overload > 0) h += '<div class="buff" style="--bc:#ffc83d">' + ic('bolt') + 'ПЕРЕГРУЗКА</div>';
-      $('#hudBuffs').innerHTML = h;
+      el.buffs.innerHTML = h;
     }
     // оружие
     if (c.weapon !== p.weapon) {
       c.weapon = p.weapon;
-      $$('#hudWeapons .wbtn').forEach((b) => b.classList.toggle('active', b.dataset.w === p.weapon));
+      for (const b of ui._wBtns || []) b.classList.toggle('active', b.dataset.w === p.weapon);
     }
-    // навыки
-    $$('#hudSkills .skbtn').forEach((b) => {
-      const id = b.dataset.sk, sk = D.SKILLS[id];
+    // навыки: ключ — число (состояние, секунды, доля кольца)
+    const sks = ui._skBtns || [];
+    for (let i = 0; i < sks.length; i++) {
+      const b = sks[i], id = b._id, sk = D.SKILLS[id];
       const cd = run.skillCd[id] || 0, fx = run.skillFx[id] || 0;
-      const state = fx > 0 ? 'active' : cd > 0 ? 'cd' : 'ready';
-      const key = state + Math.ceil(cd) + '|' + Math.round((fx > 0 ? fx / (sk.dur || 1) : cd / (sk.cd * g.st.cdMul)) * 40);
-      if (b._key === key) return;
+      const st = fx > 0 ? 2 : cd > 0 ? 1 : 0;
+      const key = st * 1e6 + Math.ceil(cd) * 100 + Math.round((fx > 0 ? fx / (sk.dur || 1) : cd / (sk.cd * g.st.cdMul)) * 40);
+      if (b._key === key) continue;
       b._key = key;
+      const state = st === 2 ? 'active' : st === 1 ? 'cd' : 'ready';
       b.className = 'skbtn ' + state;
       const frac = fx > 0 ? fx / (sk.dur || 1) : cd > 0 ? 1 - cd / (sk.cd * g.st.cdMul) : 1;
-      b.querySelector('.rfg').style.strokeDashoffset = (188.5 * (1 - frac)).toFixed(1);
-      b.querySelector('.sk-cd').textContent = state === 'cd' ? Math.ceil(cd) : '';
-    });
+      b._rfg.style.strokeDashoffset = (188.5 * (1 - frac)).toFixed(1);
+      b._cd.textContent = state === 'cd' ? Math.ceil(cd) : '';
+    }
     // бомбы
-    const bombKey = p.bombs + (p.bombCd > 0 ? 'c' : '');
+    const bombKey = p.bombs * 2 + (p.bombCd > 0 ? 1 : 0);
     if (c.bomb !== bombKey) {
       c.bomb = bombKey;
-      $('#hudBombs').textContent = p.bombs;
-      const bb = $('#btnBomb');
+      el.bombs.textContent = p.bombs;
+      const bb = el.bomb;
       bb.classList.toggle('empty', p.bombs <= 0);
       bb.classList.toggle('cd', p.bombCd > 0);
     }
@@ -777,7 +800,7 @@
         const lvlOk = s.shipLvl >= d.lvl;
         const card = document.createElement('button');
         card.className = 'item-card' + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
-        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(id, s.ship.skin), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.8, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
+        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(id, s.ship.skin), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.8, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.src(f), f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
         card.insertAdjacentHTML('beforeend', '<b>' + d.name + '</b><small>' + d.desc + '</small>' +
           (owned ? '' : lvlOk ? '<span class="price">' + ic('coin') + U.fmt(d.price) + '</span>' : '<span class="req">' + ic('lock') + 'Корабль ур. ' + d.lvl + '</span>'));
         card.addEventListener('click', () => {
@@ -797,7 +820,7 @@
         const owned = s.ship.skins.includes(sk.id), sel = s.ship.skin === sk.id;
         const card = document.createElement('button');
         card.className = 'item-card rar-' + sk.rar + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
-        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(s.ship.model, sk.id, true), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.78, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.img, f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
+        card.appendChild(spriteCard((x, sz) => { const v = game.shipLook(s.ship.model, sk.id, true), cv = v.cv; const f = G.frame(v.sprite); const w = sz * 0.78, h = w * f[3] / f[2]; if (cv) x.drawImage(cv, (sz - w) / 2, (sz - h) / 2, w, h); else x.drawImage(G.src(f), f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h); }, 64));
         card.insertAdjacentHTML('beforeend', '<span class="rar">' + D.RARITY_NAMES[sk.rar] + '</span><b>' + sk.name + '</b>' + (owned ? '' : '<span class="req">' + ic('lock') + U.escape(sk.req) + '</span>'));
         card.addEventListener('click', () => {
           if (!owned) { A.play('error'); ui._preview = { model: s.ship.model, skin: sk.id, trail: s.ship.trail }; ui.toast({ ico: '🔒', title: sk.name, text: sk.req, info: true }); return; }

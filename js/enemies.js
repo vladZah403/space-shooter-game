@@ -201,6 +201,9 @@
   E.spawnMini = function (wn) {
     const order = D.MINI_ORDER;
     const k = Math.max(0, Math.floor((wn - 8) / 5)) % order.length;
+    // большие мини-боссы лежат в позднем атласе: пока он качается, волна обходится без мини-босса
+    const mf = G.frame(D.ENEMIES[order[k]].sprite);
+    if (mf && mf[5] && !G.img2) return null;
     const e = E.spawn(order[k], { x: G.FW / 2 });
     if (e) SS.emit('toast', { ico: '⚠️', title: 'МИНИ-БОСС', text: e.def.name + ' приближается!', info: true, dur: 1800 });
     return e;
@@ -248,7 +251,7 @@
       // клешни: пары снарядов сходятся в точке игрока
       for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd, f.bullet);
       for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd * 0.8, f.bullet, -sd * 0.18);
-    } else if (k === 'mine') { game.ebullet(e.x, e.y + e.h * 0.1, e.vx * 0.2, 50 * S, 'mine', { fuse: 1.9, life: 6 }); A.play('mine'); return; }
+    } else if (k === 'mine') { game.ebullet(e.x, e.y + e.h * 0.1, e.vx * 0.2, 50 * S, 'mine', e.elite ? { fuse: 1.9, life: 6, sprite: 'fx_mine2', w: 30, r: 10 } : { fuse: 1.9, life: 6 }); A.play('mine'); return; }
     A.play('enemyShot');
   }
   function tickFire(e, dt) {
@@ -423,8 +426,10 @@
           e.n++;
           if (e.n >= 4) { e.leaving = true; e.alive = false; return; }
           FX.glowPuff(e.x, e.y, '#ff5c7a', 50 * S, 0.3);
+          FX.portal(e.x, e.y, e.w * 1.1, '#ff5c7a', false);
           e.x = U.rand(e.w, G.FW - e.w); e.y = U.rand(minY(e), Math.max(minY(e) + 20, G.H * 0.45));
           FX.glowPuff(e.x, e.y, '#ff5c7a', 60 * S, 0.35);
+          FX.portal(e.x, e.y, e.w * 1.1, '#ff5c7a', true);
           A.play('teleport', { vol: 0.5 });
           e.st = 0;
         }
@@ -828,7 +833,7 @@
     const S = G.S;
     const size = U.clamp(Math.max(e.w, e.h * 0.8) / (48 * S), 0.6, 2.6);
     const col = COLORS[e.type] || '#ffb03d';
-    FX.explode(e.x, e.y, size, size > 1.4 ? '#ffb03d' : col);
+    FX.explode(e.x, e.y, size, size > 1.4 ? '#ffb03d' : col, e.mini ? { kind: 'kill' } : e.elite ? { kind: 'crit' } : null);
     if (e.mini) { FX.explode(e.x - e.w * 0.25, e.y, 1.4, col); FX.explode(e.x + e.w * 0.25, e.y, 1.4, '#ffb03d'); }
     if (FX.quality > 0) FX.debris(e.x, e.y, col, Math.round(size * 3), 140);
     A.play(size > 1.5 ? 'explodeM' : 'explodeS', { vol: size > 1.5 ? 0.8 : 0.6 });
@@ -861,33 +866,42 @@
   // ════════════════════════════════════════════════════════════
   // БОССЫ
   // ════════════════════════════════════════════════════════════
-  E.spawnBoss = function (n) {
+  E.spawnBoss = function (n, tries) {
     const num = Math.max(1, Math.round(n / 5));
     const bdef = D.BOSSES[(num - 1) % D.BOSSES.length];
     const cycle = Math.floor((num - 1) / D.BOSSES.length);
     const S = G.S;
+    // свой спрайт босса лежит в позднем атласе: на очень медленной сети он может ещё качаться — тогда ждём
+    // (на экране идёт предупреждение), а если атлас так и не скачался, босс выходит в облике Стража своего цвета
+    let sprite = bdef.sprite, hue = bdef.hue, fallback = false;
+    const bf = G.frame(sprite);
+    if (bf && bf[5] && !G.img2) {
+      if (!G.lateFailed && (tries || 0) < 60) { game.after(0.5, () => E.spawnBoss(n, (tries || 0) + 1)); return; }
+      sprite = 'boss'; hue = G.hueOf(bdef.color); fallback = true;
+    }
     // прочность растёт вместе с прочностью обычных врагов; первые два босса — разминка
     const ramp = num === 1 ? 0.92 : num === 2 ? 1.6 : 2 + (num - 3) * 0.2;
     const hp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3);
     const w = Math.min(G.FW * bdef.wf, bdef.wmax * S);
-    const asp = G.aspect(bdef.sprite);
+    const asp = G.aspect(sprite);
     const h = w * asp;
     const b = {
-      uid: uid++, type: 'boss', def: { coins: 0, xp: 0, score: 0 }, bdef, sprite: bdef.sprite, boss: true, mini: false,
+      uid: uid++, type: 'boss', def: { coins: 0, xp: 0, score: 0 }, bdef, sprite, fallback, boss: true, mini: false,
       alive: true, hittable: true, entering: true,
       x: G.FW / 2, y: -h * 0.6, w, h, r: w * 0.37, rx: 0, ry: 0,
       hp, maxHp: hp, phase: 1, age: 0, mt: 0, flash: 0, frozen: 0, alpha: 1, bank: 0, face: -1, lastX: G.FW / 2,
       shield: bdef.shield ? hp * bdef.shield * 0.4 : 0, shieldMax: bdef.shield ? hp * bdef.shield * 0.4 : 0, shieldHitT: 0, shieldRegenWait: 0, fx: 1,
-      cv: bdef.hue !== undefined && bdef.hue !== null ? G.tinted(bdef.sprite, { hue: bdef.hue }) : null,
+      cv: hue !== undefined && hue !== null ? G.tinted(sprite, { hue }) : null,
       // корпус целиком ниже полосы босса, но не ниже середины экрана
       baseY: Math.max(G.H * 0.2, Math.min((SS.ui ? SS.ui.topInset() : 120) + h * 0.5 + 4 * S, G.H * 0.52 - h * 0.5)), reborn: false, cycle, num,
       pt: {}, orbs: [], spin: 0, aim: null, dive: null, dash: null, vuln: 0,
     };
-    setHitbox(b, bdef.sprite);
+    setHitbox(b, sprite);
     if (bdef.id === 'phoenix') for (let i = 0; i < 3; i++) b.orbs.push({ a: i / 3 * U.TAU });
     game.boss = b;
     game.enemies.push(b);
     game.run.bossDamaged = false;
+    FX.sprite('fx_warp', G.FW / 2, (SS.ui ? SS.ui.topInset() : 120) + 30 * S, { w0: G.FW * 0.6, w1: G.FW * 1.05, sy: 0.32, dur: 1.6, hold: 0.45, fadeIn: 0.15, alpha: 0.85, hue: G.hueOf(bdef.color) });
     A.play('bossRoar');
     FX.shake(0.4);
     SS.emit('bossSpawn', b);
@@ -960,6 +974,7 @@
       if (b.phase >= 2 && timer(b, 'sweep', bcd(b, 3.2))) fan(b.x, b.y + b.h * 0.3, 9, 1.7, 170, 'orb', Math.PI / 2);
       if (b.phase >= 3 && timer(b, 'tele', 4.5)) {
         FX.glowPuff(b.x, b.y, b.bdef.color, b.w * 1.4, 0.4);
+        FX.portal(b.x, b.y, b.w * 0.9, b.bdef.color, false);
         b.mtOff = U.rand(0, U.TAU);
         A.play('teleport');
         b.flashTele = 0.3;
@@ -1140,6 +1155,7 @@
       }
       if (timer(b, 'glitch', 5.5, 4)) {
         FX.glowPuff(b.x, b.y, '#ff7a2a', b.w * 1.2, 0.35);
+        FX.portal(b.x, b.y, b.w * 0.9, '#ff7a2a', false);
         b.mtOff = U.rand(0, U.TAU);
         b.flashTele = 0.25;
         A.play('teleport', { rate: 0.8 });
@@ -1166,7 +1182,7 @@
         A.play('rail', { vol: 0.4, rate: 1.4 });
       }
       if (b.dash && timer(b, 'dashfire', 0.22)) game.ebullet(b.x, b.y + b.h * 0.3, 0, game.bspd(230), 'needle');
-      if (b.phase >= 3 && timer(b, 'mines', bcd(b, 3.6))) { for (const sd of [-1, 1]) game.ebullet(b.x + sd * b.w * 0.3, b.y + b.h * 0.3, sd * 30 * S, 45 * S, 'mine', { fuse: 2.2, life: 6 }); A.play('mine'); }
+      if (b.phase >= 3 && timer(b, 'mines', bcd(b, 3.6))) { for (const sd of [-1, 1]) game.ebullet(b.x + sd * b.w * 0.3, b.y + b.h * 0.3, sd * 30 * S, 45 * S, 'mine', { fuse: 2.2, life: 6, sprite: 'fx_mine_spider', w: 36, r: 12 }); A.play('mine'); }
     },
     // Оверлорд: следящий луч из глаза, батарея пушек, элитная стража, тёмная нова
     overlord(b) {
@@ -1266,7 +1282,7 @@
     }
     b.alive = false;
     game.boss = null;
-    E.corpses.push({ x: b.x, y: b.y, w: b.w, h: b.h, cv: b.cv, sprite: b.sprite, rot: b.bdef.rot || 0, flip: b.fx < 0 ? -1 : 1, t: 0, dur: 1.6, color: b.bdef.color });
+    E.corpses.push({ x: b.x, y: b.y, w: b.w, h: b.h, cv: b.cv, sprite: b.sprite, rot: b.fallback ? 0 : b.bdef.rot || 0, flip: b.fx < 0 ? -1 : 1, t: 0, dur: 1.6, color: b.bdef.color });
     FX.shake(0.7);
     SS.tg.haptic('success');
     if (b.bdef.id === 'overlord') SS.meta.unlock('overlord');
@@ -1363,12 +1379,14 @@
         if (wh) ctx.drawImage(wh, -e.w / 2, -e.h / 2, e.w, e.h);
       }
       ctx.restore();
+      const bubble = G.frame('fx_sh_bubble');
       // энергобарьер Редута
       if (e.barrier > 0) {
         const r = e.w * 0.62;
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.3 + 0.15 * Math.sin(e.age * 14) + (e.shieldHitT > 0 ? 0.35 : 0);
-        ctx.drawImage(G.soft('#b06bff', 64), e.x - r * 1.2, e.y - r * 1.2, r * 2.4, r * 2.4);
+        if (bubble) G.drawCanvas(ctx, G.tinted('fx_sh_bubble', { hue: 275 }), e.x, e.y, r * 2.25, 0);
+        else ctx.drawImage(G.soft('#b06bff', 64), e.x - r * 1.2, e.y - r * 1.2, r * 2.4, r * 2.4);
         ctx.globalAlpha = 0.8;
         ctx.strokeStyle = e.shieldHitT > 0 ? '#ffffff' : '#d9b8ff'; ctx.lineWidth = 2 * S;
         ctx.beginPath(); ctx.arc(e.x, e.y, r, e.age * 3, e.age * 3 + U.TAU * 0.85); ctx.stroke();
@@ -1380,7 +1398,8 @@
         const r = e.w * 0.66, k = e.shield / e.shieldMax;
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.18 + k * 0.2 + (e.shieldHitT > 0 ? 0.4 : 0);
-        ctx.drawImage(G.soft('#4cb8ff', 64), e.x - r * 1.15, e.y - r * 1.15, r * 2.3, r * 2.3);
+        if (bubble) G.draw(ctx, 'fx_sh_bubble', e.x, e.y, r * 2.25);
+        else ctx.drawImage(G.soft('#4cb8ff', 64), e.x - r * 1.15, e.y - r * 1.15, r * 2.3, r * 2.3);
         ctx.globalAlpha = 0.5 + k * 0.4;
         ctx.strokeStyle = e.shieldHitT > 0 ? '#ffffff' : '#7fd8ff'; ctx.lineWidth = 2 * S;
         ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, U.TAU * k); ctx.stroke();
@@ -1413,8 +1432,8 @@
 
   function drawFrame(ctx, sprite, cv, w, h) {
     if (cv) { ctx.drawImage(cv, -w / 2, -h / 2, w, h); return; }
-    const f = G.frame(sprite);
-    if (f) ctx.drawImage(G.img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
+    const f = G.frame(sprite), img = f && G.src(f);
+    if (img) ctx.drawImage(img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
   }
 
   function drawBoss(ctx, b) {
@@ -1427,7 +1446,8 @@
         if (o.x === undefined) continue;
         const s = 30 * S;
         ctx.drawImage(G.glow('#ff9f3d', 64), o.x - s, o.y - s, s * 2, s * 2);
-        G.draw(ctx, 'eb_fire', o.x, o.y, s * 1.1, t * 3);
+        if (G.frame('fx_plasma2')) G.draw(ctx, 'fx_plasma2', o.x, o.y, s * 1.7, t * 2);
+        else G.draw(ctx, 'eb_fire', o.x, o.y, s * 1.1, t * 3);
       }
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -1440,7 +1460,7 @@
     ctx.drawImage(G.soft(b.vuln > 0 ? '#ff3d1a' : col, 64), -gs / 2, -gs / 2, gs, gs);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = b.entering ? 0.85 : 1;
-    ctx.rotate((b.bdef.rot || 0) + Math.sin(t * 0.8) * 0.03);
+    ctx.rotate((b.fallback ? 0 : b.bdef.rot || 0) + Math.sin(t * 0.8) * 0.03);
     if (b.fx !== 1) ctx.scale((b.fx < 0 ? -1 : 1) * Math.max(0.12, Math.abs(b.fx)), 1);
     drawFrame(ctx, b.sprite, b.cv, b.w, b.h);
     if (b.flash > 0 || b.entering || b.flashTele > 0 || b.vuln > 0) {
@@ -1450,12 +1470,20 @@
       if (wh) ctx.drawImage(wh, -b.w / 2, -b.h / 2, b.w, b.h);
     }
     ctx.restore();
+    if (b.vuln > 0 && G.frame('fx_crosshair')) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(t * 9));
+      G.draw(ctx, 'fx_crosshair', b.x, b.y, Math.min(b.w, b.h) * 0.6 * (1 + Math.sin(t * 9) * 0.06), t * 0.9);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
     // энергощит
     if (b.shield > 0) {
       const k = b.shield / b.shieldMax, r = Math.max(b.w, b.h) * 0.6;
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.12 + k * 0.18 + (b.shieldHitT > 0 ? 0.3 : 0);
-      ctx.drawImage(G.soft('#3db8ff', 64), b.x - r * 1.2, b.y - r * 1.2, r * 2.4, r * 2.4);
+      if (G.frame('fx_sh_bubble')) G.draw(ctx, 'fx_sh_bubble', b.x, b.y, r * 2.2);
+      else ctx.drawImage(G.soft('#3db8ff', 64), b.x - r * 1.2, b.y - r * 1.2, r * 2.4, r * 2.4);
       ctx.strokeStyle = b.shieldHitT > 0 ? '#ffffff' : '#7fd8ff';
       ctx.lineWidth = 2.5 * S;
       ctx.globalAlpha = 0.6;

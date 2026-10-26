@@ -172,14 +172,16 @@
 
     async renderSfx() {
       const rate = 32000;
+      // один белый шум на все эффекты: раньше секунда шума заново заполнялась для каждого звука при запуске
+      const noise = new Float32Array(rate);
+      for (let i = 0; i < rate; i++) noise[i] = Math.random() * 2 - 1;
       const jobs = Object.keys(SFX).map(async (name) => {
         const def = SFX[name];
         try {
           const len = Math.ceil(def.d * rate) + 200;
           const oc = new OAC(1, len, rate);
           const nb = oc.createBuffer(1, rate, rate);
-          const nd = nb.getChannelData(0);
-          for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+          nb.getChannelData(0).set(noise);
           const out = oc.createGain(); out.gain.value = 0.9; out.connect(oc.destination);
           def.b(oc, out, nb);
           const buf = await new Promise((res, rej) => {

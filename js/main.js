@@ -42,6 +42,7 @@
       G.bg.makeStars();
     }
     if (SS.game.player) SS.game.clampPlayer();
+    main._dirty = true; // смена размера очищает холст — нужен хотя бы один кадр
     if (SS.ui && SS.ui.measure) setTimeout(() => { SS.ui.measure(); if (SS.ui.measureMenuSlot) SS.ui.measureMenuSlot(); }, 60);
   };
 
@@ -131,9 +132,14 @@
     if (rdt > 0.25) rdt = 0.016; // после сворачивания — без скачка
     const G = SS.gfx, g = SS.game;
     g.frame(rdt);
-    ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    g.draw(ctx);
+    // экран меню или окно закрывает холст, а игра стоит (меню, пауза, выбор улучшения, итоги) — кадр не
+    // перерисовываем: меньше расход батареи, и браузеру не нужно каждый кадр заново размывать фон под окном
+    if (g.state === 'play' || g.state === 'dying' || !SS.ui.covered || main._dirty) {
+      main._dirty = false;
+      ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      g.draw(ctx);
+    }
     if (g.state === 'play' || g.state === 'perk' || g.state === 'pause' || g.state === 'dying' || g.state === 'revive') SS.ui.updateHud();
     measure(rdt);
   }

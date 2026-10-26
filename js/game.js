@@ -297,14 +297,14 @@
     const p = this.player, run = this.run, st = this.st;
     if (p.inv > 0) p.inv -= dt;
     if (p.bombCd > 0) p.bombCd -= dt;
-    for (const k of Object.keys(this.buffs)) { if (this.buffs[k] > 0) { this.buffs[k] -= dt; if (this.buffs[k] <= 0) { delete this.buffs[k]; this.hudDirty = true; } } }
-    for (const k of Object.keys(run.skillCd)) if (run.skillCd[k] > 0) run.skillCd[k] = Math.max(0, run.skillCd[k] - dt);
-    for (const k of Object.keys(run.skillFx)) if (run.skillFx[k] > 0) run.skillFx[k] = Math.max(0, run.skillFx[k] - dt);
+    for (const k in this.buffs) { if (this.buffs[k] > 0) { this.buffs[k] -= dt; if (this.buffs[k] <= 0) { delete this.buffs[k]; this.hudDirty = true; } } }
+    for (const k in run.skillCd) if (run.skillCd[k] > 0) run.skillCd[k] = Math.max(0, run.skillCd[k] - dt);
+    for (const k in run.skillFx) if (run.skillFx[k] > 0) run.skillFx[k] = Math.max(0, run.skillFx[k] - dt);
     if (run.overload > 0) run.overload -= dt;
     // восстановление щита
     if (st.shieldRegen && !p.shield && p.alive) {
       run.shieldRegenT += dt;
-      if (run.shieldRegenT >= st.shieldRegen) { run.shieldRegenT = 0; p.shield = true; A.play('powerup', { vol: 0.5 }); this.hudDirty = true; }
+      if (run.shieldRegenT >= st.shieldRegen) { run.shieldRegenT = 0; p.shield = true; this.shieldFx(); A.play('powerup', { vol: 0.5 }); this.hudDirty = true; }
     }
     // регенерация (навык)
     if (this.skill('sk_regen') && p.alive && p.lives < p.maxLives) {
@@ -383,8 +383,8 @@
 
     if (wid === 'laser') {
       const lvl = wl(wid, 'dmg');
-      const sprite = lvl >= 6 ? 'pb_laser' : lvl >= 3 ? 'pb_bolt_m' : 'pb_bolt_s';
-      const sw = (sprite === 'pb_laser' ? 13 : sprite === 'pb_bolt_m' ? 15 : 13) * S;
+      const sprite = lvl >= 8 && G.frame('fx_charge') ? 'fx_charge' : lvl >= 6 ? 'pb_laser' : lvl >= 3 ? 'pb_bolt_m' : 'pb_bolt_s';
+      const sw = (sprite === 'fx_charge' ? 18 : sprite === 'pb_laser' ? 13 : sprite === 'pb_bolt_m' ? 15 : 13) * S;
       const n = 1 + multi, gap = 10 * S, pierce = wl(wid, 'pierce') + st.pierce;
       const spd = base.speed * S;
       for (let i = 0; i < n; i++) {
@@ -407,24 +407,25 @@
     } else if (wid === 'rocket') {
       const n = base.salvo + wl(wid, 'salvo') + multi;
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
+      const rs = wl(wid, 'dmg') >= 4 ? 'fx_rocket2' : 'fx_rocket', rw = (rs === 'fx_rocket2' ? 14 : 13) * S;
       for (let i = 0; i < n; i++) {
         p.side = -p.side;
         const out = p.side * (0.55 + i * 0.12) + (spread ? p.side * 0.3 : 0);
         shot({ x: p.x + p.side * p.w * 0.3, y: p.y - p.w * 0.05, vx: Math.sin(out) * 260 * S, vy: -Math.cos(out) * 260 * S,
-          dmg: base.dmg * dmgMul * mk, aoe: base.aoe * dmgMul * mk, aoeR: radius, r: 7 * S, kind: 'rocket', w: 11 * S,
+          dmg: base.dmg * dmgMul * mk, aoe: base.aoe * dmgMul * mk, aoeR: radius, r: 7 * S, kind: 'rocket', sprite: rs, w: rw,
           homing: 6.5, acc: 900 * S, maxSpd: base.speed * S, wid, life: 2.4 });
       }
       A.play('rocket');
     } else if (wid === 'plasma') {
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
-      const cv = G.tinted('eb_fire', { hue: 305 });
+      const orb = G.frame('fx_plasma2'), cv = G.tinted(orb ? 'fx_plasma2' : 'eb_fire', { hue: 305 }), pw = (orb ? 1.35 : 1) * S;
       const n = 1 + multi;
       for (let i = 0; i < n; i++) {
         const a = (i - (n - 1) / 2) * 0.16 + (spread && i === 0 ? 0 : 0);
         shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * mk, aoe: base.aoe * dmgMul * mk, aoeR: radius,
-          r: 12 * S, kind: 'plasma', cv, w: 40 * S, wid, life: 2.6 });
+          r: 12 * S, kind: 'plasma', cv, w: 40 * pw, wid, life: 2.6 });
       }
-      if (spread) for (const a of [-0.35, 0.35]) shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * 0.6, aoe: base.aoe * dmgMul * 0.6, aoeR: radius * 0.8, r: 10 * S, kind: 'plasma', cv, w: 30 * S, wid, life: 2.6 });
+      if (spread) for (const a of [-0.35, 0.35]) shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * 0.6, aoe: base.aoe * dmgMul * 0.6, aoeR: radius * 0.8, r: 10 * S, kind: 'plasma', cv, w: 30 * pw, wid, life: 2.6 });
       A.play('plasma');
     } else if (wid === 'lightning') {
       const jumps = base.chain + wl(wid, 'chain') + (this.skill('sk_conductor') ? 2 : 0) + multi;
@@ -545,7 +546,7 @@
           ang += U.clamp(U.angleDiff(ang, want), -b.homing * dt, b.homing * dt);
         } else if (b.age > 0.12) ang += U.clamp(U.angleDiff(ang, -Math.PI / 2), -3 * dt, 3 * dt);
         b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
-        if (Math.random() < 0.7) FX.glowPuff(b.x - b.vx * 0.02, b.y - b.vy * 0.02, '#ff9f3d', 14 * S, 0.18);
+        if (Math.random() < (G.frame('fx_tr_rocket') ? 0.3 : 0.7)) FX.glowPuff(b.x - b.vx * 0.02, b.y - b.vy * 0.02, '#ff9f3d', 14 * S, 0.18);
         if (FX.quality > 0 && Math.random() < 0.35) FX.smoke(b.x - b.vx * 0.03, b.y - b.vy * 0.03, 1, 7 * S);
       } else if (b.kind === 'dark') {
         b.vx *= Math.exp(-0.85 * dt); b.vy *= Math.exp(-0.85 * dt);
@@ -607,7 +608,7 @@
     }
   };
   game.plasmaBlast = function (b, direct) {
-    FX.explode(b.x, b.y, 1.3, '#ff5cf0');
+    FX.explode(b.x, b.y, 1.3, '#ff5cf0', { hue: 305 });
     FX.ring(b.x, b.y, 8, b.aoeR, '#ff8af5', 0.35, 4);
     FX.shake(0.12);
     A.play('explodeM', { vol: 0.6 });
@@ -618,7 +619,7 @@
     }
   };
   game.darkBurst = function (b) {
-    FX.explode(b.x, b.y, 1.2, '#b06bff');
+    FX.explode(b.x, b.y, 1.2, '#b06bff', { hue: 275 });
     FX.ring(b.x, b.y, b.burstR, 4, '#d9b8ff', 0.3, 4);
     A.play('explodeM', { vol: 0.55, rate: 0.7 });
     for (const e of this.enemies) {
@@ -682,7 +683,13 @@
       }
     }
     let crit = false;
-    if (o.crit && Math.random() < this.st.crit) { dmg *= this.st.critMul; crit = true; }
+    if (o.crit && Math.random() < this.st.crit) {
+      dmg *= this.st.critMul; crit = true;
+      if (Math.abs(this.t - (this.critFxT || -1)) > 0.08) {
+        this.critFxT = this.t;
+        FX.sprite('fx_flare', e.x + U.rand(-0.25, 0.25) * (e.rx ? e.rx : e.r), e.y + U.rand(-0.2, 0.2) * (e.ry ? e.ry : e.r), { w0: 26 * G.S, w1: 40 * G.S, dur: 0.22, hold: 0.3, hue: 45, rot: U.rand(-0.3, 0.3), minor: true });
+      }
+    }
     if (e.boss || e.mini) dmg *= this.st.bossDmg;
     if (e.vuln > 0) dmg *= 1.5;
     if (this.skill('sk_executioner') && e.hp < e.maxHp * 0.25) dmg *= 2;
@@ -807,6 +814,7 @@
       p.inv = 1.0;
       run.shieldRegenT = 0;
       FX.ring(p.x, p.y, p.w * 0.6, p.w * 1.4, '#7fe7ff', 0.4, 4);
+      FX.sprite('fx_sh_break', p.x, p.y, { w0: p.w * 1.3, w1: p.w * 2.3, dur: 0.45, hold: 0.3, rot: U.rand(-0.4, 0.4) });
       FX.sparks(p.x, p.y, '#7fe7ff', 18, 320);
       A.play('shieldHit');
       SS.tg.haptic('medium');
@@ -844,9 +852,16 @@
     if (p.lives > before) {
       FX.text(p.x, p.y - p.w * 0.7, label || '+1 ЖИЗНЬ', '#ff6b8a', 13, 0.9);
       FX.glowPuff(p.x, p.y, '#ff6b8a', 70 * G.S, 0.35);
+      FX.sprite('fx_regen', p.x, p.y - p.w * 0.35, { w0: p.w * 0.45, w1: p.w * 0.6, dur: 0.9, hold: 0.55, fadeIn: 0.12, vy: -45 * G.S });
       A.play('powerup', { vol: 0.7 });
       this.hudDirty = true;
     }
+  };
+
+  // кольца щита сходятся к кораблю — щит появился
+  game.shieldFx = function () {
+    const p = this.player;
+    FX.sprite('fx_sh_restore', 0, 0, { follow: p, w0: p.w * 2.2, w1: p.w * 1.2, dur: 0.5, hold: 0.4 });
   };
 
   game.playerDown = function () {
@@ -858,6 +873,8 @@
       p.inv = 3.5;
       this.novaWave(false);
       FX.flash('#ffb03d', 0.6);
+      FX.explode(p.x, p.y, 2, '#ffb03d', { kind: 'crit' });
+      FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.25, w1: p.w * 1.4, dur: 1.1, hold: 0.5, fadeIn: 0.1, hue: 30 });
       FX.text(p.x, p.y - p.w, 'ФЕНИКС!', '#ffb03d', 20, 1.3);
       A.play('revive');
       SS.emit('toast', { ico: '🔥', title: 'НАВЫК', text: 'Феникс возродил корабль!', info: true });
@@ -896,6 +913,7 @@
     for (const b of this.ebullets) b.dead = true;
     this.novaWave(false);
     FX.flash('#7fe7ff', 0.5);
+    FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.25, w1: p.w * 1.4, dur: 1.1, hold: 0.5, fadeIn: 0.1, hue: 190 });
     A.play('revive');
     this.hudDirty = true;
     SS.emit('revived');
@@ -931,6 +949,7 @@
     const S = G.S;
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H) * 1.1, '#ffb36b', 0.7, 10);
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H) * 0.8, '#ffffff', 0.5, 4);
+    FX.sprite('fx_ex_kill', p.x, p.y, { w0: 90 * S, w1: 420 * S, dur: 0.65, hold: 0.25, rot: Math.random() * U.TAU });
     FX.flash('#ffd9a0', 0.55);
     FX.shake(0.8);
     A.play('bomb');
@@ -966,19 +985,30 @@
     A.play('skill');
     SS.tg.haptic('medium');
     if (id === 'sk_nova') this.novaWave(true);
-    else if (id === 'sk_barrier') { FX.ring(p.x, p.y, p.w * 0.5, p.w * 1.6, '#ffd23d', 0.5, 5); }
-    else if (id === 'sk_overclock') { FX.glowPuff(p.x, p.y, '#3de0ff', 120 * S, 0.4); }
+    else if (id === 'sk_barrier') { FX.ring(p.x, p.y, p.w * 0.5, p.w * 1.6, '#ffd23d', 0.5, 5); FX.sprite('fx_sh_restore', 0, 0, { follow: p, w0: p.w * 2.4, w1: p.w * 1.3, dur: 0.5, hold: 0.4, hue: 46 }); }
+    else if (id === 'sk_overclock') { FX.glowPuff(p.x, p.y, '#3de0ff', 120 * S, 0.4); this.speedFx(190); }
     else if (id === 'sk_airstrike') this.airstrike();
-    else if (id === 'sk_timewarp') { FX.flash('#3d6bff', 0.25); FX.ring(G.FW / 2, G.H / 2, 20, G.H, '#7fb8ff', 0.8, 6); }
+    else if (id === 'sk_timewarp') {
+      FX.flash('#3d6bff', 0.25); FX.ring(G.FW / 2, G.H / 2, 20, G.H, '#7fb8ff', 0.8, 6);
+      FX.sprite('fx_warp', G.FW / 2, G.H / 2, { w0: G.FW * 0.9, w1: G.FW * 1.3, sy: 0.6, dur: 0.9, hold: 0.3, alpha: 0.55, hue: 225 });
+    }
     else if (id === 'sk_rail') { this.ov.rail = { t: 0, dur: sk.dur, tick: 0, charge: 0.35 }; A.play('railCharge'); }
     else if (id === 'sk_blackhole') { this.ov.hole = { x: G.FW / 2, y: G.H * 0.32, t: 0, dur: sk.dur, tick: 0 }; A.play('dark', { rate: 0.6 }); }
     M.trackMission('skills', 1);
     this.hudDirty = true;
   };
 
+  // шевроны «ускорения» поднимаются сквозь корабль
+  game.speedFx = function (hue) {
+    const p = this.player;
+    FX.sprite('fx_speed', 0, 0, { follow: p, oy: p.w * 0.7, vy: -95 * G.S, w0: p.w * 0.6, w1: p.w * 0.74, dur: 0.75, hold: 0.5, fadeIn: 0.15, hue });
+  };
+
   game.novaWave = function (withDamage) {
     const p = this.player, S = G.S;
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H), '#bfe6ff', 0.6, 8);
+    FX.sprite('fx_sh_restore', p.x, p.y, { w0: 40 * S, w1: Math.max(G.FW, G.H) * 1.2, dur: 0.6, hold: 0.2, alpha: 0.8 });
+    FX.sprite('fx_flare', p.x, p.y, { w0: 60 * S, w1: 150 * S, dur: 0.45, hold: 0.25 });
     FX.flash('#cfeaff', 0.35);
     FX.shake(0.5);
     A.play('explodeM');
@@ -1058,7 +1088,7 @@
       }
       if (FX.quality > 0) { const a = Math.random() * U.TAU; FX.embers(h.x + Math.cos(a) * R * 0.9, h.y + Math.sin(a) * R * 0.9, '#b06bff', 1, 10); }
       if (h.t >= h.dur) {
-        FX.explode(h.x, h.y, 3, '#b06bff');
+        FX.explode(h.x, h.y, 3, '#b06bff', { hue: 275 });
         FX.ring(h.x, h.y, 10, R * 1.5, '#e0c8ff', 0.5, 8);
         FX.flash('#d9b8ff', 0.35);
         FX.shake(0.6);
@@ -1127,7 +1157,7 @@
     green:  { sprite: 'eb_orb',    w: 15, r: 5.5, color: '#7dff6b', tint: 110 },
     violet: { sprite: 'eb_orb',    w: 15, r: 5.5, color: '#b06bff', tint: 275 },
     blue:   { sprite: 'eb_orb',    w: 15, r: 5.5, color: '#4cc9ff', tint: 200 },
-    mine:   { proc: 'mine',        w: 24, r: 9,   color: '#ff3d5a' },
+    mine:   { sprite: 'fx_mine', proc: 'mine', w: 26, r: 9, color: '#ff3d5a' },
     shard:   { sprite: 'eb_needle', w: 16, r: 5,   color: '#3dffd2', tint: 165, rotate: true },
     feather: { sprite: 'eb_bolt_l', w: 14, r: 5,   color: '#ffd23d', tint: 40, rotate: true },
     ink:     { sprite: 'eb_orb',    w: 30, r: 11,  color: '#8a5cff', tint: 255 },
@@ -1143,13 +1173,13 @@
     const def = EB[type] || EB.orb, S = G.S;
     const b = ebPool.get();
     b.x = x; b.y = y; b.px = x; b.py = y; b.vx = vx; b.vy = vy; b.type = type;
-    b.sprite = def.sprite || null; b.cv = def.tint ? G.tinted(def.sprite, { hue: def.tint }) : def.proc ? G.proc(def.proc) : null;
-    b.w = def.w * S; b.r = def.r * S; b.color = def.color; b.rotate = !!def.rotate;
+    b.sprite = (o && o.sprite) || def.sprite || null; b.cv = def.tint ? G.tinted(def.sprite, { hue: def.tint }) : def.proc ? G.proc(def.proc) : null;
+    b.w = ((o && o.w) || def.w) * S; b.r = ((o && o.r) || def.r) * S; b.color = def.color; b.rotate = !!def.rotate;
     b.life = (o && o.life) || 9; b.age = 0; b.dead = false;
     b.accel = (o && o.accel) || 0; b.homing = (o && o.homing) || 0; b.fuse = (o && o.fuse) || 0;
     b.maxSpd = (o && o.maxSpd) || 0;
     b.redirT = (o && o.redir) || 0; b.redirSpd = (o && o.redirSpd) || 0; b.redone = false;
-    b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0;
+    b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0; b.ebc = null;
     this.ebullets.push(b);
     return b;
   };
@@ -1317,10 +1347,14 @@
     A.play('powerup');
     SS.tg.haptic('medium');
     FX.glowPuff(p.x, p.y, def.color, 90 * S, 0.35);
+    FX.sprite('fx_pickup', 0, 0, { follow: p, w0: p.w * 0.8, w1: p.w * 1.9, dur: 0.45, hold: 0.35, hue: G.hueOf(def.color) });
     FX.text(p.x, p.y - p.w * 0.7, def.name, def.color, 13, 1.0, -50);
+    if (type === 'rapid') this.speedFx(G.hueOf(def.color));
+    else if (type === 'star') FX.sprite('fx_flare', 0, 0, { follow: p, w0: p.w * 0.8, w1: p.w * 2.2, dur: 0.5, hold: 0.3, hue: 45 });
+    else if (type === 'freeze') FX.sprite('fx_dust', p.x, p.y, { w0: 60 * S, w1: 320 * S, dur: 0.8, hold: 0.3 });
     switch (type) {
       case 'heal': this.heal(1); break;
-      case 'shield': p.shield = true; this.run.shieldRegenT = 0; M.unlock('shield'); break;
+      case 'shield': p.shield = true; this.run.shieldRegenT = 0; this.shieldFx(); M.unlock('shield'); break;
       case 'bomb': p.bombs = Math.min(p.bombs + 1, 9); break;
       case 'star': {
         const pts = Math.round(1000 * this.wave.n * this.diff.score);
@@ -1383,10 +1417,11 @@
     if (id === 'heal') p.lives = Math.min(p.maxLives, p.lives + 1);
     if (id === 'maxhp') { p.maxLives++; p.lives++; }
     if (id === 'bomb') p.bombs = Math.min(9, p.bombs + 1);
-    if (id === 'shieldgen' && !p.shield) p.shield = true;
+    if (id === 'shieldgen' && !p.shield) { p.shield = true; this.shieldFx(); }
     this.refreshStats();
     A.play('perk');
     FX.glowPuff(p.x, p.y, '#3dffa2', 110 * G.S, 0.45);
+    FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.2, w1: p.w * 1.35, dur: 0.85, hold: 0.45, fadeIn: 0.1 });
     FX.ring(p.x, p.y, p.w * 0.4, p.w * 1.5, '#3dffa2', 0.45, 4);
     p.inv = Math.max(p.inv, 0.8);
     this.state = 'play';
@@ -1422,7 +1457,8 @@
     const w = this.wave;
     if (!w) return;
     if (w.intro > 0) { w.intro -= dt; return; }
-    const alive = this.enemies.filter((e) => e.alive && !e.leaving).length;
+    let alive = 0;
+    for (const e of this.enemies) if (e.alive && !e.leaving) alive++;
     if (w.boss) {
       // волна босса завершается его уничтожением (см. enemies.bossDefeated)
       return;
@@ -1556,16 +1592,42 @@
     return { sprite, cv: this.shipCanvas(model, skinId) };
   };
 
-  // корабль с пламенем: (x, y) — центр, w — ширина
-  game.drawShip = function (ctx, model, skin, trail, x, y, w, tilt, t, boost) {
+  // облик корабля для отрисовки (спрайт, перекраска, пламя, сопла) — раньше каждый кадр заново искались
+  // раскраска и след и собирались строки-ключи; теперь пересчёт только при смене корабля, раскраски,
+  // следа или шага радуги
+  const NOZ_DEFAULT = [[0.5, 1, 1]];
+  const looks = [];
+  let skinById = null, trailById = null;
+  function drawLook(model, skin, trail) {
+    if (!skinById) {
+      skinById = {}; for (const k of D.SKINS) skinById[k.id] = k;
+      trailById = {}; for (const k of D.TRAILS) trailById[k.id] = k;
+    }
+    const now = performance.now();
+    const sk = skinById[skin], tr = trailById[trail];
+    const ss = sk && sk.hue === 'rainbow' ? Math.floor((now / 150) % 12) : 0;
+    const ts = tr && tr.colors === 'rainbow' ? Math.floor((now / 120) % 12) : 0;
+    for (let i = 0; i < looks.length; i++) {
+      const L = looks[i];
+      if (L.model === model && L.skin === skin && L.trail === trail && L.ss === ss && L.ts === ts) return L;
+    }
     const variant = D.SHIP_VARIANTS[model] && D.SHIP_VARIANTS[model][skin];
     const sprite = variant || D.SHIPS[model].sprite;
-    const f = G.frame(sprite);
+    const cols = game.trailColors(trail);
+    const L = { model, skin, trail, ss, ts, sprite, f: G.frame(sprite), cv: variant ? null : game.shipCanvas(model, skin),
+      flame: flameSprite(cols), glowCol: cols[1], noz: G.nozzles[sprite] || NOZ_DEFAULT };
+    if (!L.f) return L;
+    looks.push(L);
+    if (looks.length > 8) looks.shift();
+    return L;
+  }
+
+  // корабль с пламенем: (x, y) — центр, w — ширина
+  game.drawShip = function (ctx, model, skin, trail, x, y, w, tilt, t, boost) {
+    const L = drawLook(model, skin, trail), f = L.f;
     if (!f) return;
     const h = w * f[3] / f[2];
-    const cols = this.trailColors(trail);
-    const flame = flameSprite(cols);
-    const noz = G.nozzles[sprite] || [[0.5, 1, 1]];
+    const flame = L.flame, noz = L.noz;
     ctx.save();
     ctx.translate(x, y);
     if (tilt) ctx.rotate(tilt);
@@ -1579,13 +1641,13 @@
       ctx.drawImage(flame, nx - fw / 2, ny - fh * 0.06, fw, fh);
       ctx.globalAlpha = 0.5;
       const gs = fw * 2.6;
-      ctx.drawImage(G.glow(cols[1], 64), nx - gs / 2, ny - gs * 0.35, gs, gs);
+      ctx.drawImage(G.glow(L.glowCol, 64), nx - gs / 2, ny - gs * 0.35, gs, gs);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    const cv = variant ? null : this.shipCanvas(model, skin);
+    const cv = L.cv;
     if (cv) ctx.drawImage(cv, -w / 2, -h / 2, w, h);
-    else ctx.drawImage(G.img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
+    else { const im = G.src(f); if (im) ctx.drawImage(im, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h); }
     ctx.restore();
   };
 
@@ -1677,21 +1739,37 @@
 
   game.drawBullets = function (ctx) {
     ctx.globalCompositeOperation = 'lighter';
-    const rocket = G.proc('rocket');
+    const rocket = G.proc('rocket'), trail = G.frame('fx_tr_rocket') && SS.main.quality > 0, vortex = G.frame('fx_vortex');
     for (const b of this.bullets) {
       if (b.dead) continue;
       const ang = Math.atan2(b.vy, b.vx) + Math.PI / 2;
       if (b.kind === 'rocket') {
+        const f = b.sprite && G.frame(b.sprite);
+        const h = f ? b.w * f[3] / f[2] : b.w * rocket.height / rocket.width;
+        if (f && trail) {
+          // след: голова у сопла, хвост из искр уходит назад по курсу
+          const va = ang - Math.PI / 2, tw = b.w * 0.9, back = h * 0.35 + tw * 1.2;
+          ctx.globalAlpha = 0.75;
+          G.draw(ctx, 'fx_tr_rocket', b.x - Math.cos(va) * back, b.y - Math.sin(va) * back, tw, va + 1.262);
+          ctx.globalAlpha = 1;
+        }
         ctx.globalCompositeOperation = 'source-over';
-        const h = b.w * rocket.height / rocket.width;
-        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); ctx.drawImage(rocket, -b.w / 2, -h / 2, b.w, h); ctx.restore();
+        if (f) G.draw(ctx, b.sprite, b.x, b.y, b.w, ang);
+        else { ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); ctx.drawImage(rocket, -b.w / 2, -h / 2, b.w, h); ctx.restore(); }
         ctx.globalCompositeOperation = 'lighter';
-        const gs = b.w * 2.2;
-        ctx.drawImage(G.glow('#ff9f3d', 64), b.x - Math.sin(ang) * -h * 0.5 - gs / 2, b.y + Math.cos(ang) * h * 0.5 - gs / 2, gs, gs);
+        const gs = b.w * (f ? 1.7 : 2.2);
+        ctx.globalAlpha = f ? 0.75 : 1;
+        ctx.drawImage(G.glow('#ff9f3d', 64), b.x - Math.sin(ang) * h * 0.5 - gs / 2, b.y + Math.cos(ang) * h * 0.5 - gs / 2, gs, gs);
+        ctx.globalAlpha = 1;
       } else if (b.kind === 'dark') {
+        const s = b.r * 0.42 * (1 + Math.sin(b.age * 12) * 0.06);
         ctx.globalCompositeOperation = 'source-over';
-        const v = G.proc('vortex'), s = b.r * 0.42 * (1 + Math.sin(b.age * 12) * 0.06);
-        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.drawImage(v, -s, -s, s * 2, s * 2); ctx.restore();
+        if (vortex) {
+          ctx.globalCompositeOperation = 'lighter';
+          G.draw(ctx, 'fx_vortex', b.x, b.y, s * 2.7, b.rot);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.drawImage(G.proc('voidcore'), b.x - s * 0.5, b.y - s * 0.5, s, s);
+        } else { const v = G.proc('vortex'); ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.drawImage(v, -s, -s, s * 2, s * 2); ctx.restore(); }
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.16;
         ctx.drawImage(G.soft('#7a3dff', 64), b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
@@ -1717,10 +1795,15 @@
       const w = 24 * S, h = w * f[3] / f[2];
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.7 + Math.random() * 0.3;
-      ctx.drawImage(G.glow(i ? '#ffc83d' : '#7fe7ff', 32), d.x - 7 * S, d.y + h * 0.38, 14 * S, 18 * S);
+      if (G.frame('fx_tr_engine')) {
+        // пламя развёрнуто вниз: основание у сопла, язык уходит назад
+        const fw = 9 * S, fy = d.y + h * 0.5 + fw * 0.9;
+        if (i) G.drawCanvas(ctx, G.tinted('fx_tr_engine', { hue: 45 }), d.x, fy, fw, Math.PI);
+        else G.draw(ctx, 'fx_tr_engine', d.x, fy, fw, Math.PI);
+      } else ctx.drawImage(G.glow(i ? '#ffc83d' : '#7fe7ff', 32), d.x - 7 * S, d.y + h * 0.38, 14 * S, 18 * S);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(G.img, f[0], f[1], f[2], f[3], d.x - w / 2, d.y - h / 2, w, h);
+      ctx.drawImage(G.src(f), f[0], f[1], f[2], f[3], d.x - w / 2, d.y - h / 2, w, h);
     }
     if (!p.alive) return;
     const blink = p.inv > 0 && this.state === 'play' && Math.floor(p.inv * 14) % 2 === 0;
@@ -1736,11 +1819,20 @@
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.18 + Math.sin(this.t * 6) * 0.05;
       ctx.drawImage(G.soft(col, 64), p.x - r * 1.2, p.y - r * 1.2, r * 2.4, r * 2.4);
+      const bubble = G.frame('fx_sh_bubble');
+      if (bubble) {
+        const bw = r * 2.25 * (1 + Math.sin(this.t * 4) * 0.025);
+        ctx.globalAlpha = 0.4 + Math.sin(this.t * 6) * 0.08;
+        if (barrier) G.drawCanvas(ctx, G.tinted('fx_sh_bubble', { hue: 46 }), p.x, p.y, bw, 0);
+        else G.draw(ctx, 'fx_sh_bubble', p.x, p.y, bw);
+      }
       ctx.globalAlpha = 0.75;
       ctx.strokeStyle = col; ctx.lineWidth = 2 * S;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, this.t * 2, this.t * 2 + U.TAU * 0.8); ctx.stroke();
-      ctx.globalAlpha = 0.4;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.9, -this.t * 3, -this.t * 3 + U.TAU * 0.5); ctx.stroke();
+      if (!bubble) {
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.9, -this.t * 3, -this.t * 3 + U.TAU * 0.5); ctx.stroke();
+      }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -1761,27 +1853,48 @@
       if (b.type === 'mine') {
         ctx.globalCompositeOperation = 'source-over';
         const s = b.w;
-        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.age * 3); ctx.drawImage(b.cv, -s / 2, -s / 2, s, s); ctx.restore();
+        if (b.sprite && G.frame(b.sprite)) {
+          ctx.drawImage(G.proc('voidcore'), b.x - s * 0.36, b.y - s * 0.36, s * 0.72, s * 0.72);
+          G.draw(ctx, b.sprite, b.x, b.y, s, b.age * 1.6);
+        } else { ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.age * 3); ctx.drawImage(b.cv, -s / 2, -s / 2, s, s); ctx.restore(); }
         ctx.globalCompositeOperation = 'lighter';
         if (Math.sin(b.age * 18) > 0) ctx.drawImage(G.glow('#ff3d5a', 32), b.x - s * 0.6, b.y - s * 0.6, s * 1.2, s * 1.2);
         continue;
       }
-      const gs = b.w * 2;
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(G.glow(b.color, 32), b.x - gs / 2, b.y - gs / 2, gs, gs);
-      ctx.globalAlpha = 1;
-      if (b.cv) G.drawCanvas(ctx, b.cv, b.x, b.y, b.w, 0);
-      else G.draw(ctx, b.sprite, b.x, b.y, b.w, b.rotate ? Math.atan2(b.vy, b.vx) + Math.PI / 2 : 0);
+      const c = b.ebc || (b.ebc = ebSprite(b));
+      if (b.rotate) G.drawCanvas(ctx, c, b.x, b.y, c.cw, Math.atan2(b.vy, b.vx) + Math.PI / 2);
+      else ctx.drawImage(c, b.x - c.cw / 2, b.y - c.ch / 2, c.cw, c.ch);
     }
     ctx.globalCompositeOperation = 'source-over';
-    // белые ядра — чтобы пули читались на любом фоне
-    ctx.fillStyle = '#fff';
-    for (const b of this.ebullets) {
-      if (b.dead || b.type === 'mine') continue;
-      const r = b.r * 0.45;
-      ctx.fillRect(b.x - r, b.y - r, r * 2, r * 2);
-    }
   };
+
+  // кадр вражеского снаряда: ореол, спрайт и белое ядро (чтобы пуля читалась на любом фоне).
+  // Собирается один раз на тип и размер в разрешении экрана
+  const ebCache = {};
+  function ebSprite(b) {
+    const dpr = G.dpr, key = b.type + '|' + (b.sprite || '') + '|' + Math.round(b.w * 8) + '|' + dpr;
+    let c = ebCache[key];
+    if (c) return c;
+    const src = b.cv, f = src ? null : G.frame(b.sprite);
+    const sh = src ? b.w * src.height / src.width : f ? b.w * f[3] / f[2] : b.w;
+    const gs = b.w * 2, cw = gs, ch = Math.max(gs, sh);
+    c = document.createElement('canvas');
+    c.width = Math.ceil(cw * dpr); c.height = Math.ceil(ch * dpr);
+    c.cw = cw; c.ch = ch;
+    const x = c.getContext('2d');
+    x.scale(c.width / cw, c.height / ch);
+    x.globalCompositeOperation = 'lighter';
+    x.globalAlpha = 0.5;
+    x.drawImage(G.glow(b.color, 32), 0, (ch - gs) / 2, gs, gs);
+    x.globalAlpha = 1;
+    if (src) x.drawImage(src, (cw - b.w) / 2, (ch - sh) / 2, b.w, sh);
+    else if (f && G.src(f)) x.drawImage(G.src(f), f[0], f[1], f[2], f[3], (cw - b.w) / 2, (ch - sh) / 2, b.w, sh);
+    const r = b.r * 0.45;
+    x.fillStyle = '#fff';
+    x.fillRect(cw / 2 - r, ch / 2 - r, r * 2, r * 2);
+    ebCache[key] = c;
+    return c;
+  }
 
   game.drawOverlays = function (ctx) {
     const p = this.player, S = G.S, ov = this.ov;
@@ -1803,6 +1916,11 @@
         const k = r.t / r.charge;
         ctx.globalAlpha = 0.4 + k * 0.5;
         ctx.drawImage(G.glow('#7ffff0', 64), p.x - 40 * S * k, p.y - p.w * 0.6 - 40 * S * k, 80 * S * k, 80 * S * k);
+        if (G.frame('fx_super')) {
+          const sw = 46 * S * (0.4 + k * 0.6);
+          ctx.globalAlpha = 0.5 + k * 0.5;
+          G.draw(ctx, 'fx_super', p.x, p.y - p.w * 0.45 - sw * 0.6, sw);
+        }
         ctx.globalAlpha = k * 0.35;
         ctx.fillStyle = '#7ffff0';
         ctx.fillRect(p.x - 1.5 * S, 0, 3 * S, p.y);
@@ -1816,6 +1934,7 @@
         ctx.globalAlpha = fade;
         ctx.fillStyle = '#ffffff'; ctx.fillRect(p.x - wv * 0.2, 0, wv * 0.4, p.y - p.w * 0.3);
         ctx.drawImage(G.glow('#7ffff0', 64), p.x - 50 * S, p.y - p.w * 0.6 - 50 * S, 100 * S, 100 * S);
+        if (G.frame('fx_charge')) { ctx.globalAlpha = fade * (0.8 + Math.random() * 0.2); G.draw(ctx, 'fx_charge', p.x, p.y - p.w * 0.55 - 26 * S, 34 * S); }
       }
       ctx.globalAlpha = 1;
     }
@@ -1824,10 +1943,21 @@
       const h = ov.hole, k = Math.min(1, h.t * 3), R = 210 * S;
       ctx.globalAlpha = 0.35 * k;
       ctx.drawImage(G.soft('#7a3dff', 64), h.x - R, h.y - R, R * 2, R * 2);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-      const v = G.proc('vortex'), s = R * 0.55 * k * (1 + Math.sin(h.t * 10) * 0.05);
-      ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.t * 4); ctx.drawImage(v, -s, -s, s * 2, s * 2); ctx.rotate(-h.t * 7); ctx.globalAlpha = 0.6; ctx.drawImage(v, -s * 0.7, -s * 0.7, s * 1.4, s * 1.4); ctx.restore();
+      const s = R * 0.55 * k * (1 + Math.sin(h.t * 10) * 0.05);
+      if (G.frame('fx_vortex')) {
+        ctx.globalAlpha = k;
+        G.draw(ctx, 'fx_vortex', h.x, h.y, s * 2.6, h.t * 4);
+        ctx.globalAlpha = 0.55 * k;
+        G.draw(ctx, 'fx_vortex', h.x, h.y, s * 1.7, -h.t * 6);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(G.proc('voidcore'), h.x - s * 0.45, h.y - s * 0.45, s * 0.9, s * 0.9);
+      } else {
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        const v = G.proc('vortex');
+        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.t * 4); ctx.drawImage(v, -s, -s, s * 2, s * 2); ctx.rotate(-h.t * 7); ctx.globalAlpha = 0.6; ctx.drawImage(v, -s * 0.7, -s * 0.7, s * 1.4, s * 1.4); ctx.restore();
+      }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'lighter';
     }
@@ -1857,6 +1987,7 @@
         const gs = (14 + 30 * L.t / L.warn) * S;
         ctx.globalAlpha = 0.6;
         ctx.drawImage(G.glow(L.color, 64), o.x - gs, o.y - gs, gs * 2, gs * 2);
+        if (G.frame('fx_storm')) { ctx.globalAlpha = 0.85; G.drawCanvas(ctx, G.tinted('fx_storm', { hue: G.hueOf(L.color) }), o.x, o.y, gs * 2.2, L.ang - Math.PI / 2); }
       } else {
         const k = Math.min(1, (L.t - L.warn) * 8, (L.warn + L.dur - L.t) * 5);
         ctx.globalAlpha = 0.3 * k; ctx.strokeStyle = L.color; ctx.lineWidth = L.w * 2.4; ctx.stroke();

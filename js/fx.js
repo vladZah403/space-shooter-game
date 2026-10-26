@@ -1,7 +1,8 @@
 // ════════════════════════════════════════════════════════════════
 // SPACE SHOOTER 2.0 — визуальные эффекты
 //  искры, дым, обломки, взрывы (кадры из листа), ударные волны,
-//  молнии, всплывающие числа, вспышка экрана, тряска
+//  молнии, всплывающие числа, вспышка экрана, тряска,
+//  спрайтовые эффекты листа VFX (щиты, порталы, бонусы, вспышки)
 // ════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -14,19 +15,19 @@
   const textPool = new SS.Pool(() => ({}));
 
   const fx = {
-    parts: [], expl: [], rings: [], texts: [], beams: [],
+    parts: [], expl: [], rings: [], texts: [], beams: [], sprites: [],
     trauma: 0, shakeX: 0, shakeY: 0,
     flashA: 0, flashColor: '#fff',
     maxParts: 500,
     quality: 2,
     shakeOn: true,
-    font: '700 13px Orbitron, Rajdhani, sans-serif',
+    _tc: new Map(), _tcDpr: 0, _mx: null,
 
     setQuality(q) { this.quality = q; this.maxParts = q >= 2 ? 520 : q === 1 ? 280 : 110; },
     clear() {
       for (const p of this.parts) partPool.put(p);
       for (const t of this.texts) textPool.put(t);
-      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0;
+      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0; this.sprites.length = 0;
       this.trauma = 0; this.flashA = 0;
     },
 
@@ -34,7 +35,7 @@
       if (this.parts.length >= this.maxParts) return null;
       const p = partPool.get();
       p.t = type; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.life = life; p.max = life; p.size = size; p.color = color;
-      p.drag = 0; p.rot = 0; p.vr = 0; p.grow = 0;
+      p.drag = 0; p.rot = 0; p.vr = 0; p.grow = 0; p.spr = null;
       this.parts.push(p);
       return p;
     },
@@ -70,10 +71,15 @@
     },
     debris(x, y, color, n, speed) {
       if (this.quality === 0) return;
+      // часть осколков — камни из листа эффектов, остальные — цветные пластины корпуса
+      const rocks = G().frames.fx_rock1 ? 6 : 0;
       for (let i = 0; i < n; i++) {
         const a = Math.random() * U.TAU, s = (speed || 160) * U.rand(0.4, 1);
         const p = this._p(P_DEBRIS, x, y, Math.cos(a) * s, Math.sin(a) * s, U.rand(0.6, 1.2), U.rand(2, 4.5), color);
-        if (p) { p.drag = 1.4; p.rot = Math.random() * U.TAU; p.vr = U.rand(-12, 12); }
+        if (p) {
+          p.drag = 1.4; p.rot = Math.random() * U.TAU; p.vr = U.rand(-12, 12);
+          if (rocks && Math.random() < 0.55) p.spr = 'fx_rock' + (1 + Math.floor(Math.random() * rocks));
+        }
       }
     },
     ring(x, y, r0, r1, color, dur, width) {
@@ -81,10 +87,18 @@
       this.rings.push({ x, y, r0, r1, color, life: dur, max: dur, w: width || 3 });
     },
     // взрыв: size ~ 1 (малый) … 4 (босс)
-    explode(x, y, size, color) {
+    // o: { kind: 'crit' — огненный с кольцами (элита), 'kill' — с электрическими разрядами (мини-боссы); hue — перекраска }
+    explode(x, y, size, color, o) {
       size = size || 1;
-      const S = G().S;
-      this.expl.push({ x, y, life: 0, dur: 0.42 + size * 0.08, w: (58 + size * 34) * S, rot: Math.random() * U.TAU });
+      const g = G(), S = g.S;
+      const kind = o && o.kind;
+      const name = kind === 'crit' ? 'fx_ex_crit' : kind === 'kill' || size >= 2.5 ? 'fx_ex_kill' : size >= 1.5 ? 'fx_ex_l' : size >= 0.95 ? 'fx_ex_m' : 'fx_ex_s';
+      if (g.frames[name]) {
+        const hue = o && o.hue;
+        this.expl.push({ x, y, life: 0, dur: 0.36 + size * 0.07, w: (44 + size * 30) * S * (kind ? 1.15 : 1), rot: Math.random() * U.TAU, name, cv: hue == null ? null : g.tinted(name, { hue }) });
+      } else {
+        this.expl.push({ x, y, life: 0, dur: 0.42 + size * 0.08, w: (58 + size * 34) * S, rot: Math.random() * U.TAU });
+      }
       this.glowPuff(x, y, color || '#ffb03d', (90 + size * 70) * S, 0.25 + size * 0.05);
       this.ring(x, y, 6 * S, (40 + size * 38) * S, color || '#ffd9a0', 0.32 + size * 0.06, 2 + size);
       this.sparks(x, y, color || '#ffcf6b', 8 + Math.round(size * 7), 220 + size * 60, 0.4 + size * 0.06);
@@ -117,7 +131,51 @@
       if (this.texts.length > 60) { textPool.put(this.texts.shift()); }
       const t = textPool.get();
       t.x = x; t.y = y; t.s = str; t.c = color || '#fff'; t.size = size || 13; t.life = dur || 0.7; t.max = t.life; t.vy = vy === undefined ? -55 : vy;
+      t.cv = null;
       this.texts.push(t);
+    },
+    // надпись рисуется в маленький холст один раз и дальше копируется: обводка и заливка текста на холсте —
+    // одна из самых дорогих операций, а числа урона сильно повторяются
+    textCanvas(str, color, size) {
+      const dpr = G().dpr;
+      if (this._tcDpr !== dpr) { this._tc.clear(); this._tcDpr = dpr; }
+      const key = size + '|' + color + '|' + str;
+      let c = this._tc.get(key);
+      if (c) return c;
+      const font = '900 ' + size + 'px Orbitron, Rajdhani, sans-serif';
+      const m = this._mx || (this._mx = document.createElement('canvas').getContext('2d'));
+      m.font = font;
+      const tw = Math.ceil(m.measureText(str).width) + 8, th = Math.ceil(size * 1.5) + 6;
+      c = document.createElement('canvas');
+      c.width = Math.ceil(tw * dpr); c.height = Math.ceil(th * dpr);
+      c.tw = tw; c.th = th;
+      const x = c.getContext('2d');
+      x.scale(dpr, dpr);
+      x.font = font; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      x.lineWidth = 3.5; x.strokeStyle = 'rgba(0,0,10,.85)'; x.strokeText(str, tw / 2, th / 2);
+      x.fillStyle = color; x.fillText(str, tw / 2, th / 2);
+      if (this._tc.size >= 160) this._tc.delete(this._tc.keys().next().value);
+      this._tc.set(key, c);
+      return c;
+    },
+    // спрайт листа эффектов: ширина растёт от w0 до w1, после доли hold — затухание
+    // o: { w0, w1, dur, hue, rot, vr, alpha, hold, fadeIn, vy, sy — сжатие по вертикали, follow — объект с x/y, ox, oy,
+    //      minor — не рисовать на слабом качестве }
+    sprite(name, x, y, o) {
+      const g = G();
+      if (!g.frames[name] || (o.minor && this.quality === 0)) return null;
+      if (this.sprites.length > 50) this.sprites.shift();
+      const s = { name, x, y, w0: o.w0, w1: o.w1 == null ? o.w0 : o.w1, dur: o.dur || 0.5, life: 0, rot: o.rot || 0, vr: o.vr || 0,
+        a: o.alpha == null ? 1 : o.alpha, hold: o.hold == null ? 0.35 : o.hold, fadeIn: o.fadeIn || 0, vy: o.vy || 0, sy: o.sy || 1,
+        follow: o.follow || null, ox: o.ox || 0, oy: o.oy || 0, cv: o.hue == null ? null : g.tinted(name, { hue: o.hue }) };
+      this.sprites.push(s);
+      return s;
+    },
+    // портал: open — раскрывается (появление), иначе схлопывается (исчезновение)
+    portal(x, y, w, color, open) {
+      const hue = color ? G().hueOf(color) : null;
+      if (open) this.sprite('fx_portal_out', x, y, { w0: w * 0.25, w1: w, dur: 0.5, hold: 0.55, hue });
+      else this.sprite('fx_portal_in', x, y, { w0: w, w1: w * 0.15, dur: 0.4, hold: 0.5, hue });
     },
     flash(color, a) { this.flashColor = color || '#fff'; this.flashA = Math.max(this.flashA, a || 0.5); },
     shake(amount) { if (this.shakeOn) this.trauma = Math.min(1, this.trauma + amount); },
@@ -142,6 +200,12 @@
         if (p.grow) p.size *= 1 + p.grow * dt;
       }
       for (let i = this.expl.length - 1; i >= 0; i--) { const e = this.expl[i]; e.life += dt; if (e.life >= e.dur) this.expl.splice(i, 1); }
+      for (let i = this.sprites.length - 1; i >= 0; i--) {
+        const s = this.sprites[i];
+        s.life += dt;
+        if (s.life >= s.dur) { this.sprites.splice(i, 1); continue; }
+        s.rot += s.vr * dt; s.oy += s.vy * dt;
+      }
       for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.life -= dt; if (r.life <= 0) this.rings.splice(i, 1); }
       for (let i = this.beams.length - 1; i >= 0; i--) { const b = this.beams[i]; b.life -= dt; if (b.life <= 0) this.beams.splice(i, 1); }
       for (let i = this.texts.length - 1; i >= 0; i--) {
@@ -161,6 +225,7 @@
           ctx.drawImage(g.soft('#232845', 64), p.x - s, p.y - s, s * 2, s * 2);
         } else if (p.t === P_DEBRIS) {
           ctx.globalAlpha = Math.min(1, p.life / p.max * 2);
+          if (p.spr) { g.draw(ctx, p.spr, p.x, p.y, p.size * 3.4, p.rot); continue; }
           ctx.fillStyle = p.color;
           ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
           ctx.fillRect(-p.size, -p.size * 0.5, p.size * 2, p.size);
@@ -176,10 +241,28 @@
       ctx.globalCompositeOperation = 'lighter';
       for (const e of this.expl) {
         const k = e.life / e.dur;
+        if (e.name) {
+          // один кадр листа: быстро раздувается, во второй половине гаснет
+          ctx.globalAlpha = k < 0.45 ? 1 : (1 - k) / 0.55;
+          const w = e.w * (0.45 + 0.75 * U.easeOutCubic(k));
+          if (e.cv) g.drawCanvas(ctx, e.cv, e.x, e.y, w, e.rot); else g.draw(ctx, e.name, e.x, e.y, w, e.rot);
+          continue;
+        }
         const fi = Math.min(4, Math.floor(k * 5));
         const w = e.w * (0.75 + k * 0.45);
         ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
         g.draw(ctx, 'ex' + (fi + 1), e.x, e.y, w, e.rot);
+      }
+      for (const s of this.sprites) {
+        const k = s.life / s.dur;
+        const fade = k < s.fadeIn ? k / s.fadeIn : k > s.hold ? 1 - (k - s.hold) / (1 - s.hold) : 1;
+        ctx.globalAlpha = s.a * Math.max(0, fade);
+        const w = s.w0 + (s.w1 - s.w0) * U.easeOutCubic(k);
+        const x = (s.follow ? s.follow.x : s.x) + s.ox, y = (s.follow ? s.follow.y : s.y) + s.oy;
+        if (s.sy !== 1) { ctx.save(); ctx.translate(x, y); ctx.scale(1, s.sy); }
+        const dx = s.sy !== 1 ? 0 : x, dy = s.sy !== 1 ? 0 : y;
+        if (s.cv) g.drawCanvas(ctx, s.cv, dx, dy, w, s.rot); else g.draw(ctx, s.name, dx, dy, w, s.rot);
+        if (s.sy !== 1) ctx.restore();
       }
       ctx.globalAlpha = 1;
       for (const p of this.parts) {
@@ -224,18 +307,13 @@
 
     drawTexts(ctx) {
       if (!this.texts.length) return;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
-      let lastSize = 0;
       for (const t of this.texts) {
         const k = t.life / t.max;
         const pop = k > 0.85 ? 1 + (k - 0.85) * 2.5 : 1;
-        if (t.size !== lastSize) { ctx.font = '900 ' + t.size + 'px Orbitron, Rajdhani, sans-serif'; lastSize = t.size; }
+        const c = t.cv || (t.cv = this.textCanvas(t.s, t.c, t.size));
+        const w = c.tw * pop, h = c.th * pop;
         ctx.globalAlpha = Math.min(1, k * 2.2);
-        ctx.save(); ctx.translate(t.x, t.y); if (pop !== 1) ctx.scale(pop, pop);
-        ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(0,0,10,.85)'; ctx.strokeText(t.s, 0, 0);
-        ctx.fillStyle = t.c; ctx.fillText(t.s, 0, 0);
-        ctx.restore();
+        ctx.drawImage(c, t.x - w / 2, t.y - h / 2, w, h);
       }
       ctx.globalAlpha = 1;
     },
@@ -248,6 +326,9 @@
       ctx.globalAlpha = 1;
     },
   };
+
+  // шрифт догрузился — новые надписи рисуются им, а не запасным
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => fx._tc.clear());
 
   SS.fx = fx;
 })();

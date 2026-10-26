@@ -17,24 +17,59 @@
   }
 
   const gfx = {
-    img: null,
+    img: null, img2: null, lateFailed: false,
     frames: ATLAS.frames,
     nozzles: ATLAS.nozzles,
     W: 360, H: 640, dpr: 1, FX: 0, FW: 360, S: 1,
-    _tint: {}, _white: {}, _glow: {}, _proc: {},
+    _tint: {}, _white: {}, _glow: {}, _glowC: {}, _softC: {}, _proc: {}, _hue: {},
 
-    load(onProgress) {
-      return new Promise((resolve) => {
+    // картинка атласа. Атлас — самый тяжёлый файл: качаем его потоком, чтобы полоса загрузки показывала
+    // реальный прогресс, и распаковываем заранее, чтобы первый кадр не споткнулся. Если что-то
+    // не поддерживается — обычная загрузка картинкой (WebP, затем PNG)
+    fetchSheet(base, onProgress) {
+      const plain = () => new Promise((resolve) => {
         const img = new Image();
         let triedPng = false;
-        img.onload = () => { this.img = img; onProgress && onProgress(1); resolve(true); };
+        img.onload = () => resolve(img);
         img.onerror = () => {
-          if (!triedPng) { triedPng = true; img.src = 'assets/sprites.png?v=' + SS.VERSION; }
-          else { console.error('[gfx] атлас не загрузился'); resolve(false); }
+          if (!triedPng) { triedPng = true; img.src = base + '.png?v=' + SS.VERSION; }
+          else resolve(null);
         };
-        img.src = 'assets/sprites.webp?v=' + SS.VERSION;
+        img.src = base + '.webp?v=' + SS.VERSION;
+      });
+      if (!window.fetch || !window.ReadableStream || !window.URL || !URL.createObjectURL) return plain();
+      return (async () => {
+        const res = await fetch(base + '.webp?v=' + SS.VERSION);
+        if (!res.ok || !res.body) throw new Error('http ' + res.status);
+        const total = +res.headers.get('Content-Length') || 0, reader = res.body.getReader(), parts = [];
+        let got = 0;
+        for (;;) {
+          const r = await reader.read();
+          if (r.done) break;
+          parts.push(r.value); got += r.value.length;
+          if (total && onProgress) onProgress(Math.min(0.97, got / total));
+        }
+        const url = URL.createObjectURL(new Blob(parts, { type: 'image/webp' }));
+        const img = new Image();
+        img.src = url;
+        if (img.decode) await img.decode();
+        else await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; });
+        // ссылку на байты не освобождаем: при нехватке памяти браузер может заново распаковать картинку из неё
+        return img;
+      })().catch(() => plain());
+    },
+    // основной атлас — до показа меню; поздний (свои спрайты боссов, большие мини-боссы) — в фоне после него
+    load(onProgress) {
+      return this.fetchSheet('assets/sprites', onProgress).then((img) => {
+        if (!img) { console.error('[gfx] атлас не загрузился'); return false; }
+        this.img = img;
+        onProgress && onProgress(1);
+        this.fetchSheet('assets/sprites2').then((im) => { if (im) this.img2 = im; else this.lateFailed = true; });
+        return true;
       });
     },
+    // картинка атласа, в которой лежит кадр (null — поздний атлас ещё качается)
+    src(f) { return f[5] ? this.img2 : this.img; },
 
     // габариты кадра
     frame(name) { return this.frames[name]; },
@@ -42,16 +77,16 @@
 
     // рисует кадр атласа по центру (x, y) шириной w
     draw(ctx, name, x, y, w, rot, alpha) {
-      const f = this.frames[name];
-      if (!f || !this.img) return;
+      const f = this.frames[name], img = f && this.src(f);
+      if (!img) return;
       const h = w * f[3] / f[2];
       if (alpha !== undefined) ctx.globalAlpha = alpha;
       if (rot) {
         ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
-        ctx.drawImage(this.img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
+        ctx.drawImage(img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h);
         ctx.restore();
       } else {
-        ctx.drawImage(this.img, f[0], f[1], f[2], f[3], x - w / 2, y - h / 2, w, h);
+        ctx.drawImage(img, f[0], f[1], f[2], f[3], x - w / 2, y - h / 2, w, h);
       }
       if (alpha !== undefined) ctx.globalAlpha = 1;
     },
@@ -65,32 +100,48 @@
     // ── Перекраска: hue — тон 0..360, sat/dark/bright — доп. обработка ──
     tinted(name, t) {
       if (!t || (t.hue == null && !t.sat && !t.dark && !t.bright)) return null;
-      const key = name + '|' + t.hue + '|' + (t.sat || 0) + '|' + (t.dark || 0) + '|' + (t.bright || 0);
+      const key = name + '|' + t.hue + '|' + (t.sat || 0) + '|' + (t.dark || 0) + '|' + (t.bright || 0) + (t.alpha ? '|a' : '');
       if (this._tint[key]) return this._tint[key];
-      const f = this.frames[name];
-      if (!f || !this.img) return null;
+      const f = this.frames[name], img = f && this.src(f);
+      if (!img) return null;
       const c = mk(f[2], f[3]), x = c.getContext('2d');
-      x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
-      x.drawImage(this.img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+      if (!t.alpha) { x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height); }
+      x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
       if (t.hue != null) { x.globalCompositeOperation = 'hue'; x.fillStyle = 'hsl(' + t.hue + ',100%,50%)'; x.fillRect(0, 0, c.width, c.height); }
       if (t.sat != null && t.sat !== 0) { x.globalCompositeOperation = 'saturation'; x.fillStyle = 'hsl(0,' + Math.round(t.sat * 100) + '%,50%)'; x.fillRect(0, 0, c.width, c.height); }
       if (t.dark) { x.globalCompositeOperation = 'multiply'; x.fillStyle = 'hsl(' + (t.hue || 0) + ',40%,' + Math.round((1 - t.dark) * 100) + '%)'; x.fillRect(0, 0, c.width, c.height); }
       if (t.bright) { x.globalCompositeOperation = 'screen'; x.fillStyle = 'rgba(255,255,255,' + t.bright + ')'; x.fillRect(0, 0, c.width, c.height); }
-      // обычные спрайты: возвращаем прозрачность; аддитивные остаются на чёрном (рисуются через 'lighter')
-      if (!f[4]) {
+      // обычные спрайты и t.alpha (иконки на прозрачном фоне): возвращаем прозрачность;
+      // аддитивные остаются на чёрном (рисуются через 'lighter')
+      if (!f[4] || t.alpha) {
         x.globalCompositeOperation = 'destination-in';
-        x.drawImage(this.img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+        x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
       }
       this._tint[key] = c;
       return c;
     },
+    // тон цвета '#rrggbb' в градусах — для перекраски эффектов под цвет врага или бонуса
+    hueOf(hex) {
+      if (this._hue[hex] !== undefined) return this._hue[hex];
+      let h = 0;
+      if (hex && hex[0] === '#') {
+        let s = hex.slice(1);
+        if (s.length === 3) s = s.split('').map((ch) => ch + ch).join('');
+        const n = parseInt(s, 16), r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+        const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+        if (d > 0) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        h = Math.round((h * 60 + 360) % 360);
+      }
+      this._hue[hex] = h;
+      return h;
+    },
     // белый силуэт — вспышка при попадании (зависит только от прозрачности кадра)
     white(name) {
       if (this._white[name]) return this._white[name];
-      const f = this.frames[name];
-      if (!f || !this.img) return null;
+      const f = this.frames[name], img = f && this.src(f);
+      if (!img) return null;
       const c = mk(f[2], f[3]), x = c.getContext('2d');
-      x.drawImage(this.img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+      x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
       x.globalCompositeOperation = 'source-in';
       x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
       this._white[name] = c;
@@ -99,8 +150,8 @@
     // мягкое свечение заданного цвета
     glow(color, size) {
       size = size || 64;
-      const key = color + size;
-      if (this._glow[key]) return this._glow[key];
+      const m = this._glowC[color] || (this._glowC[color] = {});
+      if (m[size]) return m[size];
       const c = mk(size, size), x = c.getContext('2d');
       const g = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
       g.addColorStop(0, 'rgba(255,255,255,1)');
@@ -108,21 +159,21 @@
       g.addColorStop(0.45, hexA(color, 0.35));
       g.addColorStop(1, hexA(color, 0));
       x.fillStyle = g; x.fillRect(0, 0, size, size);
-      this._glow[key] = c;
+      m[size] = c;
       return c;
     },
     // мягкий круг без белого ядра (дым, подсветка)
     soft(color, size) {
       size = size || 64;
-      const key = 'soft' + color + size;
-      if (this._glow[key]) return this._glow[key];
+      const m = this._softC[color] || (this._softC[color] = {});
+      if (m[size]) return m[size];
       const c = mk(size, size), x = c.getContext('2d');
       const g = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
       g.addColorStop(0, hexA(color, 1));
       g.addColorStop(0.5, hexA(color, 0.45));
       g.addColorStop(1, hexA(color, 0));
       x.fillStyle = g; x.fillRect(0, 0, size, size);
-      this._glow[key] = c;
+      m[size] = c;
       return c;
     },
 
@@ -143,14 +194,27 @@
       const s = size, cx = s / 2, cy = s / 2;
       const w = D.WEAPONS[wid];
       x.globalCompositeOperation = 'lighter';
-      const sprite = (n, px, py, ww, rot) => { const f = this.frames[n]; if (!f) return; const hh = ww * f[3] / f[2]; x.save(); x.translate(px, py); x.rotate(rot || 0); x.drawImage(this.img, f[0], f[1], f[2], f[3], -ww / 2, -hh / 2, ww, hh); x.restore(); };
+      const sprite = (n, px, py, ww, rot) => { const f = this.frames[n], im = f && this.src(f); if (!im) return; const hh = ww * f[3] / f[2]; x.save(); x.translate(px, py); x.rotate(rot || 0); x.drawImage(im, f[0], f[1], f[2], f[3], -ww / 2, -hh / 2, ww, hh); x.restore(); };
       if (wid === 'laser') { sprite('pb_bolt_m', cx - s * 0.16, cy, s * 0.26); sprite('pb_bolt_m', cx + s * 0.16, cy, s * 0.26); }
-      else if (wid === 'shotgun') { const t = this.tinted('pb_orb', { hue: 45 }); if (t) for (let i = -2; i <= 2; i++) { const a = i * 0.32 - Math.PI / 2; x.drawImage(t, cx + Math.cos(a) * s * 0.3 - s * 0.1, cy + s * 0.12 + Math.sin(a) * s * 0.3 - s * 0.1, s * 0.2, s * 0.2); } }
-      else if (wid === 'rocket') { x.globalCompositeOperation = 'source-over'; const r = this.proc('rocket'); x.save(); x.translate(cx, cy); x.rotate(0.6); x.drawImage(r, -s * 0.16, -s * 0.38, s * 0.32, s * 0.76); x.restore(); }
-      else if (wid === 'plasma') { const t = this.tinted('eb_fire', { hue: 305 }); if (t) x.drawImage(t, cx - s * 0.36, cy - s * 0.36, s * 0.72, s * 0.72); }
+      else if (wid === 'shotgun') { const t = this.tinted('pb_orb', { hue: 45, alpha: true }); if (t) for (let i = -2; i <= 2; i++) { const a = i * 0.32 - Math.PI / 2; x.drawImage(t, cx + Math.cos(a) * s * 0.3 - s * 0.1, cy + s * 0.12 + Math.sin(a) * s * 0.3 - s * 0.1, s * 0.2, s * 0.2); } }
+      else if (wid === 'rocket') {
+        x.globalCompositeOperation = 'source-over';
+        if (this.frames.fx_rocket2) sprite('fx_rocket2', cx, cy, s * 0.34, 0.6);
+        else { const r = this.proc('rocket'); x.save(); x.translate(cx, cy); x.rotate(0.6); x.drawImage(r, -s * 0.16, -s * 0.38, s * 0.32, s * 0.76); x.restore(); }
+      }
+      else if (wid === 'plasma') {
+        const t = this.tinted(this.frames.fx_plasma2 ? 'fx_plasma2' : 'eb_fire', { hue: 305, alpha: true });
+        if (t) { const tw = s * 0.84, th = tw * t.height / t.width; x.drawImage(t, cx - tw / 2, cy - th / 2, tw, th); }
+      }
       else if (wid === 'lightning') { drawBolt(x, cx - s * 0.2, cy - s * 0.38, cx + s * 0.18, cy + s * 0.38, '#fff36b', s * 0.07); }
       else if (wid === 'arc') { x.strokeStyle = '#7ff6ff'; x.lineWidth = s * 0.07; x.shadowColor = '#7ff6ff'; x.shadowBlur = s * 0.15; x.lineCap = 'round'; for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(cx, cy + s * 0.3, s * (0.25 + i * 0.13), -Math.PI * 0.82, -Math.PI * 0.18); x.stroke(); } }
-      else if (wid === 'darkmatter') { x.globalCompositeOperation = 'source-over'; const v = this.proc('vortex'); x.drawImage(v, cx - s * 0.42, cy - s * 0.42, s * 0.84, s * 0.84); }
+      else if (wid === 'darkmatter') {
+        if (this.frames.fx_vortex) {
+          sprite('fx_vortex', cx, cy, s * 0.82);
+          x.globalCompositeOperation = 'source-over';
+          x.drawImage(this.proc('voidcore'), cx - s * 0.14, cy - s * 0.14, s * 0.28, s * 0.28);
+        } else { x.globalCompositeOperation = 'source-over'; const v = this.proc('vortex'); x.drawImage(v, cx - s * 0.42, cy - s * 0.42, s * 0.84, s * 0.84); }
+      }
       if (!w) return c;
       this._proc[key] = c;
       return c;
@@ -251,6 +315,14 @@
       x.strokeStyle = 'rgba(220,190,255,.7)'; x.lineWidth = 2;
       for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(s / 2, s / 2, s * (0.2 + i * 0.07), i * 2, i * 2 + 2.2); x.stroke(); }
       x.fillStyle = '#000'; x.beginPath(); x.arc(s / 2, s / 2, s * 0.13, 0, U.TAU); x.fill();
+      return c;
+    },
+    // тёмное ядро тёмной материи и чёрной дыры, подложка под корпус мины
+    voidcore() {
+      const s = 64, c = mk(s, s), x = c.getContext('2d');
+      const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(4,0,12,.92)'); g.addColorStop(1, 'rgba(10,0,30,0)');
+      x.fillStyle = g; x.fillRect(0, 0, s, s);
       return c;
     },
     // значки бонусов, которых нет в листе (в том же стиле шестиугольных медалей)
@@ -405,12 +477,13 @@
       }
     },
 
+    // небо и туманности одного сектора
     drawLayerSet(ctx, set, alpha, quality) {
       const W = gfx.W, H = gfx.H;
       ctx.globalAlpha = alpha;
       ctx.drawImage(set.sky, 0, 0, W, H);
       ctx.globalCompositeOperation = 'lighter';
-      // на слабом качестве — один слой туманности (меньше заливки экрана)
+      // на слабом качестве — один слой туманности
       const n = quality >= 2 ? set.layers.length : 1;
       for (let li = 0; li < n; li++) {
         const L = set.layers[li];
@@ -419,15 +492,39 @@
         ctx.drawImage(L.c, 0, off, W, H);
       }
       ctx.globalCompositeOperation = 'source-over';
-      const p = set.planet;
-      if (p) ctx.drawImage(p.c, p.x - p.s / 2, p.y - p.s / 2);
+      ctx.globalAlpha = 1;
+    },
+    // небо и туманности мягкие: их собираем в холст вдвое меньшего разрешения и растягиваем на экран одним
+    // непрозрачным вызовом. Раньше это были три полноэкранные заливки с наложением в каждом кадре — самая
+    // дорогая часть кадра для видеочипа телефона
+    compose(quality) {
+      const W = gfx.W, H = gfx.H, cw = Math.max(2, Math.ceil(W / 2)), ch = Math.max(2, Math.ceil(H / 2));
+      if (!this.comp || this.comp.width !== cw || this.comp.height !== ch) {
+        this.comp = mk(cw, ch);
+        this.compX = this.comp.getContext('2d', { alpha: false });
+      }
+      const x = this.compX, cur = this.cur || (this.cur = {});
+      cur.sky = this.sky; cur.layers = this.layers;
+      x.setTransform(cw / W, 0, 0, ch / H, 0, 0);
+      if (this.prev && this.fade < 1) this.drawLayerSet(x, this.prev, 1, quality);
+      this.drawLayerSet(x, cur, this.prev ? this.fade : 1, quality);
+      return this.comp;
+    },
+    // планета — поверх сборки в полном разрешении; за краем экрана не рисуется
+    drawPlanet(ctx, p, a) {
+      if (!p || a <= 0 || p.y + p.s / 2 < 0 || p.y - p.s / 2 > gfx.H) return;
+      ctx.globalAlpha = a;
+      ctx.drawImage(p.c, p.x - p.s / 2, p.y - p.s / 2);
       ctx.globalAlpha = 1;
     },
 
     draw(ctx, quality) {
       const W = gfx.W, H = gfx.H;
-      if (this.prev && this.fade < 1) this.drawLayerSet(ctx, this.prev, 1, quality);
-      this.drawLayerSet(ctx, { sky: this.sky, layers: this.layers, planet: this.planet }, this.prev ? this.fade : 1, quality);
+      const fading = this.prev && this.fade < 1;
+      ctx.drawImage(this.compose(quality), 0, 0, W, H);
+      // при смене сектора старая планета гаснет, новая проявляется
+      if (fading) this.drawPlanet(ctx, this.prev.planet, 1 - this.fade);
+      this.drawPlanet(ctx, this.planet, fading ? this.fade : 1);
       // звёзды
       const t = performance.now() / 1000;
       const col = this.sec ? this.sec.star : '#fff';
