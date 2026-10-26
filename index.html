@@ -136,24 +136,22 @@
     </div>
 
     <div class="menu-play">
-      <div class="diff-select" id="diffSelect"></div>
-      <div class="diff-desc" id="diffDesc"></div>
       <button class="btn-play" id="btnPlay"><svg><use href="#i-play"/></svg><span>ИГРАТЬ</span></button>
+      <div class="play-sub" id="playSub"></div>
     </div>
 
-    <div class="daily-card" id="dailyCard"></div>
-
     <nav class="menu-grid">
-      <button class="tile t-cyan" data-go="hangar"><svg><use href="#i-ship"/></svg><b>АНГАР</b><small>Корабли и скины</small><i class="badge" id="badgeHangar" hidden></i></button>
-      <button class="tile t-gold" data-go="arsenal"><svg><use href="#i-swords"/></svg><b>АРСЕНАЛ</b><small>Оружие и прокачка</small><i class="badge" id="badgeArsenal" hidden></i></button>
-      <button class="tile t-violet" data-go="skills"><svg><use href="#i-atom"/></svg><b>НАВЫКИ</b><small>Дерево умений</small><i class="badge" id="badgeSkills" hidden></i></button>
-      <button class="tile t-pink" data-go="leaders"><svg><use href="#i-trophy"/></svg><b>РЕЙТИНГ</b><small>Лучшие пилоты</small></button>
+      <button class="tile t-cyan" data-go="hangar"><svg><use href="#i-ship"/></svg><b>АНГАР</b><small>Корабли</small><i class="badge" id="badgeHangar" hidden></i></button>
+      <button class="tile t-gold" data-go="arsenal"><svg><use href="#i-swords"/></svg><b>АРСЕНАЛ</b><small>Оружие</small><i class="badge" id="badgeArsenal" hidden></i></button>
+      <button class="tile t-violet" data-go="skills"><svg><use href="#i-atom"/></svg><b>НАВЫКИ</b><small>Умения</small><i class="badge" id="badgeSkills" hidden></i></button>
+      <button class="tile t-orange" data-go="missions"><svg><use href="#i-target"/></svg><b>ЗАДАНИЯ</b><small id="missionCount">0 / 3</small><i class="badge" id="badgeMissions" hidden></i></button>
+      <button class="tile t-pink" data-go="leaders"><svg><use href="#i-trophy"/></svg><b>РЕЙТИНГ</b><small>Пилоты</small></button>
       <button class="tile t-green" data-go="achievements"><svg><use href="#i-medal"/></svg><b>НАГРАДЫ</b><small id="achCount">0 / 0</small><i class="badge" id="badgeAch" hidden></i></button>
-      <button class="tile t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><b>НАСТРОЙКИ</b><small>Звук и графика</small></button>
+      <button class="tile t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><b>НАСТРОЙКИ</b><small>Звук</small></button>
+      <button class="tile t-blue" data-go="suggest"><svg><use href="#i-mail"/></svg><b>ИДЕЯ</b><small>Написать</small></button>
     </nav>
 
     <footer class="menu-foot">
-      <button class="link-btn" data-go="suggest"><svg><use href="#i-mail"/></svg>Предложить идею</button>
       <span class="ver-txt" id="verTxt">v2.0</span>
     </footer>
   </div>
@@ -178,16 +176,18 @@
 <section id="scr-arsenal" class="screen sub">
   <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>АРСЕНАЛ</h2><div class="wallet sm"><svg><use href="#i-coin"/></svg><span class="js-coins">0</span></div></div>
   <div class="sub-body">
-    <div class="loadout">
-      <div class="loadout-title">ОРУЖИЕ В БОЙ <small>до 3 — переключаются кнопками в игре</small></div>
-      <div class="loadout-slots" id="loadoutSlots"></div>
-    </div>
     <div class="tabs" id="arsenalTabs">
       <button class="tab active" data-tab="weapons">ОРУЖИЕ</button>
       <button class="tab" data-tab="general">КОРАБЛЬ</button>
     </div>
     <div id="arsenalList"></div>
   </div>
+</section>
+
+<!-- ═══ ЗАДАНИЯ ═══ -->
+<section id="scr-missions" class="screen sub">
+  <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>ЗАДАНИЯ</h2><div class="wallet sm"><svg><use href="#i-coin"/></svg><span class="js-coins">0</span></div></div>
+  <div class="sub-body" id="missionsBody"></div>
 </section>
 
 <!-- ═══ НАВЫКИ ═══ -->
@@ -300,6 +300,18 @@
     <div class="perk-sub">Выберите улучшение</div>
     <div class="perk-cards" id="perkCards"></div>
     <button class="btn ghost" id="btnPerkReroll"><svg><use href="#i-retry"/></svg>ДРУГИЕ <span id="perkRerollCost"></span></button>
+  </div>
+</section>
+
+<!-- ═══ ВЫБОР СЛОЖНОСТИ ═══ -->
+<section id="scr-diff" class="screen overlay">
+  <div class="modal diff-modal">
+    <button class="modal-x" id="btnDiffClose" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+    <div class="modal-title">СЛОЖНОСТЬ</div>
+    <div class="diff-lives" id="diffLives"></div>
+    <div class="diff-list" id="diffList"></div>
+    <div class="diff-desc2" id="diffDesc2"></div>
+    <button class="btn primary big wide" id="btnDiffGo"><svg><use href="#i-play"/></svg><span>В БОЙ</span></button>
   </div>
 </section>
 

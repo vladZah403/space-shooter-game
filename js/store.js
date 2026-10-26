@@ -23,7 +23,7 @@
       stats: { games: 0, kills: 0, bosses: 0, bossTypes: [], bestScore: 0, bestWave: 0, maxCombo: 0, playTime: 0,
         coinsEarned: 0, perks: 0, deaths: 0, shots: 0, diff },
       achievements: {},
-      daily: { date: '', missions: [], bonus: false, loginDate: '', streak: 0 },
+      daily: { date: '', missions: [], bonus: false, loginDate: '', streak: 0, seen: '' },
       settings: { music: 70, sfx: 80, musicStyle: 'synthwave', quality: 'auto', vibro: true, sens: 1.25,
         dmgNums: true, shake: true, fps: false, diff: 'normal' },
       lb: [],
@@ -547,7 +547,9 @@
       s.lb = s.lb.slice(0, 20);
 
       // опыт корабля: за врагов, волны и боссов
-      const xp = Math.round(run.kills * 1 + run.wave * 12 + run.bosses * 120 + run.score / 400);
+      // опыт за врагов и очки нормирован на число врагов и множитель очков, затем умножен на опыт сложности
+      const dk = D.DIFFS[run.diff] || D.DIFFS.normal;
+      const xp = Math.round((run.kills / dk.count + run.wave * 12 + run.bosses * 120 + run.score / (400 * dk.score * dk.count)) * dk.xp);
       const lvlBefore = s.shipLvl, xpBefore = s.shipXP;
       const res = this.addShipXP(xp);
 

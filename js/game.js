@@ -72,7 +72,7 @@
       tilt: 0, vxs: 0, alive: true,
       weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, side: 1,
     };
-    p.maxLives = this.diff.lives + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
+    p.maxLives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
     p.lives = p.maxLives;
     p.shield = M.generalLevel('shield') >= 1;
     p.bombs = 1 + M.generalLevel('bombs') + (D.SHIPS[s.ship.model].stats.bombs || 0);
@@ -142,7 +142,8 @@
       multi: pk('multi') + (ship.multi || 0),
       wings: ship.wings || 0,
       magnet: sk('sk_magnet') ? 9999 : 120 * S * (1 + gl('magnet') * 0.2) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
-      coins: this.diff.coins * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1),
+      // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
+      coins: this.diff.coins / this.diff.count * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1),
       luck: (1 + gl('luck') * 0.12) * (1 + pk('luck') * 0.4),
       speed: (1 + (ship.speed || 0)) * (1 + gl('engine') * 0.04) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
       dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0)),
@@ -756,7 +757,7 @@
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
     this.addScore(pts);
     // монеты и кристаллы
-    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1);
+    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1);
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
@@ -1399,7 +1400,7 @@
     const n = this.wave ? this.wave.n + 1 : 1;
     const isBoss = n % 5 === 0;
     const sector = Math.floor((n - 1) / 5);
-    const budget = isBoss ? 0 : 9 + n * 4.4 + Math.pow(n, 1.28);
+    const budget = isBoss ? 0 : (9 + n * 4.4 + Math.pow(n, 1.28)) * this.diff.count;
     this.wave = { n, boss: isBoss, budget, spent: 0, spawnT: 0.8, intro: n === 1 ? 1.2 : 1.6, done: false, clearT: 0, miniDone: !(n % 5 === 3 && n >= 8), startT: this.t };
     this.run.waveDamage = 0;
     if (sector !== this.run.sector) {
@@ -1428,11 +1429,11 @@
     }
     if (!w.done) {
       w.spawnT -= dt;
-      const cap = Math.min(26, 7 + w.n * 0.7);
+      const cap = Math.min(26 * Math.max(1, this.diff.count), (7 + w.n * 0.7) * this.diff.count);
       if (w.spawnT <= 0 && alive < cap) {
         const cost = SS.enemies.spawnGroup(w.n, w.budget - w.spent);
         w.spent += cost;
-        w.spawnT = Math.max(0.42, 1.3 - w.n * 0.035) * U.rand(0.75, 1.25);
+        w.spawnT = Math.max(0.42, 1.3 - w.n * 0.035) * U.rand(0.75, 1.25) / Math.pow(this.diff.count, 0.4);
         if (!w.miniDone && w.spent > w.budget * 0.4) { w.miniDone = true; SS.enemies.spawnMini(w.n); }
         if (w.spent >= w.budget) w.done = true;
       }
@@ -1465,7 +1466,7 @@
     if (!run.bossDamaged) M.unlock('no_damage_boss');
     const pts = Math.round(6000 * (this.wave.n / 5) * this.diff.score);
     this.addScore(pts);
-    this.dropCoins(boss.x, boss.y, Math.round((60 + this.wave.n * 8) * this.st.coins));
+    this.dropCoins(boss.x, boss.y, Math.round((60 + this.wave.n * 8) * this.st.coins * this.diff.count));
     this.dropXp(boss.x, boss.y, 18 + this.wave.n);
     this.dropPowerup(boss.x - 30 * S, boss.y, 'heal');
     this.dropPowerup(boss.x + 30 * S, boss.y);

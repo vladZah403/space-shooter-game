@@ -28,6 +28,25 @@
     $$('[data-back]').forEach((b) => b.addEventListener('click', () => ui.back()));
     $('#btnPlay').addEventListener('click', () => ui.play());
 
+    // выбор сложности перед боем
+    $('#btnDiffClose').addEventListener('click', () => ui.back());
+    $('#scr-diff').addEventListener('click', (e) => { if (e.target.id === 'scr-diff') ui.back(); });
+    $('#diffList').addEventListener('click', (e) => {
+      const b = e.target.closest('.diff-row');
+      if (!b) return;
+      ui._diffSel = b.dataset.diff;
+      $$('#diffList .diff-row').forEach((r) => r.classList.toggle('sel', r === b));
+      A.play('click'); T.haptic('select');
+      syncDiffGo();
+    });
+    $('#btnDiffGo').addEventListener('click', () => {
+      const id = D.DIFFS[ui._diffSel] ? ui._diffSel : 'normal';
+      store.s.settings.diff = id; store.soon();
+      ui.hide('#scr-diff');
+      A.play('click'); T.haptic('medium');
+      ui.startRun(id);
+    });
+
     // вкладки
     tabs('#hangarTabs', (t) => ui.renderHangar(t));
     tabs('#arsenalTabs', (t) => ui.renderArsenal(t));
@@ -136,7 +155,7 @@
   // ════════════════════════════════════════════════════════════
   // ЭКРАНЫ
   // ════════════════════════════════════════════════════════════
-  const SUBS = { hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
+  const SUBS = { hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
 
   ui.show = function (sel) { const el = $(sel); if (el) { el.classList.add('show'); } };
   ui.hide = function (sel) { const el = $(sel); if (el) el.classList.remove('show'); };
@@ -172,11 +191,13 @@
     if (name === 'achievements') ui.renderAchievements();
     if (name === 'settings') ui.renderSettings();
     if (name === 'suggest') ui.renderSuggest();
+    if (name === 'missions') ui.renderMissions();
     updateWallets();
   };
 
   ui.back = function () {
     if (ui.isShown('#scr-dialog')) { ui.hide('#scr-dialog'); return; }
+    if (ui.isShown('#scr-diff')) { A.play('back'); ui.hide('#scr-diff'); if (ui.cur === 'menu') T.back(null); return; }
     if (ui.isShown('#scr-pause')) { game.resume(); return; }
     if (ui.isShown('#scr-gameover')) { ui.toMenu(); return; }
     if (ui.cur && SUBS[ui.cur]) {
@@ -204,30 +225,13 @@
     $('#menuBest').textContent = U.fmt(s.stats.bestScore);
     $('#menuBestWave').textContent = s.stats.bestWave;
     updateWallets();
-    // сложность
-    const ds = $('#diffSelect');
-    if (!ds.children.length) {
-      ds.innerHTML = D.DIFF_ORDER.map((k) => {
-        const d = D.DIFFS[k];
-        return '<button class="diff-btn" data-diff="' + k + '" style="--dc:' + d.color + '"><b>' + (d.short || d.name) + '</b><small>' + ic('heart') + d.lives + '</small></button>';
-      }).join('');
-      ds.addEventListener('click', (e) => {
-        const b = e.target.closest('.diff-btn');
-        if (!b) return;
-        s.settings.diff = b.dataset.diff; store.soon();
-        A.play('click'); T.haptic('select');
-        syncDiff();
-      });
-    }
-    syncDiff();
-    // ежедневные задания
+    // текущая сложность под кнопкой «Играть»
+    const cd = D.DIFFS[s.settings.diff] || D.DIFFS.normal;
+    $('#playSub').innerHTML = 'Сложность: <b style="color:' + cd.color + '">' + cd.name + '</b> • награды ×' + fmtMul(cd.coins);
+    // задания дня — на отдельном экране
     const ms = M.missions();
-    const d = s.daily;
-    $('#dailyCard').innerHTML =
-      '<div class="daily-head"><span>' + ic('target') + 'ЗАДАНИЯ ДНЯ</span><em>' + (d.bonus ? 'Все выполнены ✓' : 'Бонус +' + D.DAILY_BONUS + ' за все') + '</em></div>' +
-      ms.map((m) => '<div class="mission' + (m.done ? ' done' : '') + '"><div class="mission-name">' + (m.done ? '✓ ' : '') + U.escape(M.missionText(m)) + '</div>' +
-        '<div class="mission-reward">' + ic('coin') + m.reward + '</div>' +
-        '<div class="mission-bar"><i style="width:' + Math.min(100, m.progress / m.goal * 100) + '%"></i></div></div>').join('');
+    $('#missionCount').textContent = ms.filter((m) => m.done).length + ' / ' + ms.length;
+    $('#badgeMissions').hidden = !(M.loginStatus().available || s.daily.seen !== U.today());
     // счётчики
     $('#achCount').textContent = Object.keys(s.achievements).length + ' / ' + D.ACHIEVEMENTS.length;
     $('#badgeSkills').hidden = M.skillPoints() <= 0;
@@ -238,21 +242,13 @@
 
   // свободное место между логотипом и выбором сложности — там летает корабль
   ui.measureMenuSlot = function () {
-    const a = $('.best-row'), b = $('#diffSelect');
+    const a = $('.best-row'), b = $('#btnPlay');
     if (!a || !b || !ui.isShown('#scr-menu')) return;
     const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
     const top = ra.bottom + 8, bottom = rb.top - 8;
     game.attract.slot = { y: (top + bottom) / 2 - 10, h: bottom - top };
   };
 
-  function syncDiff() {
-    const id = store.s.settings.diff;
-    $$('#diffSelect .diff-btn').forEach((b) => b.classList.toggle('active', b.dataset.diff === id));
-    const d = D.DIFFS[id];
-    $('#diffDesc').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b> — ' + d.desc + (d.score !== 1 ? ' • очки ×' + d.score : '');
-    const act = $('#diffSelect .diff-btn.active');
-    if (act && act.scrollIntoView) { try { act.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) {} }
-  }
   function canAffordSomething() {
     const s = store.s, c = s.coins;
     for (const wid of D.WEAPON_ORDER) {
@@ -281,7 +277,93 @@
     A.unlock();
     A.play('click');
     T.haptic('medium');
-    ui.startRun(store.s.settings.diff);
+    ui.showDiff();
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // ВЫБОР СЛОЖНОСТИ
+  // ════════════════════════════════════════════════════════════
+  function fmtMul(v) { return String(Math.round(v * 100) / 100).replace('.', ','); }
+  function pct(v) { const d = Math.round((v - 1) * 100); return (d > 0 ? '+' : '−') + Math.abs(d) + '%'; }
+  // совет: следующая сложность, когда на текущей пройдено 25 волн
+  function recommendedDiff() {
+    const st = store.s.stats.diff, order = D.DIFF_ORDER;
+    let rec = 'normal';
+    for (const id of ['normal', 'hard', 'nightmare']) if (((st[id] && st[id].wave) || 0) >= 25) rec = order[order.indexOf(id) + 1];
+    return rec;
+  }
+  function syncDiffGo() {
+    const d = D.DIFFS[ui._diffSel] || D.DIFFS.normal;
+    $('#btnDiffGo span').textContent = 'В БОЙ • ' + (d.short || d.name);
+    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc;
+  }
+  ui.showDiff = function () {
+    const s = store.s;
+    ui._diffSel = D.DIFFS[s.settings.diff] ? s.settings.diff : 'normal';
+    const rec = recommendedDiff();
+    const lives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
+    $('#diffLives').innerHTML = ic('heart') + 'Жизней: <b>' + lives + '</b> на любой сложности';
+    $('#diffList').innerHTML = D.DIFF_ORDER.map((id) => {
+      const d = D.DIFFS[id], best = s.stats.diff[id] || { wave: 0 };
+      const meta = [['Враги', d.count], ['Броня', d.hp], ['Огонь', d.fire]]
+        .filter((x) => x[1] !== 1).map((x) => '<span class="' + (x[1] > 1 ? 'up' : 'down') + '">' + x[0] + ' <b>' + pct(x[1]) + '</b></span>').join('');
+      return '<button class="diff-row' + (id === ui._diffSel ? ' sel' : '') + '" data-diff="' + id + '" style="--dc:' + d.color + '">' +
+        '<div class="dr-main"><div class="diff-name">' + d.name + (id === rec ? '<span class="diff-rec">СОВЕТУЕМ</span>' : '') +
+        (best.wave ? '<span class="diff-best">рекорд: волна ' + best.wave + '</span>' : '') + '</div>' +
+        '<div class="diff-meta">' + (meta || '<span>Обычные враги и награды</span>') + '</div></div>' +
+        '<div class="diff-rew">' + ic('coin') + ' ×' + fmtMul(d.coins) + '<small>опыт ×' + fmtMul(d.xp) + '</small></div></button>';
+    }).join('');
+    syncDiffGo();
+    ui.show('#scr-diff');
+    T.back(() => ui.back());
+    requestAnimationFrame(() => { const el = $('#diffList .diff-row.sel'); if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} } });
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // ЗАДАНИЯ
+  // ════════════════════════════════════════════════════════════
+  function fmtProg(m) {
+    const p = Math.floor(Math.min(m.progress, m.goal));
+    return U.fmt(p) + ' / ' + U.fmt(m.goal) + (m.id === 'minutes' ? ' мин' : '');
+  }
+  function tickMsTimer() {
+    const el = $('#msTimer');
+    if (!el) return;
+    const now = new Date(), next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const mins = Math.max(1, Math.round((next - now) / 60000));
+    el.textContent = 'Новые через ' + (mins >= 60 ? Math.floor(mins / 60) + ' ч ' : '') + (mins % 60) + ' мин';
+  }
+  ui.renderMissions = function () {
+    const s = store.s, d = s.daily, ms = M.missions();
+    if (d.seen !== U.today()) { d.seen = U.today(); store.soon(); }
+    let h = '<div class="ms-card"><div class="ms-head"><h3>' + ic('target') + 'ЗАДАНИЯ ДНЯ</h3><div class="ms-timer" id="msTimer"></div></div>';
+    h += ms.map((m) => {
+      const k = Math.min(1, m.progress / m.goal);
+      return '<div class="ms-row' + (m.done ? ' done' : '') + '"><div class="ms-check">' + (m.done ? ic('check') : '<small>' + Math.floor(k * 100) + '%</small>') + '</div>' +
+        '<div class="ms-text">' + U.escape(M.missionText(m)) + '</div><div class="ms-rew">' + ic('coin') + m.reward + '</div>' +
+        '<div class="ms-prog"><div class="ms-bar"><i style="width:' + (k * 100) + '%"></i></div><div class="ms-num">' + fmtProg(m) + '</div></div></div>';
+    }).join('');
+    h += '<div class="ms-bonus' + (d.bonus ? ' done' : '') + '"><span>' + ic(d.bonus ? 'check' : 'gift') + (d.bonus ? 'Бонус за все задания получен' : 'Бонус за все три задания') + '</span><span class="ms-rew">' + ic('coin') + D.DAILY_BONUS + '</span></div></div>';
+    h += '<div class="ms-hint">Прогресс засчитывается во время игры, награда приходит сразу</div>';
+    const st = M.loginStatus();
+    h += '<div class="ms-card ms-login"><div class="ms-head"><h3>' + ic('gift') + 'НАГРАДА ЗА ВХОД</h3><div class="ms-timer">' + (st.streak > 1 ? 'Серия: ' + st.streak + ' ' + U.plural(st.streak, 'день', 'дня', 'дней') : '') + '</div></div>';
+    h += '<div class="login-days">' + D.LOGIN.map((r, i) => {
+      const cls = i < st.day ? 'got' : (i === st.day ? (st.available ? 'today' : 'got') : '');
+      return '<div class="lday ' + cls + (i === 6 ? ' big' : '') + '"><small>День ' + (i + 1) + '</small>' + ic(i === 6 ? 'gift' : 'coin') + '<b>' + r.coins + (r.sp ? ' + ✦' : '') + '</b></div>';
+    }).join('') + '</div>';
+    h += st.available ? '<button class="btn gold wide" id="msClaim">' + ic('gift') + 'ЗАБРАТЬ НАГРАДУ</button>' : '<div class="ms-hint" style="margin:2px 0 0">Следующая награда завтра. Заходите каждый день, чтобы серия не прервалась</div>';
+    h += '</div>';
+    $('#missionsBody').innerHTML = h;
+    const cb = $('#msClaim');
+    if (cb) cb.addEventListener('click', () => {
+      const r = M.claimLogin();
+      if (r) { A.play('buy'); T.haptic('success'); ui.toast({ ico: '🎁', title: 'НАГРАДА', text: '+' + r.coins + ' монет' + (r.sp ? ' и +1 очко навыка' : '') }); }
+      updateWallets();
+      ui.renderMissions();
+    });
+    tickMsTimer();
+    clearInterval(ui._msTimer);
+    ui._msTimer = setInterval(() => { if (ui.cur !== 'missions') { clearInterval(ui._msTimer); return; } tickMsTimer(); }, 30000);
   };
 
   ui.startRun = function (diffId) {
@@ -580,7 +662,7 @@
     const s = store.s;
     $('#goTitle').textContent = sum.isRecord ? 'НОВЫЙ РЕКОРД' : 'КОРАБЛЬ ПОДБИТ';
     $('#goTitle').classList.toggle('win', !!sum.isRecord);
-    $('#goSub').textContent = D.DIFFS[sum.diff].name + ' • Сектор ' + (sum.sector + 1) + ' • Волна ' + sum.wave;
+    $('#goSub').textContent = D.DIFFS[sum.diff].name + ' • награды ×' + fmtMul(D.DIFFS[sum.diff].coins) + ' • Волна ' + sum.wave;
     $('#goRecord').hidden = !sum.isRecord;
     $('#goBest').textContent = U.fmt(s.stats.bestScore);
     $('#goStats').innerHTML = [
@@ -767,80 +849,125 @@
   // АРСЕНАЛ
   // ════════════════════════════════════════════════════════════
   ui.renderArsenal = function (tab) {
-    const s = store.s;
     updateWallets();
-    // слоты
-    const slots = $('#loadoutSlots');
-    let h = '';
-    for (let i = 0; i < 3; i++) {
-      const wid = s.weapons.loadout[i];
-      if (wid) { const w = D.WEAPONS[wid]; h += '<div class="lo-slot filled" style="--wc:' + w.color + '"><span class="num">' + (i + 1) + '</span><canvas class="wico" data-wi="' + wid + '" width="68" height="68"></canvas><b>' + w.name + '</b></div>'; }
-      else h += '<div class="lo-slot">пусто</div>';
-    }
-    slots.innerHTML = h;
-    $$('canvas[data-wi]', slots).forEach((c) => c.getContext('2d').drawImage(G.weaponIcon(c.dataset.wi, 68), 0, 0));
     const list = $('#arsenalList');
-    list.innerHTML = '';
-    if (tab === 'weapons') {
-      for (const wid of D.WEAPON_ORDER) {
-        const w = D.WEAPONS[wid], owned = s.weapons.owned.includes(wid), inLo = s.weapons.loadout.includes(wid);
-        const card = document.createElement('div');
-        card.className = 'wpn-card';
-        card.style.setProperty('--wc', w.color);
-        let rows = '';
-        if (owned) {
-          rows = '<div class="upg-rows">' + w.ups.map((up) => {
-            const lvl = M.weaponLevel(wid, up.id), max = lvl >= up.max;
-            const cur = up.abs ? lvl * up.step : Math.round(lvl * up.step * 100);
-            const pips = Array.from({ length: up.max }, (_, i) => '<i class="' + (i < lvl ? 'on' : '') + '"></i>').join('');
-            return '<div class="upg-row"><div class="upg-row-name">' + up.name + (lvl ? ' <em>+' + cur + up.unit + '</em>' : '') + '</div>' +
-              '<div class="upg-pips">' + pips + '</div>' +
-              (max ? '<button class="btn sm upg-buy max" disabled>' + ic('check') + 'MAX</button>' : '<button class="btn sm upg-buy" data-up="' + up.id + '"' + (s.coins < up.costs[lvl] && !SS.DEV ? ' disabled' : '') + '>' + ic('coin', 'coin-ico') + U.fmt(up.costs[lvl]) + '</button>') + '</div>';
-          }).join('') + '</div>';
-        }
-        card.innerHTML = '<div class="wpn-top"><div class="wpn-ico"><canvas width="80" height="80"></canvas></div><div class="wpn-info"><div class="wpn-name">' + w.name + (inLo ? '<span class="tag">в бою</span>' : '') + '</div><div class="wpn-desc">' + w.desc + '</div></div><div class="wpn-act">' +
-          (owned ? '<button class="btn sm sel-toggle' + (inLo ? ' on' : '') + '" data-lo="1">' + (inLo ? ic('check') + 'ВЗЯТО' : ic('plus') + 'ВЗЯТЬ') + '</button>'
-            : '<button class="btn sm gold" data-buy="1"' + (s.coins < w.price && !SS.DEV ? ' disabled' : '') + '>' + ic('coin', 'coin-ico') + U.fmt(w.price) + '</button>') + '</div></div>' + rows;
-        card.querySelector('canvas').getContext('2d').drawImage(G.weaponIcon(wid, 80), 0, 0);
-        card.addEventListener('click', (e) => {
-          const b = e.target.closest('button');
-          if (!b || b.disabled) return;
-          if (b.dataset.buy) {
-            ui.dialog({ ico: 'swords', title: w.name, text: w.desc + '\n\nЦена: ' + U.fmt(w.price) + ' монет', ok: 'КУПИТЬ', onOk: () => {
-              if (M.buyWeapon(wid)) { A.play('buy'); T.haptic('success'); ui.toast({ ico: '⚔️', title: 'НОВОЕ ОРУЖИЕ', text: w.name, info: true }); } else A.play('error');
-              ui.renderArsenal('weapons');
-            } });
-          } else if (b.dataset.lo) {
-            if (inLo && s.weapons.loadout.length <= 1) { A.play('error'); ui.toast({ ico: '⚠️', title: 'НУЖНО ОРУЖИЕ', text: 'Хотя бы одно оружие должно быть в бою', info: true }); return; }
-            M.toggleLoadout(wid); A.play('click'); T.haptic('select'); ui.renderArsenal('weapons');
-          } else if (b.dataset.up) {
-            if (M.buyWeaponUp(wid, b.dataset.up)) { A.play('buy'); T.haptic('light'); } else A.play('error');
-            ui.renderArsenal('weapons');
-          }
-        });
-        list.appendChild(card);
-      }
-    } else {
-      const card = document.createElement('div');
-      card.className = 'wpn-card';
-      card.style.setProperty('--wc', '#ffc83d');
-      card.innerHTML = '<div class="upg-rows">' + D.GENERAL.map((g) => {
-        const lvl = M.generalLevel(g.id), max = lvl >= g.max;
-        const cur = g.levelText ? (lvl ? g.levelText[lvl - 1] : '') : (lvl ? '+' + (g.abs ? lvl * g.step : Math.round(lvl * g.step * 100)) + g.unit : '');
-        const pips = Array.from({ length: g.max }, (_, i) => '<i class="' + (i < lvl ? 'on' : '') + '"></i>').join('');
-        return '<div class="upg-row"><div class="upg-row-name">' + g.ico + ' ' + g.name + (cur ? ' <em>' + cur + '</em>' : '') + '</div><div class="upg-pips">' + pips + '</div>' +
-          (max ? '<button class="btn sm upg-buy max" disabled>' + ic('check') + 'MAX</button>' : '<button class="btn sm upg-buy" data-g="' + g.id + '"' + (s.coins < g.costs[lvl] && !SS.DEV ? ' disabled' : '') + '>' + ic('coin', 'coin-ico') + U.fmt(g.costs[lvl]) + '</button>') + '</div>';
-      }).join('') + '</div>';
-      card.addEventListener('click', (e) => {
-        const b = e.target.closest('button[data-g]');
-        if (!b || b.disabled) return;
-        if (M.buyGeneral(b.dataset.g)) { A.play('buy'); T.haptic('light'); } else A.play('error');
-        ui.renderArsenal('general');
-      });
-      list.appendChild(card);
-      list.insertAdjacentHTML('beforeend', '<div class="hint-txt">Прокачка действует на все корабли и всё оружие</div>');
-    }
+    if (tab === 'weapons') renderWeapons(list); else renderGeneral(list);
   };
+
+  function segs(v, n) { return Array.from({ length: n }, (_, i) => '<i class="' + (i < v ? 'on' : '') + '"></i>').join(''); }
+  // эффект улучшения на уровне lvl: «+24% урона», «+2 прыжок» или текст уровня
+  function effText(up, lvl) {
+    if (up.levelText) return up.levelText[lvl - 1];
+    const v = up.abs ? lvl * up.step : Math.round(lvl * up.step * 100);
+    return '+' + v + (up.abs && up.units ? U.plural(v, up.units[0], up.units[1], up.units[2]) : up.unit);
+  }
+  function upRow(up, lvl, attr) {
+    const s = store.s, max = lvl >= up.max;
+    const cost = max ? 0 : up.costs[lvl], poor = !max && s.coins < cost && !SS.DEV;
+    const eff = max ? '<b>' + effText(up, lvl) + '</b> • максимум'
+      : (lvl ? effText(up, lvl) : 'Сейчас нет') + '<span class="arr">›</span><b>' + effText(up, lvl + 1) + '</b>';
+    return '<div class="up2"><div class="up2-name">' + (up.ico ? '<span class="gen-ico">' + up.ico + '</span>' : '') + up.name + ' <small>' + lvl + '/' + up.max + '</small></div>' +
+      '<div class="up2-eff">' + eff + '</div><div class="segs">' + segs(lvl, up.max) + '</div>' +
+      (max ? '<button class="btn sm up2-buy max" disabled>' + ic('check') + 'MAX</button>'
+        : '<button class="btn sm up2-buy ' + (poor ? 'poor' : 'gold') + '" ' + attr + (poor ? ' disabled' : '') + '><span class="pr">' + ic('coin', 'coin-ico') + U.fmt(cost) + '</span><small>' + (poor ? 'не хватает' : 'улучшить') + '</small></button>') + '</div>';
+  }
+  function weaponLevels(wid) { const o = {}; for (const up of D.WEAPONS[wid].ups) o[up.id] = M.weaponLevel(wid, up.id); return o; }
+  // примерный урон в секунду с учётом прокачки оружия и корабля (без улучшений забега)
+  function weaponPower(wid) {
+    const w = D.WEAPONS[wid], b = w.base, lv = weaponLevels(wid);
+    const gen = (1 + M.generalLevel('power') * 0.07) * (1 + M.generalLevel('rate') * 0.05);
+    const dm = 1 + (lv.dmg || 0) * 0.12, cd = b.cd / (1 + (lv.rate || 0) * 0.08);
+    let dps = 0;
+    if (wid === 'laser' || wid === 'arc') dps = b.dmg * dm / cd;
+    else if (wid === 'shotgun') dps = b.dmg * dm * (b.pellets + (lv.pellets || 0)) * 0.65 / cd;
+    else if (wid === 'rocket') dps = (b.dmg + b.aoe * 0.5) * dm * (b.salvo + (lv.salvo || 0)) / cd;
+    else if (wid === 'plasma') dps = (b.dmg + b.aoe) * dm / cd;
+    else if (wid === 'lightning') { let k = 0, f = 1; for (let i = 0; i <= b.chain + (lv.chain || 0); i++) { k += f; f *= b.falloff; } dps = b.dmg * dm * k / cd; }
+    else if (wid === 'darkmatter') dps = (b.dmg * (b.life / b.tick) * 0.6 + b.burst) * dm / cd;
+    return Math.round(dps * gen);
+  }
+  function canUpgrade(wid) {
+    const c = store.s.coins;
+    return D.WEAPONS[wid].ups.some((up) => { const l = M.weaponLevel(wid, up.id); return l < up.max && c >= up.costs[l]; });
+  }
+  function weaponDetail(wid) {
+    const s = store.s, w = D.WEAPONS[wid], r = w.rate || {};
+    const owned = s.weapons.owned.includes(wid), slot = s.weapons.loadout.indexOf(wid);
+    let h = '<div class="ad-head"><div class="ad-ico"><canvas data-wi="' + wid + '" width="104" height="104"></canvas></div><div>' +
+      '<div class="ad-name">' + w.name + (slot >= 0 ? '<span class="tag">В БОЮ • ' + (slot + 1) + '</span>' : '') + '</div>' +
+      '<div class="ad-tags">' + (w.tags || []).map((t) => '<span>' + t + '</span>').join('') + '</div></div></div>';
+    h += '<div class="ad-desc">' + w.desc + '</div>';
+    h += '<div class="ad-stats">' + [['Урон', r.dmg], ['Скорострельность', r.speed], ['Площадь', r.area], ['Дальность', r.range]]
+      .map((x) => '<span>' + x[0] + '</span><div class="segs">' + segs(x[1] || 0, 5) + '</div>').join('') + '</div>';
+    h += '<div class="ad-power"><span>Урон в секунду<br>с вашей прокачкой</span><b>≈ ' + U.fmt(weaponPower(wid)) + '</b></div>';
+    if (owned) {
+      const total = w.ups.reduce((a, up) => a + up.max, 0), got = w.ups.reduce((a, up) => a + M.weaponLevel(wid, up.id), 0);
+      h += '<div class="ad-sec">ПРОКАЧКА<small>' + got + ' из ' + total + '</small></div>';
+      h += w.ups.map((up) => upRow(up, M.weaponLevel(wid, up.id), 'data-up="' + up.id + '"')).join('');
+      h += '<div class="ad-actions">' + (slot >= 0
+        ? '<button class="btn on-green" data-lo="1">' + ic('check') + 'В БОЮ • УБРАТЬ</button>'
+        : '<button class="btn primary" data-lo="1">' + ic('plus') + 'ВЗЯТЬ В БОЙ</button>') + '</div>';
+    } else {
+      const poor = s.coins < w.price && !SS.DEV;
+      h += '<div class="ad-actions"><button class="btn gold" data-buy="1"' + (poor ? ' disabled' : '') + '>' + ic('coin', 'coin-ico') + 'КУПИТЬ ЗА ' + U.fmt(w.price) + '</button></div>';
+      if (poor) h += '<div class="locked-note">' + ic('lock') + 'Не хватает ' + U.fmt(w.price - s.coins) + ' монет. Монеты падают с врагов и даются за задания дня.</div>';
+    }
+    return h;
+  }
+  function renderWeapons(list) {
+    const s = store.s, lo = s.weapons.loadout;
+    if (!D.WEAPONS[ui._ars]) ui._ars = lo[0] || 'laser';
+    const wid = ui._ars, w = D.WEAPONS[wid];
+    let h = '<div class="ars-hint"><b>В бою ' + lo.length + ' из 3.</b> Нажмите на оружие, чтобы прокачать его или взять в бой. В игре оружие переключается кнопками внизу экрана.</div>';
+    h += '<div class="ars-grid">' + D.WEAPON_ORDER.map((id) => {
+      const d = D.WEAPONS[id], own = s.weapons.owned.includes(id), sl = lo.indexOf(id);
+      const poor = !own && s.coins < d.price && !SS.DEV;
+      const st = own ? (sl >= 0 ? ic('check') + 'В БОЮ' : 'Куплено') : ic('lock') + U.fmt(d.price);
+      return '<button class="ars-tile' + (id === wid ? ' sel' : '') + (own ? '' : ' locked') + (poor ? ' poor' : '') + (sl >= 0 ? ' inlo' : '') + '" data-pick="' + id + '" style="--wc:' + d.color + '">' +
+        (sl >= 0 ? '<span class="slot-n">' + (sl + 1) + '</span>' : '') + (own && canUpgrade(id) ? '<i class="upd"></i>' : '') +
+        '<canvas data-wi="' + id + '" width="80" height="80"></canvas><b>' + d.name + '</b><span class="st">' + st + '</span></button>';
+    }).join('') + '</div>';
+    h += '<div class="ad" style="--wc:' + w.color + '">' + weaponDetail(wid) + '</div>';
+    list.innerHTML = h;
+    $$('canvas[data-wi]', list).forEach((c) => c.getContext('2d').drawImage(G.weaponIcon(c.dataset.wi, c.width), 0, 0));
+    list.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled) return;
+      if (b.dataset.pick) { ui._ars = b.dataset.pick; A.play('click'); T.haptic('select'); ui.renderArsenal('weapons'); return; }
+      const id = ui._ars, def = D.WEAPONS[id];
+      if (b.dataset.buy) {
+        ui.dialog({ ico: 'swords', title: def.name, text: def.desc + '\n\nЦена: ' + U.fmt(def.price) + ' монет', ok: 'КУПИТЬ', onOk: () => {
+          if (M.buyWeapon(id)) {
+            A.play('buy'); T.haptic('success');
+            ui.toast({ ico: '⚔️', title: 'НОВОЕ ОРУЖИЕ', text: def.name + (store.s.weapons.loadout.includes(id) ? ' • уже в бою' : ''), info: true });
+          } else A.play('error');
+          ui.renderArsenal('weapons');
+        } });
+      } else if (b.dataset.lo) {
+        const cur = store.s.weapons.loadout, inLo = cur.includes(id);
+        if (inLo && cur.length <= 1) { A.play('error'); ui.toast({ ico: '⚠️', title: 'НУЖНО ОРУЖИЕ', text: 'Хотя бы одно оружие должно быть в бою', info: true }); return; }
+        const out = !inLo && cur.length >= 3 ? cur[0] : null;
+        M.toggleLoadout(id); A.play('click'); T.haptic('select');
+        if (out) ui.toast({ ico: '🔁', title: 'ЗАМЕНА', text: D.WEAPONS[out].name + ' убран из боя', info: true, dur: 1600 });
+        ui.renderArsenal('weapons');
+      } else if (b.dataset.up) {
+        if (M.buyWeaponUp(id, b.dataset.up)) { A.play('buy'); T.haptic('light'); } else A.play('error');
+        ui.renderArsenal('weapons');
+      }
+    };
+  }
+  function renderGeneral(list) {
+    let h = '<div class="ars-hint">Прокачка корабля действует на всё оружие и на все корабли.</div><div class="gen-card">';
+    h += D.GENERAL.map((g) => upRow(g, M.generalLevel(g.id), 'data-g="' + g.id + '"')).join('');
+    h += '</div>';
+    list.innerHTML = h;
+    list.onclick = (e) => {
+      const b = e.target.closest('button[data-g]');
+      if (!b || b.disabled) return;
+      if (M.buyGeneral(b.dataset.g)) { A.play('buy'); T.haptic('light'); } else A.play('error');
+      ui.renderArsenal('general');
+    };
+  }
 
   // ════════════════════════════════════════════════════════════
   // НАВЫКИ

@@ -10,14 +10,18 @@
   const D = {};
 
   // ── Сложности ────────────────────────────────────────────────
-  // hp/spd/fire/bspd — множители прочности, скорости врагов, частоты и скорости их стрельбы
+  // Жизни у корабля всегда одинаковые (BASE_LIVES + прокачка и бонусы корабля).
+  // Сложность меняет врагов: count — сколько их в волне, hp — прочность, spd — скорость,
+  // fire/bspd — частота и скорость их стрельбы, elite — шанс элиты.
+  // И награды: coins — монеты, score — очки, xp — опыт корабля.
+  D.BASE_LIVES = 4;
   D.DIFFS = {
-    zen:       { name: 'ЗЕН',       color: '#3dffd0', lives: 6, hp: 0.55, spd: 0.78, fire: 0.45, bspd: 0.75, score: 0.5, coins: 0.6, elite: 0,    desc: 'Спокойный полёт и мало пуль' },
-    easy:      { name: 'ЛЕГКО',     color: '#3dffa2', lives: 5, hp: 0.75, spd: 0.88, fire: 0.7,  bspd: 0.85, score: 0.8, coins: 0.85, elite: 0,   desc: 'Для разминки' },
-    normal:    { name: 'НОРМА',     color: '#3de0ff', lives: 4, hp: 1,    spd: 1,    fire: 1,    bspd: 1,    score: 1,   coins: 1,   elite: 0.03, desc: 'Задуманный баланс' },
-    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lives: 3, hp: 1.35, spd: 1.1,  fire: 1.35, bspd: 1.12, score: 1.6, coins: 1.3, elite: 0.08, desc: 'Элитные враги и больше пуль' },
-    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lives: 2, hp: 1.8,  spd: 1.2,  fire: 1.7,  bspd: 1.25, score: 2.4, coins: 1.7, elite: 0.15, desc: 'Для ветеранов' },
-    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lives: 1, hp: 2.4, spd: 1.32, fire: 2.1, bspd: 1.38, score: 3.5, coins: 2.2, elite: 0.25, desc: 'Одна жизнь. Пощады не будет' },
+    zen:       { name: 'ЗЕН',       color: '#3dffd0', count: 0.65, hp: 0.6,  spd: 0.8,  fire: 0.45, bspd: 0.75, elite: 0,    coins: 0.5,  score: 0.4, xp: 0.5,  desc: 'Мало врагов и пуль — спокойный полёт' },
+    easy:      { name: 'ЛЕГКО',     color: '#3dffa2', count: 0.8,  hp: 0.8,  spd: 0.9,  fire: 0.7,  bspd: 0.85, elite: 0,    coins: 0.75, score: 0.7, xp: 0.75, desc: 'Враги слабее и реже стреляют' },
+    normal:    { name: 'НОРМА',     color: '#3de0ff', count: 1,    hp: 1,    spd: 1,    fire: 1,    bspd: 1,    elite: 0.03, coins: 1,    score: 1,   xp: 1,    desc: 'Задуманный баланс' },
+    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', count: 1.25, hp: 1.3,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1.6, xp: 1.35, desc: 'Больше врагов, элита встречается чаще' },
+    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', count: 1.5,  hp: 1.7,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 2.4, xp: 1.75, desc: 'Плотный огонь и крепкие враги' },
+    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', count: 1.8, hp: 2.2, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 3.5, xp: 2.3, desc: 'Испытание для лучших пилотов' },
   };
   D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god'];
 
@@ -26,7 +30,7 @@
   const C = (a) => a; // для читаемости массивов цен
   D.WEAPONS = {
     laser: {
-      name: 'ЛАЗЕР', color: '#3de0ff', price: 0,
+      name: 'ЛАЗЕР', color: '#3de0ff', price: 0, rate: { dmg: 2, speed: 5, area: 1, range: 5 }, tags: ['Точный', 'Дальний бой'],
       desc: 'Скорострельные импульсы. Надёжен против всего.',
       base: { dmg: 10, cd: 0.14, speed: 1050, pierce: 0 },
       ups: [
@@ -36,27 +40,27 @@
       ],
     },
     shotgun: {
-      name: 'ДРОБОВИК', color: '#ffc83d', price: 600,
+      name: 'ДРОБОВИК', color: '#ffc83d', price: 600, rate: { dmg: 4, speed: 2, area: 3, range: 1 }, tags: ['Ближний бой', 'Против роя'],
       desc: 'Веер дроби в упор. Идеален против роя.',
       base: { dmg: 9, cd: 0.48, speed: 860, pellets: 5, life: 0.52 },
       ups: [
         { id: 'dmg', name: 'Мощность', max: 8, step: 0.12, unit: '% урона', costs: C([70, 120, 190, 290, 430, 630, 900, 1300]) },
-        { id: 'pellets', name: 'Дробинки', max: 4, step: 1, unit: ' дробинки', abs: true, costs: C([250, 550, 1000, 1700]) },
+        { id: 'pellets', name: 'Дробинки', max: 4, step: 1, unit: ' дробинки', units: [' дробинка', ' дробинки', ' дробинок'], abs: true, costs: C([250, 550, 1000, 1700]) },
         { id: 'rate', name: 'Перезарядка', max: 6, step: 0.08, unit: '% темпа', costs: C([90, 160, 260, 400, 600, 880]) },
       ],
     },
     rocket: {
-      name: 'РАКЕТЫ', color: '#ff8a3d', price: 900,
+      name: 'РАКЕТЫ', color: '#ff8a3d', price: 900, rate: { dmg: 3, speed: 2, area: 3, range: 5 }, tags: ['Самонаведение', 'Взрыв'],
       desc: 'Самонаводящиеся ракеты со взрывом. Не промахиваются.',
       base: { dmg: 26, aoe: 18, radius: 56, cd: 0.44, speed: 540, salvo: 1 },
       ups: [
         { id: 'dmg', name: 'Боеголовка', max: 8, step: 0.12, unit: '% урона', costs: C([80, 130, 210, 320, 480, 700, 1000, 1450]) },
         { id: 'aoe', name: 'Радиус взрыва', max: 5, step: 0.15, unit: '% радиуса', costs: C([150, 260, 420, 640, 950]) },
-        { id: 'salvo', name: 'Залп', max: 2, step: 1, unit: ' ракета в залпе', abs: true, costs: C([900, 2200]) },
+        { id: 'salvo', name: 'Залп', max: 2, step: 1, unit: ' ракета в залпе', units: [' ракета в залпе', ' ракеты в залпе', ' ракет в залпе'], abs: true, costs: C([900, 2200]) },
       ],
     },
     arc: {
-      name: 'ДУГА', color: '#7ff6ff', price: 1200,
+      name: 'ДУГА', color: '#7ff6ff', price: 1200, rate: { dmg: 3, speed: 3, area: 4, range: 2 }, tags: ['Все цели впереди', 'Ближний бой'],
       desc: 'Электрическая дуга бьёт всех врагов впереди корабля.',
       base: { dmg: 26, cd: 0.42, range: 225, angle: 0.95 },
       ups: [
@@ -66,7 +70,7 @@
       ],
     },
     plasma: {
-      name: 'ПЛАЗМА', color: '#ff5cf0', price: 1500,
+      name: 'ПЛАЗМА', color: '#ff5cf0', price: 1500, rate: { dmg: 5, speed: 1, area: 4, range: 4 }, tags: ['Мощный взрыв', 'Медленный снаряд'],
       desc: 'Медленный шар с огромным взрывом. Лучший урон по площади.',
       base: { dmg: 34, aoe: 28, radius: 72, cd: 0.72, speed: 430 },
       ups: [
@@ -76,17 +80,17 @@
       ],
     },
     lightning: {
-      name: 'МОЛНИЯ', color: '#fff36b', price: 2500,
+      name: 'МОЛНИЯ', color: '#fff36b', price: 2500, rate: { dmg: 2, speed: 3, area: 4, range: 4 }, tags: ['Цепная', 'Автонаведение'],
       desc: 'Цепная молния сама находит цели и прыгает между врагами.',
       base: { dmg: 14, cd: 0.32, chain: 3, range: 150, falloff: 0.8 },
       ups: [
         { id: 'dmg', name: 'Разряд', max: 8, step: 0.12, unit: '% урона', costs: C([110, 180, 290, 440, 650, 940, 1350, 1900]) },
-        { id: 'chain', name: 'Прыжки', max: 4, step: 1, unit: ' прыжок', abs: true, costs: C([300, 650, 1200, 2000]) },
+        { id: 'chain', name: 'Прыжки', max: 4, step: 1, unit: ' прыжок', units: [' прыжок', ' прыжка', ' прыжков'], abs: true, costs: C([300, 650, 1200, 2000]) },
         { id: 'range', name: 'Радиус цепи', max: 4, step: 0.15, unit: '% радиуса', costs: C([200, 350, 560, 860]) },
       ],
     },
     darkmatter: {
-      name: 'Т. МАТЕРИЯ', color: '#b06bff', price: 3500,
+      name: 'Т. МАТЕРИЯ', color: '#b06bff', price: 3500, rate: { dmg: 3, speed: 1, area: 5, range: 3 }, tags: ['Притяжение', 'Контроль толпы'],
       desc: 'Сфера притягивает врагов, жжёт их и схлопывается взрывом.',
       base: { dmg: 10, tick: 0.15, burst: 60, radius: 62, cd: 0.95, speed: 360, life: 1.3, pull: 160 },
       ups: [
@@ -103,13 +107,13 @@
     { id: 'power',   name: 'Мощь орудий',      ico: '💥', max: 10, step: 0.07, unit: '% урона',       costs: [100, 160, 240, 350, 500, 700, 950, 1300, 1750, 2300] },
     { id: 'rate',    name: 'Охлаждение',       ico: '⚡', max: 8,  step: 0.05, unit: '% темпа',       costs: [120, 200, 300, 450, 650, 900, 1250, 1700] },
     { id: 'crit',    name: 'Прицел',           ico: '🎯', max: 6,  step: 0.04, unit: '% шанс крита',  costs: [150, 250, 400, 600, 900, 1300] },
-    { id: 'hull',    name: 'Броня корпуса',    ico: '❤️', max: 3,  step: 1,    unit: ' жизнь',        abs: true, costs: [900, 2200, 4500] },
+    { id: 'hull',    name: 'Броня корпуса',    ico: '❤️', max: 3,  step: 1,    unit: ' жизнь', units: [' жизнь', ' жизни', ' жизней'], abs: true, costs: [900, 2200, 4500] },
     { id: 'shield',  name: 'Генератор щита',   ico: '🛡️', max: 3,  step: 1,    unit: '',              abs: true, costs: [600, 1400, 2800],
       levelText: ['Щит на старте', 'Щит восстанавливается каждые 40 с', 'Восстановление каждые 25 с'] },
     { id: 'magnet',  name: 'Магнит',           ico: '🧲', max: 6,  step: 0.2,  unit: '% радиус сбора', costs: [100, 170, 260, 380, 550, 800] },
     { id: 'engine',  name: 'Двигатели',        ico: '🚀', max: 5,  step: 0.04, unit: '% скорости',     costs: [150, 260, 420, 650, 950] },
     { id: 'greed',   name: 'Сборщик',          ico: '💰', max: 8,  step: 0.06, unit: '% монет',        costs: [150, 240, 360, 520, 750, 1050, 1450, 2000] },
-    { id: 'bombs',   name: 'Бомбовый отсек',   ico: '💣', max: 3,  step: 1,    unit: ' бомба на старте', abs: true, costs: [300, 800, 1800] },
+    { id: 'bombs',   name: 'Бомбовый отсек',   ico: '💣', max: 3,  step: 1,    unit: ' бомба на старте', units: [' бомба на старте', ' бомбы на старте', ' бомб на старте'], abs: true, costs: [300, 800, 1800] },
     { id: 'bombdmg', name: 'Мощность бомбы',   ico: '☢️', max: 5,  step: 0.25, unit: '% урона бомбы',  costs: [200, 350, 550, 800, 1150] },
     { id: 'luck',    name: 'Удача',            ico: '🍀', max: 5,  step: 0.12, unit: '% шанс бонусов', costs: [200, 340, 520, 760, 1100] },
   ];

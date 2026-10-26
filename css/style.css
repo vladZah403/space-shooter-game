@@ -604,3 +604,143 @@ body.in-game .toast{padding:7px 12px;border-radius:12px}
 body.in-game .toast .t-ico,body.in-game .toast .t-ico svg{font-size:20px}
 body.in-game .toast .t-text{font-size:13px}
 body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-direction:column-reverse}
+
+/* ═══════════════════════════════════════════════════════════════
+   2.2 — меню 4×2, экран заданий, окно сложности, новый арсенал
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── главное меню ── */
+.menu-grid{grid-template-columns:repeat(4,1fr);gap:7px}
+.tile{padding:12px 3px 10px;gap:4px}
+.tile svg{font-size:24px}
+.tile b{font-size:9.5px;letter-spacing:.6px}
+.tile small{font-size:11px}
+.t-orange{--tc:var(--orange)}.t-blue{--tc:var(--blue)}
+.play-sub{text-align:center;font-size:12.5px;color:var(--dim);min-height:16px}
+.play-sub b{font-weight:700}
+@media (max-width:370px){.tile b{font-size:8.4px;letter-spacing:.2px}.tile small{font-size:10px}.tile svg{font-size:22px}}
+
+/* ── экран заданий ── */
+.ms-card{border-radius:var(--r);background:var(--panel);border:1px solid var(--line);padding:14px;margin-bottom:12px}
+.ms-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.ms-head h3{font-family:var(--font-h);font-size:12px;letter-spacing:2px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ms-head h3 svg{color:var(--gold);font-size:16px}
+.ms-timer{font-size:12.5px;color:var(--dim);text-align:right}
+.ms-row{display:grid;grid-template-columns:32px 1fr auto;gap:4px 10px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.ms-row:first-of-type{border-top:none}
+.ms-check{grid-row:1/3;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--line2);color:var(--dim);font-size:15px}
+.ms-row.done .ms-check{border-color:var(--green);background:rgba(61,255,162,.12);color:var(--green)}
+.ms-text{font-size:15px;font-weight:600;line-height:1.2}
+.ms-row.done .ms-text{color:var(--green)}
+.ms-rew{display:flex;align-items:center;gap:4px;font-family:var(--font-h);font-size:13px;color:var(--gold);font-weight:700}
+.ms-rew svg{font-size:15px}
+.ms-prog{grid-column:2/4;display:flex;align-items:center;gap:10px}
+.ms-bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.ms-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.ms-row.done .ms-bar i{background:var(--green)}
+.ms-num{font-size:12.5px;color:var(--muted);min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+.ms-bonus{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(255,200,61,.08);border:1px dashed rgba(255,200,61,.35);font-weight:600}
+.ms-bonus span{display:flex;align-items:center;gap:8px}
+.ms-bonus.done{background:rgba(61,255,162,.08);border-color:rgba(61,255,162,.35);color:var(--green)}
+.ms-hint{font-size:13px;color:var(--dim);text-align:center;margin:2px 8px 12px;line-height:1.35}
+.ms-login .login-days{margin:10px 0}
+.ms-login .btn{margin-top:4px}
+
+/* ── окно выбора сложности ── */
+.diff-modal{max-width:420px;position:relative;padding:20px 14px 16px;gap:10px}
+.modal-x{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.modal-x svg{font-size:18px}
+.diff-lives{text-align:center;font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;margin-top:-4px;flex-wrap:wrap}
+.diff-lives svg{color:var(--red)}
+.diff-lives b{color:var(--text)}
+.diff-list{display:flex;flex-direction:column;gap:7px;max-height:min(60vh,540px);overflow-y:auto;padding:2px;scrollbar-width:none}
+.diff-list::-webkit-scrollbar{display:none}
+.diff-row{position:relative;display:grid;grid-template-columns:6px 1fr auto;gap:3px 10px;align-items:center;text-align:left;padding:10px 12px 10px 0;border-radius:14px;
+  background:rgba(0,0,0,.25);border:1.5px solid var(--line);transition:border-color .15s,background .15s;overflow:hidden}
+.diff-row::before{content:'';grid-row:1/4;align-self:stretch;margin:-10px 0;background:var(--dc);opacity:.85}
+.diff-row.sel{border-color:var(--dc);background:color-mix(in srgb,var(--dc) 12%,rgba(0,0,0,.25));box-shadow:0 0 18px color-mix(in srgb,var(--dc) 22%,transparent)}
+.diff-name{font-family:var(--font-h);font-weight:900;font-size:13px;letter-spacing:1.5px;color:var(--dc);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.diff-rec{font-family:var(--font);font-size:10.5px;font-weight:800;letter-spacing:.5px;padding:1px 7px;border-radius:6px;background:var(--dc);color:#04122b}
+.diff-rew{grid-row:1/3;grid-column:3;text-align:right;font-family:var(--font-h);font-weight:700;font-size:12.5px;color:var(--gold);line-height:1.3;white-space:nowrap}
+.diff-rew small{display:block;font-family:var(--font);font-size:11.5px;color:var(--muted);letter-spacing:0;font-weight:600}
+.diff-txt{grid-column:2;font-size:13px;color:var(--muted);line-height:1.2}
+.diff-meta{grid-column:2/4;display:flex;flex-wrap:wrap;gap:3px 10px;font-size:11.5px;color:var(--dim)}
+.diff-meta b{font-weight:700}
+.diff-meta .up b{color:#ff8a96}.diff-meta .down b{color:var(--green)}.diff-meta .best b{color:var(--text)}
+
+/* ── арсенал ── */
+.lo-strip{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line)}
+.lo-strip-t{font-family:var(--font-h);font-size:10px;letter-spacing:1.5px;color:var(--muted);font-weight:700;line-height:1.25;flex-shrink:0;width:72px}
+.lo-strip-t small{display:block;font-family:var(--font);font-size:11px;letter-spacing:0;color:var(--dim);font-weight:600}
+.lo-slots2{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lo2{position:relative;height:52px;border-radius:12px;border:1.5px dashed var(--line2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:20px}
+.lo2.filled{border-style:solid;border-color:var(--wc);background:color-mix(in srgb,var(--wc) 12%,transparent)}
+.lo2 canvas{width:34px;height:34px}
+.lo2 .num{position:absolute;top:3px;left:6px;font-family:var(--font-h);font-size:9px;color:var(--wc,var(--dim))}
+.ars-hint{font-size:12.5px;color:var(--dim);margin:8px 4px 10px;line-height:1.3}
+.ars-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:12px}
+.ars-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 3px 8px;border-radius:14px;background:var(--panel);border:1.5px solid var(--line);transition:transform .12s,border-color .15s}
+.ars-tile:active{transform:scale(.95)}
+.ars-tile canvas{width:40px;height:40px}
+.ars-tile b{font-family:var(--font-h);font-size:8.6px;letter-spacing:.3px;font-weight:700;color:var(--wc);text-align:center;white-space:nowrap}
+.ars-tile .st{font-size:10.5px;font-weight:700;color:var(--dim);display:flex;align-items:center;gap:3px;white-space:nowrap}
+.ars-tile .st svg{font-size:11px}
+.ars-tile.inlo .st{color:var(--green)}
+.ars-tile.locked canvas{opacity:.4;filter:grayscale(.7)}
+.ars-tile.locked .st{color:var(--gold)}
+.ars-tile.locked.poor .st{color:var(--dim)}
+.ars-tile.sel{border-color:var(--wc);background:color-mix(in srgb,var(--wc) 12%,var(--panel));box-shadow:0 0 16px color-mix(in srgb,var(--wc) 25%,transparent)}
+.ars-tile .slot-n{position:absolute;top:4px;left:6px;width:15px;height:15px;border-radius:50%;background:var(--green);color:#04122b;font-family:var(--font-h);font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.ars-tile .upd{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.ad{border-radius:var(--r);background:var(--panel);border:1px solid color-mix(in srgb,var(--wc) 40%,var(--line));padding:14px;animation:fadeIn .2s ease both}
+.ad-head{display:flex;gap:12px;align-items:center}
+.ad-ico{width:66px;height:66px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:color-mix(in srgb,var(--wc) 14%,rgba(0,0,0,.3));border:1px solid color-mix(in srgb,var(--wc) 40%,transparent)}
+.ad-ico canvas{width:52px;height:52px}
+.ad-name{font-family:var(--font-h);font-weight:900;font-size:17px;letter-spacing:2px;color:var(--wc);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ad-name .tag{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:7px;background:rgba(61,255,162,.14);color:var(--green)}
+.ad-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ad-tags span{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--muted)}
+.ad-desc{font-size:14px;color:var(--muted);margin:10px 0 2px;line-height:1.3}
+.ad-stats{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;align-items:center;margin:12px 0 2px}
+.ad-stats span{font-size:12.5px;color:var(--muted);font-weight:600}
+.segs{display:flex;gap:3px}
+.segs i{flex:1;height:7px;border-radius:2px;background:rgba(255,255,255,.08)}
+.segs i.on{background:var(--wc,var(--gold));box-shadow:0 0 6px color-mix(in srgb,var(--wc,var(--gold)) 50%,transparent)}
+.ad-power{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding:9px 12px;border-radius:12px;background:rgba(0,0,0,.28)}
+.ad-power span{font-size:12.5px;color:var(--muted);line-height:1.2}
+.ad-power b{font-family:var(--font-h);font-size:16px;color:var(--text);white-space:nowrap}
+.ad-sec{font-family:var(--font-h);font-size:10.5px;letter-spacing:2px;color:var(--muted);font-weight:700;margin:16px 0 2px;display:flex;justify-content:space-between}
+.ad-sec small{font-family:var(--font);letter-spacing:0;font-size:11.5px;color:var(--dim)}
+.up2{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.up2:first-of-type{border-top:none}
+.up2-name{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.up2-name small{font-size:11px;color:var(--dim);font-weight:700;font-family:var(--font-h);letter-spacing:.5px}
+.up2-eff{font-size:13px;color:var(--muted);line-height:1.25}
+.up2-eff b{color:var(--green);font-weight:700}
+.up2-eff .arr{color:var(--dim);margin:0 3px}
+.up2 .segs{grid-column:1/2}
+.up2 .segs i{height:5px}
+.up2-buy{grid-row:1/4;grid-column:2;min-width:94px;height:46px;flex-direction:column;gap:0;line-height:1.1}
+.up2-buy .pr{display:flex;align-items:center;gap:4px}
+.up2-buy small{font-family:var(--font);font-size:10px;letter-spacing:0;font-weight:700;opacity:.8}
+.up2-buy.max{color:var(--green);border-color:rgba(61,255,162,.35);background:rgba(61,255,162,.08)}
+.up2-buy.poor{color:#ff8a96;border-style:dashed;background:rgba(255,77,94,.05)}
+.btn.up2-buy:disabled{opacity:1}
+.btn.up2-buy.poor:disabled{opacity:.9}
+.ad-actions{display:flex;gap:8px;margin-top:14px}
+.ad-actions .btn{flex:1;height:50px}
+.btn.on-green{color:var(--green);border-color:rgba(61,255,162,.4);background:rgba(61,255,162,.08)}
+.locked-note{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:12px;line-height:1.3}
+.locked-note svg{color:var(--gold);flex-shrink:0}
+.gen-card{border-radius:var(--r);background:var(--panel);border:1px solid var(--line);padding:4px 14px;--wc:var(--gold)}
+.gen-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(255,200,61,.1);font-size:16px}
+
+/* 2.2: компактная строка сложности */
+.diff-row{display:flex;align-items:center;gap:10px;flex-shrink:0;padding:9px 12px 9px 16px;grid-template-columns:none}
+.diff-row::before{position:absolute;left:0;top:0;bottom:0;width:5px;margin:0;grid-row:auto}
+.dr-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.diff-rew{flex-shrink:0;grid-row:auto;grid-column:auto}
+.diff-meta{grid-column:auto}
+.diff-best{font-family:var(--font);font-size:11px;font-weight:600;letter-spacing:0;color:var(--dim)}
+.diff-desc2{text-align:center;font-size:13.5px;color:var(--muted);min-height:18px;line-height:1.25;margin-top:-2px}
+.ars-hint b{color:var(--text);font-weight:700}
