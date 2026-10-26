@@ -160,6 +160,17 @@ class Database:
                 )
             ''')
             
+            # Предложения игроков (из игры: через sendData или HTTP API)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS suggestions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    category TEXT,
+                    text TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
             # Таблица сессий (для аналитики)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -215,6 +226,21 @@ class Database:
                     logger.info(f"✅ Миграция: добавлена колонка {table}.{column}")
                 except Exception as e:
                     logger.warning(f"⚠️ Миграция {table}.{column} не выполнена: {e}")
+
+    def save_suggestion(self, user_id: int, text: str, category: str = 'general') -> bool:
+        """Сохранить предложение игрока (вызывается из bot.py и api.py)"""
+        with self.get_connection() as conn:
+            try:
+                conn.execute(
+                    'INSERT INTO suggestions (user_id, category, text) VALUES (?, ?, ?)',
+                    (user_id, (category or 'general')[:32], (text or '')[:1000])
+                )
+                conn.commit()
+                return True
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"❌ Ошибка сохранения предложения: {e}")
+                return False
 
     def _invalidate_cache(self, user_id: int = None):
         """Инвалидация кэша"""
