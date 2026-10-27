@@ -16,12 +16,13 @@
   // И награды: coins — монеты, score — очки, xp — опыт корабля.
   D.BASE_LIVES = 4;
   D.DIFFS = {
-    zen:       { name: 'ЗЕН',       color: '#3dffd0', count: 0.65, hp: 0.6,  spd: 0.8,  fire: 0.45, bspd: 0.75, elite: 0,    coins: 0.5,  score: 0.4, xp: 0.5,  desc: 'Мало врагов и пуль — спокойный полёт' },
-    easy:      { name: 'ЛЕГКО',     color: '#3dffa2', count: 0.8,  hp: 0.8,  spd: 0.9,  fire: 0.7,  bspd: 0.85, elite: 0,    coins: 0.75, score: 0.7, xp: 0.75, desc: 'Враги слабее и реже стреляют' },
-    normal:    { name: 'НОРМА',     color: '#3de0ff', count: 1,    hp: 1,    spd: 1,    fire: 1,    bspd: 1,    elite: 0.03, coins: 1,    score: 1,   xp: 1,    desc: 'Задуманный баланс' },
-    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', count: 1.25, hp: 1.3,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1.6, xp: 1.35, desc: 'Больше врагов, элита встречается чаще' },
-    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', count: 1.5,  hp: 1.7,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 2.4, xp: 1.75, desc: 'Плотный огонь и крепкие враги' },
-    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', count: 1.8, hp: 2.2, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 3.5, xp: 2.3, desc: 'Испытание для лучших пилотов' },
+    // lead — какая доля прицельных выстрелов берёт упреждение (к 20-й волне; на первых волнах его нет)
+    zen:       { name: 'ЗЕН',       color: '#3dffd0', lead: 0,    count: 0.65, hp: 0.6,  spd: 0.8,  fire: 0.45, bspd: 0.75, elite: 0,    coins: 0.5,  score: 0.4, xp: 0.5,  desc: 'Мало врагов и пуль — спокойный полёт' },
+    easy:      { name: 'ЛЕГКО',     color: '#3dffa2', lead: 0.3,  count: 0.8,  hp: 0.8,  spd: 0.9,  fire: 0.7,  bspd: 0.85, elite: 0,    coins: 0.75, score: 0.7, xp: 0.75, desc: 'Враги слабее и реже стреляют' },
+    normal:    { name: 'НОРМА',     color: '#3de0ff', lead: 0.6,  count: 1,    hp: 1,    spd: 1,    fire: 1,    bspd: 1,    elite: 0.03, coins: 1,    score: 1,   xp: 1,    desc: 'Задуманный баланс' },
+    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, count: 1.25, hp: 1.3,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1.6, xp: 1.35, desc: 'Больше врагов, элита встречается чаще' },
+    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, count: 1.5,  hp: 1.7,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 2.4, xp: 1.75, desc: 'Плотный огонь и крепкие враги' },
+    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, count: 1.8, hp: 2.2, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 3.5, xp: 2.3, desc: 'Испытание для лучших пилотов' },
   };
   D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god'];
 
@@ -138,7 +139,7 @@
       fire: { kind: 'aimed', cd: 2.8, bullet: 'orb', spd: 190, from: 3 } },
     drone:       { name: 'Дрон',           sprite: 'drone', alt: 'e_drone2', w: 34, hp: 12, spd: 150, score: 60, coins: 1, xp: 1, ai: 'formation', wave: 2, weight: 16 },
     shooter:     { name: 'Стрелок',        sprite: 'shooter',     w: 50, hp: 42,  spd: 95,  score: 220, coins: 2, xp: 2, ai: 'hover',     wave: 2,  weight: 15,
-      fire: { kind: 'aimed3', cd: 2.3, bullet: 'bolt', spd: 220 } },
+      fire: { kind: 'aimed3', cd: 2.3, bullet: 'bolt', spd: 220 }, fire2: { kind: 'sine', cd: 3.4, bullet: 'blue', spd: 190, from: 12 } },
     bug:         { name: 'Жук-дрон',       sprite: 'e_bug',       w: 30, hp: 10,  spd: 165, score: 70,  coins: 1, xp: 1, ai: 'swarm',     wave: 3,  weight: 9 },
     assault:     { name: 'Штурмовик',      sprite: 'assault', alt: 'e_assault2', w: 48, hp: 46, spd: 95, score: 240, coins: 2, xp: 2, ai: 'zigzag', wave: 4, weight: 14,
       fire: { kind: 'burst', cd: 2.4, count: 3, bullet: 'bolt', spd: 260 } },
@@ -146,7 +147,7 @@
     interceptor: { name: 'Перехватчик',    sprite: 'interceptor', alt: 'e_interceptor2', w: 52, hp: 55, spd: 110, score: 280, coins: 2, xp: 2, ai: 'dasher', wave: 6, weight: 10,
       fire: { kind: 'aimed', cd: 1.9, bullet: 'orb', spd: 230 } },
     heavy:       { name: 'Тяжёлый',        sprite: 'heavy',       w: 62, hp: 150, spd: 48,  score: 520, coins: 5, xp: 4, ai: 'tank',      wave: 7,  weight: 8,
-      fire: { kind: 'fan', cd: 2.7, count: 5, spread: 0.9, bullet: 'orb', spd: 170 } },
+      fire: { kind: 'fan', cd: 2.7, count: 5, spread: 0.9, bullet: 'orb', spd: 170 }, fire2: { kind: 'wall', cd: 6.5, bullet: 'orb', spd: 120, from: 15 } },
     ram:         { name: 'Таран',          sprite: 'e_ram',       w: 54, hp: 75,  spd: 70,  score: 320, coins: 3, xp: 2, ai: 'ram',       wave: 7,  weight: 6 },
     splitter:    { name: 'Делитель',       sprite: 'scout', tint: 120, w: 50, hp: 40, spd: 95, score: 260, coins: 2, xp: 2, ai: 'dive', wave: 8, weight: 6, split: true },
     bomber:      { name: 'Бомбардировщик', sprite: 'bomber',      w: 74, hp: 120, spd: 70,  score: 480, coins: 4, xp: 3, ai: 'bomber',    wave: 8,  weight: 7,
@@ -155,9 +156,10 @@
       fire: { kind: 'snipe', cd: 3.4, bullet: 'long', spd: 520 } },
     swarm:       { name: 'Рой',            sprite: 'e_swarm',     w: 46, hp: 90,  spd: 60,  score: 420, coins: 4, xp: 3, ai: 'carrier',   wave: 9,  weight: 4, brood: 4 },
     shielder:    { name: 'Щитоносец',      sprite: 'shielder',    w: 58, hp: 90, shield: 80, spd: 55, score: 480, coins: 4, xp: 3, ai: 'hover', wave: 10, weight: 6,
-      fire: { kind: 'ring', cd: 3.6, count: 8, bullet: 'orb', spd: 140 } },
+      fire: { kind: 'ring', cd: 3.6, count: 8, bullet: 'orb', spd: 140 }, fire2: { kind: 'spiral', cd: 5.5, count: 14, bullet: 'violet', spd: 150, from: 18 } },
     crystal:     { name: 'Кристалл',       sprite: 'e_crystal',   w: 50, hp: 65,  spd: 55,  score: 380, coins: 3, xp: 3, ai: 'drift',     wave: 10, weight: 5,
-      fire: { kind: 'fan', cd: 2.6, count: 3, spread: 0.5, bullet: 'shard', spd: 200 }, death: { n: 8, bullet: 'shard', spd: 165 } },
+      fire: { kind: 'fan', cd: 2.6, count: 3, spread: 0.5, bullet: 'shard', spd: 200 }, fire2: { kind: 'split', cd: 4.2, bullet: 'egg', spd: 130, count: 7, from: 14 },
+      death: { n: 8, bullet: 'shard', spd: 165 } },
     techno:      { name: 'Технодрон',      sprite: 'techno',      w: 58, hp: 75,  spd: 60,  score: 420, coins: 3, xp: 3, ai: 'teleport',  wave: 11, weight: 6,
       fire: { kind: 'ring', cd: 0, count: 10, bullet: 'dot', spd: 160 } },
     heavyfighter:{ name: 'Тяжёлый истребитель', sprite: 'e_heavyfighter', w: 62, hp: 120, spd: 62, score: 560, coins: 5, xp: 4, ai: 'tank', wave: 11, weight: 7,
@@ -175,7 +177,8 @@
     ghost:       { name: 'Призрак',        sprite: 'e_ghost',     w: 54, hp: 70,  spd: 90,  score: 460, coins: 4, xp: 3, ai: 'phase',     wave: 14, weight: 5, rot: Math.PI / 2,
       fire: { kind: 'burst', cd: 0, count: 3, bullet: 'needle', spd: 280 } },
     orbit:       { name: 'Орбита',         sprite: 'e_orbit',     w: 52, hp: 130, spd: 60,  score: 560, coins: 5, xp: 4, ai: 'orbit',     wave: 16, weight: 4,
-      fire: { kind: 'aimed', cd: 1.5, bullet: 'orb', spd: 220 }, death: { n: 12, bullet: 'orb', spd: 145 } },
+      fire: { kind: 'aimed', cd: 1.5, bullet: 'orb', spd: 220 }, fire2: { kind: 'spiral', cd: 6, count: 16, bullet: 'dot', spd: 150, from: 20 },
+      death: { n: 12, bullet: 'orb', spd: 145 } },
     cruiser:     { name: 'Крейсер',        sprite: 'e_cruiser', w: 78, hp: 380, spd: 32, score: 1100, coins: 10, xp: 7, ai: 'tank', wave: 16, weight: 3,
       fire: { kind: 'twin', cd: 1.5, bullet: 'bolt', spd: 250 }, fire2: { kind: 'ring', cd: 3.6, count: 10, bullet: 'orb', spd: 140 } },
     parasite:    { name: 'Паразит',        sprite: 'e_parasite',  w: 56, hp: 110, spd: 55,  score: 540, coins: 5, xp: 4, ai: 'hover',     wave: 16, weight: 4, brood: 3, larva: true,

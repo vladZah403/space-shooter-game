@@ -86,7 +86,9 @@
     if (def.mini) setHitbox(e, sprite);
     e.lastX = e.x;
     e.baseX = e.x;
-    const init = INIT[def.ai];
+    // поведение можно задать при появлении (строи из spawnGroup): o.ai
+    e.ai = o.ai || def.ai;
+    const init = INIT[e.ai];
     if (init) init(e, o);
     if (e.ty) e.ty = Math.max(e.ty, minY(e));
     game.enemies.push(e);
@@ -130,6 +132,25 @@
     destroyer(e) { e.ty = 0.16 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.5; e.pat = 0; e.patT = 2.2; },
     battleship(e) { e.ty = 0.16 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.5; e.pat = 0; e.patT = 2.4; },
     frigate(e) { e.ty = 0.18 * G.H; e.x = G.FW / 2; e.vx = e.spd * 0.7; e.pat = 0; e.patT = 2.0; e.run = 0; },
+    // ── 3.0: строи и манёвры ──
+    // проход по горизонтали: входит сбоку на своей высоте и стреляет вниз
+    sweep(e, o) {
+      const side = o.side || 1;
+      e.x = side < 0 ? G.FW + e.w * 0.6 : -e.w * 0.6;
+      e.y = e.baseY = o.y !== undefined ? o.y : U.rand(0.18, 0.4) * G.H;
+      e.vx = (side < 0 ? -1 : 1) * e.spd * 1.05;
+      e.fireT = U.rand(0.4, 1.0);
+    },
+    // пикировщик: занимает место наверху, по очереди пикирует на корабль и возвращается
+    diver(e, o) { e.ty = o.ty || U.rand(0.12, 0.2) * G.H; e.slotX = e.x; e.t = o.delay || U.rand(0.8, 2.4); e.n = 0; },
+    // фланг: заходит снизу из угла и уходит вверх, стреляя по кораблю
+    flank(e, o) {
+      const side = o.side || 1;
+      e.x = side < 0 ? -e.w * 0.4 : G.FW + e.w * 0.4;
+      e.y = G.H + e.h;
+      e.dir = Math.atan2(-G.H * 0.9, (side < 0 ? 1 : -1) * G.FW * 0.55);
+      e.fireT = 0.6; e.n = 0;
+    },
     flyby(e) {
       e.face = Math.random() < 0.5 ? 1 : -1;
       e.x = e.face > 0 ? -e.w * 0.55 : G.FW + e.w * 0.55;
@@ -190,6 +211,34 @@
       // два тарана с разных сторон
       E.spawn('ram', { x: FW * 0.25 }); E.spawn('ram', { x: FW * 0.75 });
       cost = COST.ram * 2;
+    } else if ((type === 'scout' || type === 'shooter') && wn >= 5 && Math.random() < 0.3) {
+      // клещи: две тройки заходят с боков на разной высоте и проходят экран, стреляя вниз
+      const n = wn >= 14 ? 4 : 3;
+      for (const side of [-1, 1]) {
+        const y = (side < 0 ? 0.2 : 0.32) * G.H;
+        for (let i = 0; i < n; i++) E.spawn(type, { ai: 'sweep', side, y: y + i * 4 * S }).x -= side * i * 46 * S;
+      }
+      cost = COST[type] * n * 2 * 0.8;
+    } else if ((type === 'interceptor' || type === 'assault') && wn >= 8 && Math.random() < 0.35) {
+      // эскадрилья пикировщиков: занимает строй наверху и по очереди пикирует на корабль
+      const n = wn >= 16 ? 4 : 3, gap = Math.min(70 * S, (FW - 80 * S) / n);
+      const x0 = FW / 2 - gap * (n - 1) / 2;
+      for (let i = 0; i < n; i++) E.spawn(type, { ai: 'diver', x: x0 + i * gap, y: -40 * S - i * 20 * S, delay: 1.4 + i * 1.1 });
+      cost = COST[type] * n;
+    } else if (type === 'interceptor' && wn >= 12 && Math.random() < 0.3) {
+      // фланг: пара заходит снизу из углов — с предупреждением у края экрана
+      for (const side of [-1, 1]) {
+        const x = side < 0 ? 16 * S : FW - 16 * S;
+        FX.sprite('fx_warn', x, G.H * 0.88, { w0: 26 * S, w1: 30 * S, dur: 1.0, hold: 0.8 });
+        game.after(0.9, () => E.spawn('interceptor', { ai: 'flank', side }));
+      }
+      A.play('warning', { vol: 0.35, rate: 1.4 });
+      cost = COST.interceptor * 2;
+    } else if (type === 'drone' && wn >= 10 && Math.random() < 0.3) {
+      // стена дронов во всю ширину с одним проходом
+      const step = 40 * S, n = Math.floor((FW - 20 * S) / step), hole = U.randi(1, n - 2);
+      for (let i = 0; i < n; i++) if (i !== hole) E.spawn('drone', { x: 20 * S + step / 2 + i * step, y: -30 * S, idx: i, amp: 0 });
+      cost = (n - 1) * COST.drone * 0.7;
     } else {
       E.spawn(type);
       cost = COST[type];
@@ -252,8 +301,41 @@
       for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd, f.bullet);
       for (const sd of [-1, 1]) game.aimAt(e.x + sd * e.w * 0.42, e.y + e.h * 0.2, f.spd * 0.8, f.bullet, -sd * 0.18);
     } else if (k === 'mine') { game.ebullet(e.x, e.y + e.h * 0.1, e.vx * 0.2, 50 * S, 'mine', e.elite ? { fuse: 1.9, life: 6, sprite: 'fx_mine2', w: 30, r: 10 } : { fuse: 1.9, life: 6 }); A.play('mine'); return; }
+    else if (NEW_FIRE[k]) { NEW_FIRE[k](e, f, mx, my); }
     A.play('enemyShot');
   }
+
+  // ── 3.0: новые атаки (свободные функции — их же берут боссы в bossPattern) ──
+  const NEW_FIRE = {
+    // спираль: два рукава пуль закручиваются за ~1 с
+    spiral(e, f) {
+      const n = f.count || 14, dir = e.uid % 2 ? 1 : -1, a0 = Math.random() * U.TAU;
+      for (let i = 0; i < n; i++) {
+        game.after(i * 0.07, () => {
+          if (!e.alive || !canShoot(e)) return;
+          const s = game.bspd(f.spd);
+          for (const arm of [0, Math.PI]) { const a = a0 + arm + dir * i * 0.38; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, f.bullet); }
+        });
+      }
+    },
+    // стена с проходом: ряд пуль во всю ширину, проход рядом с кораблём (но не ровно над ним)
+    wall(e, f) {
+      const S = G.S, step = 26 * S, gap = 74 * S, p = game.player;
+      const gx = U.clamp(p.x + U.rand(-90, 90) * S, gap, G.FW - gap), s = game.bspd(f.spd);
+      for (let x = step / 2; x < G.FW; x += step) if (Math.abs(x - gx) > gap / 2) game.ebullet(x, e.y + e.h * 0.3, 0, s, f.bullet);
+      FX.ring(gx, e.y + e.h * 0.3, 4, gap / 2, '#ffd23d', 0.3, 2);
+    },
+    // делящаяся: крупный медленный шар через секунду лопается веером
+    split(e, f, mx, my) {
+      const sh = game.aimAt(mx, my, f.spd, f.bullet || 'egg', 0, { fuse: 1.0, burst: { n: f.count || 7, spd: 150, type: 'dot' } });
+      if (sh) sh.w *= 1.3;
+    },
+    // волна: пара снарядов в противофазе виляет по пути к кораблю
+    sine(e, f, mx, my) {
+      for (const ph of [0, Math.PI]) game.aimAt(mx, my, f.spd, f.bullet, 0, { sine: { amp: 26 * G.S, f: 7, ph } });
+    },
+  };
+  E.NEW_FIRE = NEW_FIRE;
   function tickFire(e, dt) {
     const f = e.def.fire;
     if (f && f.cd && !(f.from && game.wave.n < f.from)) {
@@ -265,7 +347,7 @@
     }
     // второе орудие у тяжёлых кораблей
     const f2 = e.def.fire2;
-    if (f2) {
+    if (f2 && !(f2.from && game.wave.n < f2.from)) {
       e.fireT2 -= dt;
       if (e.fireT2 <= 0) {
         e.fireT2 = f2.cd / fireRate() * U.rand(0.85, 1.15);
@@ -286,6 +368,20 @@
     e.x += e.vx * dt;
     const m = e.w * (k || 0.6);
     if (e.x < m || e.x > G.FW - m) { e.vx = -e.vx; e.x = U.clamp(e.x, m, G.FW - m); }
+  }
+  // уклонение (с 6-й волны): враг замечает, что корабль под ним, и уходит с линии огня; реакция не мгновенная
+  function dodge(e, dt) {
+    if (!game.wave || game.wave.n < 6 || !e.vx) return;
+    if (e.vxBase === undefined) e.vxBase = Math.abs(e.vx);
+    e.vx = U.sign(e.vx) * U.damp(Math.abs(e.vx), e.vxBase, 1.4, dt);
+    e.dodgeCd = (e.dodgeCd === undefined ? U.rand(0.6, 1.6) : e.dodgeCd) - dt;
+    const p = game.player;
+    if (e.dodgeCd > 0 || !p.alive || p.y < e.y || Math.abs(p.x - e.x) > e.w * 0.65) return;
+    const away = U.sign(e.x - p.x) || 1;
+    // у края уходить некуда — уклоняется в другую сторону
+    const dir = (away > 0 && e.x > G.FW - e.w * 1.4) || (away < 0 && e.x < e.w * 1.4) ? -away : away;
+    e.vx = dir * e.vxBase * 2.6;
+    e.dodgeCd = U.rand(1.3, 2.4) * (e.elite ? 0.6 : 1);
   }
   function arrive(e, dt, k) {
     e.y = U.damp(e.y, e.ty, k || 2.2, dt) + 10 * G.S * dt;
@@ -308,6 +404,7 @@
         if (arrive(e, dt)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.55; }
       } else if (e.st === 1) {
         e.t += dt;
+        dodge(e, dt);
         strafe(e, dt);
         e.y = e.ty + Math.sin(e.age * 1.5 + e.phase) * 6 * G.S;
         tickFire(e, dt);
@@ -373,11 +470,48 @@
         if (arrive(e, dt, 1.2)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.6; }
       } else if (e.st === 1) {
         e.t += dt;
+        dodge(e, dt);
         strafe(e, dt);
         e.y = e.ty + Math.sin(e.age + e.phase) * 5 * G.S;
         if (e.t > e.stay) e.st = 2;
       } else leave(e, dt);
       tickFire(e, dt);
+    },
+    // ── 3.0 ──
+    sweep(e, dt) {
+      e.x += e.vx * dt;
+      e.y = e.baseY + Math.sin(e.age * 2.2) * 14 * G.S;
+      tickFire(e, dt);
+      if ((e.vx > 0 && e.x > G.FW + e.w) || (e.vx < 0 && e.x < -e.w)) { e.leaving = true; e.alive = false; }
+    },
+    diver(e, dt) {
+      const p = game.player, S = G.S;
+      if (e.st === 0) {
+        // встаёт на своё место в строю и ждёт очереди
+        e.y = U.damp(e.y, e.ty, 2.4, dt); e.x = U.damp(e.x, e.slotX, 2.4, dt);
+        e.t -= dt;
+        if (e.t <= 0 && e.y > e.ty - 10 * S) { e.st = 1; e.t = 0.45; A.play('mine', { rate: 1.3, vol: 0.5 }); }
+      } else if (e.st === 1) {
+        // замах: чуть приподнимается и вздрагивает — предупреждение
+        e.t -= dt; e.y -= 30 * S * dt; e.x += Math.sin(e.age * 40) * 30 * S * dt;
+        if (e.t <= 0) { e.st = 2; e.v = e.spd * 1.2; e.dir = Math.atan2(p.y - e.y, p.x - e.x); e.shot = false; }
+      } else if (e.st === 2) {
+        // пике по дуге: курс доворачивает к кораблю, на полпути — выстрел
+        const want = Math.atan2(p.y - e.y, p.x - e.x);
+        e.dir += U.clamp(U.angleDiff(e.dir, want), -1.6 * dt, 1.6 * dt);
+        e.v = Math.min(470 * S * game.diff.spd, e.v + 700 * S * dt);
+        e.x += Math.cos(e.dir) * e.v * dt; e.y += Math.sin(e.dir) * e.v * dt;
+        if (!e.shot && e.y > G.H * 0.35 && canShoot(e)) { e.shot = true; doFire(e, e.def.fire || { kind: 'aimed', bullet: 'orb', spd: 230 }); }
+        if (e.y > G.H + e.h) { e.n++; if (e.n >= 2) { e.alive = false; e.leaving = true; return; } e.y = -e.h; e.st = 0; e.t = U.rand(1.2, 2.6); }
+      }
+    },
+    flank(e, dt) {
+      const S = G.S;
+      e.x += Math.cos(e.dir) * e.spd * 1.7 * dt; e.y += Math.sin(e.dir) * e.spd * 1.7 * dt;
+      if (Math.random() < 0.4) FX.glowPuff(e.x - Math.cos(e.dir) * e.h * 0.4, e.y - Math.sin(e.dir) * e.h * 0.4, '#9fb4ff', 14 * S, 0.18);
+      e.fireT -= dt;
+      if (e.fireT <= 0 && e.n < 3 && e.y < G.H * 0.85) { e.fireT = 0.55; e.n++; if (game.player.alive) game.aimAt(e.x, e.y, 250, 'bolt'); A.play('enemyShot'); }
+      if (e.y < -e.h) { e.leaving = true; e.alive = false; }
     },
     bomber(e, dt) {
       e.x += e.vx * dt;
@@ -801,7 +935,7 @@
       if (e.frozen > 0) { e.frozen -= dt; edt2 *= 0.15; }
       e.age += edt2;
       e.lastX = e.x;
-      const ai = AI[e.def.ai];
+      const ai = AI[e.ai || e.def.ai];
       if (ai) ai(e, edt2);
       if (!e.horiz) e.bank = U.damp(e.bank, U.clamp((e.x - e.lastX) / Math.max(edt2, 0.001) * 0.0012, -0.35, 0.35), 8, dt);
       if (e.y > H + e.h + 20 || e.y < -H) { e.alive = false; e.leaving = true; }
@@ -1211,6 +1345,13 @@
     },
   };
 
+  function bossPattern(b) {
+    b.xn = (b.xn || 0) + 1;
+    const set = b.phase >= 3 ? ['spiral', 'wall', 'split', 'sine'] : b.num % 2 ? ['spiral', 'split'] : ['wall', 'sine'], k = set[b.xn % set.length];
+    const f = { spiral: { count: 16, bullet: 'orb', spd: 150 }, wall: { bullet: 'orb', spd: 115 }, split: { bullet: 'egg', spd: 140, count: 8 }, sine: { bullet: 'blue', spd: 200 } }[k];
+    NEW_FIRE[k](b, f, b.x, b.y + b.h * 0.3);
+    A.play('enemyShot');
+  }
   function updateBoss(b, edt, dt) {
     const S = G.S;
     b._dt = edt;
@@ -1233,6 +1374,8 @@
       ring(b.x, b.y, b.num === 1 ? 10 : 16, 160, 'orb', Math.random());
       SS.emit('bossPhase', b);
     }
+    // 3.0: во 2-й фазе — дополнительная атака из новых паттернов, в 3-й чаще (свой набор у каждого босса)
+    if (b.phase >= 2 && !b.entering && timer(b, 'xpat', bcd(b, b.phase >= 3 ? 5.5 : 7.5), 3)) bossPattern(b);
     // движение
     if (b.dive) {
       const d = b.dive;
@@ -1373,6 +1516,7 @@
       } else {
         let rot = (def.rot !== undefined ? def.rot : Math.PI) + e.bank;
         if ((def.ai === 'kamikaze' || def.ai === 'hunter') && e.st >= 1 && e.dir !== undefined) rot = e.dir - Math.PI / 2;
+        if ((e.ai === 'diver' && e.st === 2) || e.ai === 'flank') rot = (def.rot !== undefined ? def.rot : Math.PI) + e.dir - Math.PI / 2;
         if (e.larva) rot = e.dir - Math.PI / 2;
         ctx.rotate(rot);
       }

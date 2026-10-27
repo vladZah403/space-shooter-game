@@ -291,6 +291,8 @@
       const ab = D.WEAPONS.arc.base, mv = this.state === 'play' && p.lx !== undefined ? Math.hypot(p.x - p.lx, p.y - p.ly) : 0;
       run.arc = U.clamp(run.arc + mv / (G.FW * ab.charge) - dt * ab.drain, 0, 1);
     }
+    // скорость корабля (сглаженная) — по ней враги берут упреждение (aimAt)
+    if (p.lx !== undefined && dt > 0) { p.vxm = U.damp(p.vxm || 0, (p.x - p.lx) / dt, 6, dt); p.vym = U.damp(p.vym || 0, (p.y - p.ly) / dt, 6, dt); }
     p.lx = p.x; p.ly = p.y;
     if (run.focus.t > 0) run.focus.t -= dt;
     if (p.alive && this.state === 'play') this.fireWeapons(dt);
@@ -1341,15 +1343,23 @@
     b.maxSpd = (o && o.maxSpd) || 0;
     b.redirT = (o && o.redir) || 0; b.redirSpd = (o && o.redirSpd) || 0; b.redone = false;
     b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0; b.ebc = null;
+    b.sine = (o && o.sine) || null;
     this.ebullets.push(b);
     return b;
   };
   // скорость вражеских снарядов растёт со сложностью и волной
   game.bspd = function (v) { return v * G.S * this.diff.bspd * (1 + Math.min(this.wave ? this.wave.n : 1, 40) * 0.012); };
+  // упреждение: часть выстрелов летит туда, где корабль окажется, — постоянное движение в одну сторону
+  // больше не спасает. Доля растёт от 3-й к 20-й волне и зависит от сложности (diff.lead)
+  game.leadK = function () { const n = this.wave ? this.wave.n : 1; return U.clamp((n - 3) / 17, 0, 1) * (this.diff.lead || 0); };
   game.aimAt = function (x, y, spd, type, spreadA, o) {
-    const p = this.player;
-    const a = Math.atan2(p.y - y, p.x - x) + (spreadA || 0);
-    const s = this.bspd(spd);
+    const p = this.player, s = this.bspd(spd);
+    let tx = p.x, ty = p.y;
+    if (Math.random() < this.leadK()) {
+      const t = Math.min(1.2, Math.hypot(p.x - x, p.y - y) / Math.max(s, 1));
+      tx = U.clamp(p.x + (p.vxm || 0) * t, 0, G.FW); ty = p.y + (p.vym || 0) * t * 0.5;
+    }
+    const a = Math.atan2(ty - y, tx - x) + (spreadA || 0);
     return this.ebullet(x, y, Math.cos(a) * s, Math.sin(a) * s, type, o);
   };
 
@@ -1385,6 +1395,11 @@
         }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
+      // «волна»: снаряд виляет поперёк курса
+      if (b.sine) {
+        const sp = Math.hypot(b.vx, b.vy) || 1, k = b.sine.amp * b.sine.f * Math.cos(b.age * b.sine.f + b.sine.ph) * dt;
+        b.x -= b.vy / sp * k; b.y += b.vx / sp * k;
+      }
       if (b.bounce > 0 && (b.x < 4 || b.x > FW - 4)) { b.vx = -b.vx; b.x = U.clamp(b.x, 4, FW - 4); b.bounce--; }
       // кладка/клякса: разрывается кольцом по таймеру
       if (b.burst && b.type !== 'mine') {
