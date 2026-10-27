@@ -20,7 +20,8 @@ from PIL import Image, ImageFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы,
 # 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли),
-# 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты), 10 — каталог эффектов (экраны, индикаторы, разрушения)
+# 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты), 10 — каталог эффектов (экраны, индикаторы, разрушения),
+# 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы)
 SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet00_main.png',
     'sheet01_player_ships.png',
@@ -33,6 +34,7 @@ SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet08_customization.png',
     'sheet09_vfx.png',
     'sheet10_vfx_catalogue.png',
+    'sheet11_asteroids.png',
 )]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -217,6 +219,24 @@ SPRITES = {
     'fx_solar':       ((1242, 820, 1331, 930), 'add', 10),
     # фиолетовый лазер врага (лист 9)
     'eb_plaser':      ((1108, 100, 1141, 246), 'add', 9),
+
+    # ── лист 11: астероиды «Пояса астероидов» (m — средний, l — большой, xl — очень большой) ──
+    # обычные — камень с огненными трещинами
+    'ast_m1':   ((167, 81, 216, 134), 'solid', 11),
+    'ast_m2':   ((248, 72, 307, 134), 'solid', 11),
+    'ast_l1':   ((336, 50, 442, 151), 'solid', 11, {'max': 128}),
+    'ast_l2':   ((472, 50, 563, 153), 'solid', 11, {'max': 128}),
+    'ast_xl':   ((583, 22, 723, 153), 'solid', 11, {'max': 128}),
+    # кристальные — внутри кристаллы опыта
+    'astc_m':   ((1009, 75, 1079, 139), 'solid', 11),
+    'astc_l':   ((1107, 62, 1190, 146), 'solid', 11),
+    'astc_xl':  ((1221, 32, 1327, 154), 'solid', 11, {'max': 128}),
+    # с ресурсами — внутри монеты
+    'astr_m1':  ((912, 681, 978, 746), 'solid', 11),
+    'astr_m2':  ((1006, 675, 1078, 748), 'solid', 11),
+    'astr_l':   ((1110, 662, 1207, 754), 'solid', 11, {'max': 128}),
+    'astr_xl1': ((1239, 657, 1326, 749), 'solid', 11, {'max': 128}),
+    'astr_xl2': ((1363, 630, 1499, 759), 'solid', 11, {'max': 128}),
 }
 
 # поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
@@ -283,6 +303,8 @@ CLOSE = {'pu_spread': 4, 'boss': 5, 'interceptor': 2, 'assault': 2, 'techno': 2,
          'e_biomech': 3, 'e_crystal': 2, 'e_bug': 3, 'e_platform': 3, 'e_minelayer': 3, 'e_ghost': 3,
          'e_orbit': 3, 'e_ram': 3, 'e_swarm': 3, 'e_parasite': 3, 'e_ion': 3, 'e_crab': 3,
          'ship7': 2, 'ship8': 2, 'ship9': 2, 'ship10': 2, 'ship11': 2, 'ship12': 2, 'ship13': 2}
+# у астероидов тёмные щели между глыбами
+CLOSE.update({n: 2 for n in SPRITES if n.startswith('ast')})
 
 
 def flood_outside(x0, y0, w, h, trav, blocked=None):

@@ -208,10 +208,17 @@
       for (const e of game.enemies) if (e.alive && e.type === 'asteroid') n++;
       if (n >= [2, 3, 4, 5, 4][k]) return;
       const scale = U.rand(0.85, 1.15) + k * 0.08;
-      const e = SS.enemies.spawn('asteroid', { sprite: 'fx_rock' + U.randi(1, 6), noElite: true, scale, hpMul: scale * scale });
+      // добычу видно заранее: камни с самоцветами — монеты, с кристаллами — опыт (лист art/sheet11_asteroids.png)
+      const r = Math.random(), loot = r < 0.4 ? 'coin' : r < 0.6 ? 'xp' : '';
+      const size = scale < 1 ? 'm' : scale < 1.2 ? 'l' : 'xl';
+      const SPR = {
+        '': { m: ['ast_m1', 'ast_m2'], l: ['ast_l1', 'ast_l2'], xl: ['ast_xl'] },
+        coin: { m: ['astr_m1', 'astr_m2'], l: ['astr_l'], xl: ['astr_xl1', 'astr_xl2'] },
+        xp: { m: ['astc_m'], l: ['astc_l'], xl: ['astc_xl'] },
+      };
+      const e = SS.enemies.spawn('asteroid', { sprite: U.pick(SPR[loot][size]), noElite: true, scale, hpMul: scale * scale });
       if (!e) return;
-      const r = Math.random();
-      if (r < 0.4) e.coins = 4; else if (r < 0.6) e.xp = 2;
+      if (loot === 'coin') e.coins = 4; else if (loot === 'xp') e.xp = 2;
     },
 
     // ── отрисовка (координаты поля) ──

@@ -177,7 +177,7 @@
     debris:      { name: 'Обломок',        sprite: 'fx_rock1',    w: 40, hp: 26,  spd: 120, score: 40,  coins: 3, xp: 0, ai: 'drift',     wave: 99, weight: 0 },
     // астероиды — механика сектора «Пояс астероидов» (events.js): закрывают от вражеских пуль (cover)
     // и не задерживают зачистку волны (prop); монеты или кристаллы в части из них решаются при появлении
-    asteroid:    { name: 'Астероид',       sprite: 'fx_rock1',    w: 48, hp: 34,  spd: 85,  score: 30,  coins: 0, xp: 0, ai: 'drift',     wave: 99, weight: 0, prop: true, cover: true },
+    asteroid:    { name: 'Астероид',       sprite: 'ast_m1',      w: 48, hp: 34,  spd: 85,  score: 30,  coins: 0, xp: 0, ai: 'drift',     wave: 99, weight: 0, prop: true, cover: true },
     biomech:     { name: 'Био-мех',        sprite: 'e_biomech',   w: 86, hp: 230, spd: 58,  score: 900, coins: 8, xp: 5, ai: 'bomber',    wave: 23, weight: 3, horizontal: true, weave: 38,
       fire: { kind: 'fan', cd: 1.3, count: 5, spread: 0.9, bullet: 'green', spd: 160, down: true } },
     // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
