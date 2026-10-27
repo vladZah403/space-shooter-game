@@ -447,6 +447,8 @@
       cv.getContext('2d').drawImage(c, 0, 0);
       b.appendChild(cv);
       if (p.weapons.length > 1) { const k = document.createElement('span'); k.className = 'wkey'; k.textContent = i + 1; b.appendChild(k); }
+      // полоска ресурса (магазин, энергия, заряд): видно перезарядку ракет, пока стреляешь другим оружием
+      if (w.base.mag || wid === 'lightning' || wid === 'arc') { const r = document.createElement('i'); r.className = 'wres'; r.innerHTML = '<b></b>'; b.appendChild(r); b._res = r; b._resFill = r.firstChild; }
       bindPress(b, () => game.setWeapon(wid));
       box.appendChild(b);
     });
@@ -549,6 +551,14 @@
     if (c.weapon !== p.weapon) {
       c.weapon = p.weapon;
       for (const b of ui._wBtns || []) b.classList.toggle('active', b.dataset.w === p.weapon);
+    }
+    for (const b of ui._wBtns || []) {
+      if (!b._res) continue;
+      const r = g.weaponRes(b.dataset.w);
+      if (!r) continue;
+      const kind = r.kind === 'energy' && r.k <= 0 ? 'empty' : r.kind, k = Math.round(r.k * 20) / 20;
+      if (b._resKind !== kind) { b._resKind = kind; b._res.className = 'wres ' + kind; }
+      if (b._resK !== k) { b._resK = k; b._resFill.style.transform = 'scaleX(' + k + ')'; }
     }
     // навыки: ключ — число (состояние, секунды, доля кольца)
     const sks = ui._skBtns || [];

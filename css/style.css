@@ -412,6 +412,10 @@ body.cinema .banner{visibility:hidden}
 .wbtn.active canvas{opacity:1}
 .wbtn:active{transform:scale(.9)}
 .wbtn .wkey{position:absolute;top:3px;left:6px;font-family:var(--font-h);font-size:9px;color:var(--dim)}
+.wbtn .wres{position:absolute;left:8px;right:8px;bottom:5px;height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.wbtn .wres b{display:block;height:100%;background:var(--wc);transform-origin:left center}
+.wbtn .wres.reload b{opacity:.45}
+.wbtn .wres.empty{background:rgba(255,77,94,.55);animation:blink .5s steps(2) infinite}
 .hud-actions{display:flex;align-items:flex-end;gap:7px;pointer-events:auto}
 .hud-skills{display:flex;gap:7px}
 .skbtn{position:relative;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;

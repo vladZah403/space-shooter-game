@@ -383,6 +383,21 @@
     if (!def || !def.base.mag) return null;
     return this.player.mag[wid] || (this.player.mag[wid] = { n: magSize(wid), t: 0 });
   };
+  // ресурс оружия для HUD: k 0..1 и вид — магазин, перезарядка, энергия, заряд, фокус (null — ресурса нет)
+  game.weaponRes = function (wid) {
+    const run = this.run, def = D.WEAPONS[wid];
+    if (!def || !run) return null;
+    const b = def.base;
+    if (b.mag) {
+      const m = this.mag(wid), size = magSize(wid);
+      return m.n > 0 ? { kind: 'mag', k: m.n / size, n: m.n, max: size } : { kind: 'reload', k: U.clamp(1 - m.t / b.reload, 0, 1) };
+    }
+    if (wid === 'lightning') return { kind: 'energy', k: run.energy };
+    if (wid === 'arc') return { kind: 'charge', k: run.arc };
+    if (wid === 'laser' && run.focus.t > 0 && run.focus.n > 1) return { kind: 'focus', k: run.focus.n / b.focusMax };
+    return null;
+  };
+
   game.updateMags = function (dt) {
     const p = this.player;
     for (const wid of p.weapons) {
@@ -2229,6 +2244,30 @@
     ctx.globalCompositeOperation = 'source-over';
   };
 
+  // шкала ресурса: магазин — деления по числу выстрелов, остальное — заполнение снизу вверх
+  game.drawWeaponRes = function (ctx, p, res) {
+    const S = G.S, w = 3.5 * S, h = p.w * 0.6, x = p.x - p.w * 0.66 - w / 2, y = p.y - h * 0.4;
+    const col = D.WEAPONS[p.weapon].color, empty = res.kind === 'energy' && res.k <= 0;
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+    if (res.kind === 'mag') {
+      const gap = 2 * S, sh = (h - gap * (res.max - 1)) / res.max;
+      ctx.fillStyle = col;
+      for (let i = 0; i < res.n; i++) ctx.fillRect(x, y + h - (i + 1) * sh - i * gap, w, sh);
+    } else if (empty) {
+      // энергия кончилась — мигающая красная рамка
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(this.t * 12);
+      ctx.strokeStyle = '#ff4d5e'; ctx.lineWidth = 1.5 * S;
+      ctx.strokeRect(x, y, w, h);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = res.kind === 'reload' ? 0.5 : 1;
+      ctx.fillStyle = res.kind === 'focus' ? '#ffffff' : col;
+      ctx.fillRect(x, y + h * (1 - res.k), w, h * res.k);
+      ctx.globalAlpha = 1;
+    }
+  };
+
   game.drawPlayer = function (ctx) {
     const p = this.player, s = M.s, S = G.S, run = this.run;
     // дроны
@@ -2255,6 +2294,9 @@
     const boost = (this.buffs.rapid > 0 || run.skillFx.sk_overclock > 0 ? 1.3 : 1) + (this.scene && this.scene.kind === 'jump' ? this.scene.warp * 1.5 : 0);
     this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, p.x, p.y, p.w, p.tilt, this.t, boost);
     ctx.globalAlpha = 1;
+    // ресурс текущего оружия — вертикальная шкала слева от корабля
+    const res = this.state === 'play' && p.alive ? this.weaponRes(p.weapon) : null;
+    if (res) this.drawWeaponRes(ctx, p, res);
     // щит
     if (p.shield || run.skillFx.sk_barrier > 0) {
       const barrier = run.skillFx.sk_barrier > 0;
