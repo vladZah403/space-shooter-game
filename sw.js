@@ -1,13 +1,13 @@
 // Space Shooter 2.0 — сервис-воркер
 // Стратегия: сеть в приоритете (всегда свежая версия), кэш — для офлайна и медленной сети.
 // При каждом релизе меняйте VERSION (и ?v= в index.html).
-const VERSION = 'ss-2.6.2';
+const VERSION = 'ss-2.7.0';
 const CORE = [
-  './', './index.html', './manifest.json', './css/style.css?v=2.6.2',
-  './js/config.js?v=2.6.2', './js/atlas.js?v=2.6.2', './js/core.js?v=2.6.2', './js/data.js?v=2.6.2',
-  './js/store.js?v=2.6.2', './js/tg.js?v=2.6.2', './js/audio.js?v=2.6.2', './js/gfx.js?v=2.6.2',
-  './js/fx.js?v=2.6.2', './js/game.js?v=2.6.2', './js/enemies.js?v=2.6.2', './js/events.js?v=2.6.2', './js/intro.js?v=2.6.2', './js/ui.js?v=2.6.2', './js/main.js?v=2.6.2',
-  './assets/sprites.webp?v=2.6.2', './assets/sprites2.webp?v=2.6.2', './icon-192.png', './icon-512.png',
+  './', './index.html', './manifest.json', './css/style.css?v=2.7.0',
+  './js/config.js?v=2.7.0', './js/atlas.js?v=2.7.0', './js/core.js?v=2.7.0', './js/data.js?v=2.7.0',
+  './js/store.js?v=2.7.0', './js/tg.js?v=2.7.0', './js/audio.js?v=2.7.0', './js/gfx.js?v=2.7.0',
+  './js/fx.js?v=2.7.0', './js/game.js?v=2.7.0', './js/enemies.js?v=2.7.0', './js/events.js?v=2.7.0', './js/intro.js?v=2.7.0', './js/ui.js?v=2.7.0', './js/main.js?v=2.7.0',
+  './assets/sprites.webp?v=2.7.0', './assets/sprites2.webp?v=2.7.0', './icon-192.png', './icon-512.png',
 ];
 
 self.addEventListener('install', (e) => {
