@@ -175,6 +175,9 @@
       fire: { kind: 'twin', cd: 2.1, bullet: 'plaser', spd: 330 } },
     // обломки появляются только в событии «Космический мусор» (weight 0 — в обычных волнах их нет)
     debris:      { name: 'Обломок',        sprite: 'fx_rock1',    w: 40, hp: 26,  spd: 120, score: 40,  coins: 3, xp: 0, ai: 'drift',     wave: 99, weight: 0 },
+    // астероиды — механика сектора «Пояс астероидов» (events.js): закрывают от вражеских пуль (cover)
+    // и не задерживают зачистку волны (prop); монеты или кристаллы в части из них решаются при появлении
+    asteroid:    { name: 'Астероид',       sprite: 'fx_rock1',    w: 48, hp: 34,  spd: 85,  score: 30,  coins: 0, xp: 0, ai: 'drift',     wave: 99, weight: 0, prop: true, cover: true },
     biomech:     { name: 'Био-мех',        sprite: 'e_biomech',   w: 86, hp: 230, spd: 58,  score: 900, coins: 8, xp: 5, ai: 'bomber',    wave: 23, weight: 3, horizontal: true, weave: 38,
       fire: { kind: 'fan', cd: 1.3, count: 5, spread: 0.9, bullet: 'green', spd: 160, down: true } },
     // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
@@ -434,9 +437,12 @@
   ];
 
   // ── Секторы галактики (меняются после каждого босса) ────────
+  // mech — постоянная механика сектора на все 5 волн (events.js), desc — её описание на карточке сектора,
+  // noEvents — события волны, которые в секторе не выпадают (повторяли бы механику)
   D.SECTORS = [
     { name: 'ОРБИТА ЗЕМЛИ',       sky: ['#02040d', '#06103a'], neb: ['#1f4dff', '#3de0ff', '#7a3dff'], star: '#cfe3ff', planet: 210 },
-    { name: 'ПОЯС АСТЕРОИДОВ',    sky: ['#070305', '#21100a'], neb: ['#ff6a2a', '#ffb35c', '#b0302a'], star: '#ffe6cc', planet: 25 },
+    { name: 'ПОЯС АСТЕРОИДОВ',    sky: ['#070305', '#21100a'], neb: ['#ff6a2a', '#ffb35c', '#b0302a'], star: '#ffe6cc', planet: 25,
+      mech: 'asteroids', desc: 'Астероиды закрывают от пуль, в обломках монеты', noEvents: ['meteors', 'debris'] },
     { name: 'ТУМАННОСТЬ ОРИОНА',  sky: ['#06020c', '#260a33'], neb: ['#ff3dd2', '#8a3dff', '#3d5cff'], star: '#ffd9fb', planet: 300 },
     { name: 'ЛЕДЯНЫЕ ЛУНЫ',       sky: ['#010810', '#06283a'], neb: ['#3dfff0', '#7fb8ff', '#2a6bff'], star: '#e0fdff', planet: 190 },
     { name: 'КРАСНЫЙ ГИГАНТ',     sky: ['#0a0204', '#2e070d'], neb: ['#ff2d4d', '#ff8a3d', '#8a1a3d'], star: '#ffd6d6', planet: 5 },

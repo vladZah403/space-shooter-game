@@ -3,6 +3,8 @@
 //  С 6-й волны иногда одна волна идёт по особым правилам: ионная буря,
 //  метеоритный дождь, солнечные вспышки, космический мусор.
 //  Событие объявляется после баннера волны и длится до её зачистки.
+//  3.0: механики секторов — то же, но постоянно на все 5 волн сектора
+//  и мягче; сила растёт от первой волны сектора к четвёртой.
 // ════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -16,19 +18,23 @@
 
   const ev = {
     cur: null,
+    mech: null,             // механика текущего сектора { id, wave, k, cd }
     init() { G = SS.gfx; FX = SS.fx; A = SS.audio; M = SS.meta; game = SS.game; },
-    reset() { this.cur = null; },
+    reset() { this.cur = null; this.mech = null; },
     active() { return this.cur && this.cur.announced ? this.cur.def : null; },
 
     // на старте волны решаем, будет ли событие
     roll(w) {
       this.cur = null;
       const run = game.run, ch = run.challenge;
+      const sec = D.SECTORS[run.sector % D.SECTORS.length];
+      // k: 0..3 — волны сектора, 4 — волна босса
+      this.mech = sec.mech ? { id: sec.mech, wave: w, k: (w.n - 1) % 5, cd: 0.6 } : null;
       if (w.boss) return;
       const always = !!(ch && ch.mods.includes('events'));
       if (w.n < (always ? 3 : D.EVENT_WAVE)) return;
       if (!always && (run.lastEvent >= w.n - 1 || Math.random() > D.EVENT_CHANCE)) return;
-      const pool = D.EVENTS.filter((d) => d.id !== run.lastEventId);
+      const pool = D.EVENTS.filter((d) => d.id !== run.lastEventId && !(sec.noEvents && sec.noEvents.includes(d.id)));
       const def = pool[Math.floor(Math.random() * pool.length)];
       run.lastEvent = w.n; run.lastEventId = def.id;
       this.cur = { def, wave: w, t: 0, start: w.intro + 1.3, cd: 0, announced: false, strikes: [], lanes: [], meteors: [], solar: null };
@@ -49,6 +55,7 @@
     },
 
     update(dt) {
+      if (this.mech) this.updateMech(dt);
       const c = this.cur;
       if (!c) return;
       if (c.wave !== game.wave) { this.cur = null; return; }
@@ -67,7 +74,7 @@
       }
       // пока в волне ещё есть враги; обломки — только пока волна не выпустила всех
       let alive = 0;
-      for (const e of game.enemies) if (e.alive && !e.leaving && e.type !== 'debris') alive++;
+      for (const e of game.enemies) if (e.alive && !e.leaving && e.type !== 'debris' && !e.def.prop) alive++;
       if (c.wave.done && !alive) return;
       c.cd -= edt;
       if (c.cd > 0 || !game.player.alive) return;
@@ -180,6 +187,31 @@
       for (const e of game.enemies) if (e.alive && e.type === 'debris') n++;
       if (n >= 10) return;
       SS.enemies.spawn('debris', { sprite: 'fx_rock' + U.randi(1, 6), noElite: true, scale: U.rand(0.8, 1.35) });
+    },
+
+    // ── МЕХАНИКИ СЕКТОРОВ ──
+    // в кат-сценах новое не появляется, уже летящее продолжает движение
+    updateMech(dt) {
+      const m = this.mech;
+      if (m.wave !== game.wave) { this.mech = null; return; }
+      if (game.state !== 'play' || !game.player.alive) return;
+      m.cd -= dt;
+      if (m.cd <= 0) this['mech_' + m.id](m);
+    },
+
+    // ПОЯС АСТЕРОИДОВ: медленные астероиды закрывают от вражеских пуль и мешают стрелять;
+    // в части из них монеты или кристаллы. Чем дальше в сектор, тем их больше и они крупнее
+    mech_asteroids(m) {
+      const k = m.k;
+      m.cd = [3, 2.5, 2, 1.6, 2.2][k] * U.rand(0.8, 1.2);
+      let n = 0;
+      for (const e of game.enemies) if (e.alive && e.type === 'asteroid') n++;
+      if (n >= [2, 3, 4, 5, 4][k]) return;
+      const scale = U.rand(0.85, 1.15) + k * 0.08;
+      const e = SS.enemies.spawn('asteroid', { sprite: 'fx_rock' + U.randi(1, 6), noElite: true, scale, hpMul: scale * scale });
+      if (!e) return;
+      const r = Math.random();
+      if (r < 0.4) e.coins = 4; else if (r < 0.6) e.xp = 2;
     },
 
     // ── отрисовка (координаты поля) ──

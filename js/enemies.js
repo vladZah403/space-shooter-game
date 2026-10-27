@@ -11,7 +11,7 @@
   let uid = 100000;
 
   const COLORS = {
-    scout: '#ff5c4d', drone: '#5cff7a', lancer: '#c86bff', debris: '#d8c3a5', shooter: '#c06bff', assault: '#3dffd0', kamikaze: '#ff9f3d', interceptor: '#cfd8ff',
+    scout: '#ff5c4d', drone: '#5cff7a', lancer: '#c86bff', debris: '#d8c3a5', asteroid: '#c9a27a', shooter: '#c06bff', assault: '#3dffd0', kamikaze: '#ff9f3d', interceptor: '#cfd8ff',
     heavy: '#ffd23d', splitter: '#7dff6b', bomber: '#aab4d8', sniper: '#5cb8ff', shielder: '#7fd8ff', techno: '#ff5c7a',
     hunter: '#b06bff', armored: '#ff9f3d', heavyfighter: '#ff4d5e', bombardier: '#ffb03d', redoubt: '#c48bff', cruiser: '#ff5c7a',
     bug: '#9dff5c', ram: '#ff6a2a', swarm: '#a6ff3d', crystal: '#3dffd2', minelayer: '#ff5c4d', platform: '#ffc83d',
@@ -23,7 +23,7 @@
   const COST = { scout: 1, drone: 0.55, shooter: 2, assault: 2, kamikaze: 1.2, interceptor: 2.5, heavy: 5, splitter: 2.2,
     bomber: 4, sniper: 3, shielder: 4.5, techno: 3.5, hunter: 3.5, armored: 8, heavyfighter: 4.5, bombardier: 5, redoubt: 5.5,
     cruiser: 9, bug: 0.5, ram: 2.5, swarm: 4, crystal: 3, minelayer: 4, platform: 5.5, ghost: 3.5, orbit: 4.5, parasite: 4.5,
-    ion: 5, crab: 7, biomech: 7, lancer: 4, debris: 0, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0 };
+    ion: 5, crab: 7, biomech: 7, lancer: 4, debris: 0, asteroid: 0, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0 };
 
   // эллиптические хитбоксы для крупных кораблей (доли ширины/высоты спрайта)
   const HITBOX = {

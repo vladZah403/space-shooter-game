@@ -825,7 +825,7 @@
     if (this.skill('sk_detonator')) { run.detCount++; if (run.detCount % 5 === 0) this.blast(e.x, e.y, 80 * S, 40 * this.dmgMul(), '#ff9f3d', 'det'); }
     if (this.st.nova > 0) this.blast(e.x, e.y, (46 + this.st.nova * 14) * S, 12 * this.st.nova * this.dmgMul(), '#ffb03d', 'nova');
     if (e.def.split && !e.isChild) SS.enemies.split(e);
-    if (e.type === 'debris') M.trackMission('debris', 1);
+    if (e.type === 'debris' || e.type === 'asteroid') M.trackMission('debris', 1);
     SS.tg.haptic('light');
     this.hudDirty = true;
   };
@@ -1251,9 +1251,13 @@
     return this.ebullet(x, y, Math.cos(a) * s, Math.sin(a) * s, type, o);
   };
 
+  const cover = [];
   game.updateEBullets = function (dt) {
     const p = this.player, FW = G.FW, H = G.H, S = G.S;
     const pr = p.r;
+    // астероиды сектора закрывают от вражеских снарядов
+    cover.length = 0;
+    for (const e of this.enemies) if (e.alive && e.def.cover) cover.push(e);
     for (const b of this.ebullets) {
       if (b.dead) continue;
       b.age += dt; b.life -= dt;
@@ -1303,6 +1307,7 @@
         }
       }
       if (b.life <= 0 || b.y > H + 40 || b.y < -80 || b.x < -50 || b.x > FW + 50) { b.dead = true; continue; }
+      if (cover.length && hitsCover(b)) { b.dead = true; FX.hit(b.x, b.y, '#d8c3a5'); continue; }
       // попадание в игрока (стреловидная проверка — снаряд не «проскакивает»)
       if (p.alive && p.inv <= 0) {
         const rr = pr + b.r * 0.75;
@@ -1313,6 +1318,13 @@
       }
     }
   };
+  function hitsCover(b) {
+    for (const e of cover) {
+      const rr = e.r + b.r * 0.5;
+      if (U.dist2(e.x, e.y, b.x, b.y) < rr * rr) return true;
+    }
+    return false;
+  }
 
   // ════════════════════════════════════════════════════════════
   // ПОДБИРАЕМЫЕ ПРЕДМЕТЫ
@@ -1545,12 +1557,15 @@
     const budget = isBoss ? 0 : (9 + n * 4.4 + Math.pow(n, 1.28)) * this.diff.count;
     this.wave = { n, boss: isBoss, budget, spent: 0, spawnT: 0.8, intro: n === 1 ? 1.2 : 1.6, done: false, clearT: 0, miniDone: !(n % 5 === 3 && n >= 8), startT: this.t };
     this.run.waveDamage = 0;
+    // после прыжка (jumpScene) сектор уже сменён
     if (sector !== this.run.sector) {
       this.run.sector = sector;
       G.bg.setSector(sector);
       G.bg.warp = 1;
     }
-    SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector: n > 1 && (n - 1) % 5 === 0 });
+    // баннер сектора — только если его карточку не показали в прыжке
+    const newSector = n > 1 && (n - 1) % 5 === 0 && this.run.cardSector !== sector;
+    SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector });
     SS.events.roll(this.wave);
     if (this.run.challenge && n === D.CHALLENGE_WAVE) M.challengeDone(this.run.challenge);
     if (isBoss && this.state === 'play') this.bossScene(n);
@@ -1570,7 +1585,8 @@
     if (!w) return;
     if (w.intro > 0) { w.intro -= dt; return; }
     let alive = 0;
-    for (const e of this.enemies) if (e.alive && !e.leaving) alive++;
+    // астероиды сектора (def.prop) — часть обстановки, зачистку волны не задерживают
+    for (const e of this.enemies) if (e.alive && !e.leaving && !e.def.prop) alive++;
     if (w.boss) {
       // волна босса завершается его уничтожением (см. enemies.bossDefeated)
       return;
@@ -1604,7 +1620,9 @@
     // собираем оставшиеся монеты и кристаллы
     for (const it of this.pickups) if (it.kind !== 'pu') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
-    this.after(1.2, () => { if (this.wave === w) this.nextWave(); });
+    // после босса — прыжок в следующий сектор
+    if (w.boss) this.after(0.8, () => { if (this.wave === w) this.jumpScene(); });
+    else this.after(1.2, () => { if (this.wave === w) this.nextWave(); });
   };
 
   // уничтожение босса (из enemies.js)
@@ -1630,23 +1648,38 @@
   };
 
   // ════════════════════════════════════════════════════════════
-  // КАТ-СЦЕНА ВЫХОДА БОССА
-  //  Затемнение, полосы кино, босс выходит, карточка с именем, рёв.
-  //  Полная сцена — при первой встрече с боссом, дальше короткая.
+  // КАТ-СЦЕНЫ: выход босса и прыжок в следующий сектор
+  //  Затемнение и полосы кино поверх боя, карточка с крупным именем.
   //  Корабль можно вести, но он неуязвим и не стреляет; касание — пропуск.
+  //  scene.card = { cap, name, sub, at, y } — карточка, появившаяся в момент at
   // ════════════════════════════════════════════════════════════
+  const ease3 = (q) => 1 - Math.pow(1 - U.clamp(q, 0, 1), 3);
+
+  // выход босса: полная сцена — при первой встрече, дальше короткая
   game.bossScene = function (n) {
     const def = D.BOSSES[(n / 5 - 1) % D.BOSSES.length];
     const seen = M.s.bossSeen || (M.s.bossSeen = []);
     const full = !seen.includes(def.id);
     if (full) { seen.push(def.id); SS.store.soon(); }
     // когда выходит босс, когда появляется карточка с именем, когда сцена заканчивается
-    const sc = full ? { spawnT: 0.9, nameT: 2.4, end: 4.4 } : { spawnT: 0.1, nameT: 0.5, end: 1.8 };
-    this.scene = Object.assign(sc, { n, def, full, t: 0, out: -1, spawned: false, nameAt: -1 });
+    const sc = full ? { spawnT: 0.9, cardT: 2.4, end: 4.4 } : { spawnT: 0.1, cardT: 0.5, end: 1.8 };
+    this.startScene(Object.assign(sc, { kind: 'boss', n, def, full, color: def.color, spawned: false }));
+    A.play('warning');
+  };
+
+  // прыжок после босса: звёзды из заставки, вспышка, новый фон и карточка сектора
+  game.jumpScene = function () {
+    if (this.state !== 'play') { this.nextWave(); return; }
+    const sector = Math.floor(this.wave.n / 5), sec = D.SECTORS[sector % D.SECTORS.length];
+    this.startScene({ kind: 'jump', sector, sec, color: sec.neb[0], flashT: 1.45, cardT: 1.75, end: 3.4, warp: 0, flashed: false, stars: SS.intro.warpStars(150) });
+    A.play('skill', { rate: 0.6 });
+  };
+
+  game.startScene = function (sc) {
+    this.scene = Object.assign(sc, { t: 0, out: -1, card: null });
     this.state = 'cutscene';
     for (const b of this.ebullets) b.dead = true;
     A.muffle(true);
-    A.play('warning');
     SS.emit('cinema', true);
   };
 
@@ -1655,17 +1688,44 @@
     // сцена закончилась — полосы ещё уезжают
     if (sc.out >= 0) { sc.out += dt; if (sc.out > 0.45) this.scene = null; return; }
     sc.t += dt;
-    if (!sc.spawned && sc.t >= sc.spawnT) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
-    if (sc.nameAt < 0 && sc.t >= sc.nameT) this.sceneName();
+    if (sc.kind === 'boss') {
+      if (!sc.spawned && sc.t >= sc.spawnT) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
+      if (!sc.card && sc.t >= sc.cardT) this.bossCard();
+    } else {
+      // разгон до вспышки, после неё торможение
+      sc.warp = sc.t < sc.flashT ? ease3((sc.t - 0.25) / (sc.flashT - 0.25)) : Math.max(0, 1 - (sc.t - sc.flashT) * 0.9);
+      SS.intro.warpStep(sc.stars, dt, sc.warp);
+      if (!sc.flashed && sc.t >= sc.flashT) this.jumpFlash();
+      if (!sc.card && sc.t >= sc.cardT) this.sectorCard();
+    }
     if (sc.t >= sc.end) this.endScene();
   };
 
-  game.sceneName = function () {
-    const sc = this.scene;
-    sc.nameAt = sc.t;
+  game.bossCard = function () {
+    const sc = this.scene, def = sc.def;
+    sc.card = { cap: sc.full ? 'НОВЫЙ БОСС' : 'БОСС', name: def.name, sub: def.title, at: sc.t, y: 0.6 };
     A.play('bossRoar');
     FX.shake(sc.full ? 0.6 : 0.4);
     SS.tg.haptic('warning');
+  };
+
+  // на пике прыжка: под вспышкой меняется сектор, всё от прошлого (астероиды) остаётся позади
+  game.jumpFlash = function () {
+    const sc = this.scene;
+    sc.flashed = true;
+    this.run.sector = sc.sector;
+    G.bg.setSector(sc.sector, true);
+    G.bg.warp = 0.7;
+    for (const e of this.enemies) if (!e.boss) e.alive = false;
+    FX.flash('#dcecff', 0.7);
+    A.play('teleport');
+  };
+
+  game.sectorCard = function () {
+    const sc = this.scene;
+    sc.card = { cap: 'СЕКТОР ' + (sc.sector + 1), name: sc.sec.name, sub: sc.sec.desc || '', at: sc.t, y: 0.42 };
+    // карточку видели — баннер сектора на старте волны не нужен (см. nextWave)
+    this.run.cardSector = sc.sector;
   };
 
   game.endScene = function () {
@@ -1677,33 +1737,41 @@
     A.muffle(false);
     SS.emit('cinema', false);
     this.hudDirty = true;
+    if (sc.kind === 'jump') this.nextWave();
   };
 
   game.skipScene = function () {
     const sc = this.scene;
     if (!sc || this.state !== 'cutscene') return;
-    if (!sc.spawned) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
-    // имя ещё не показали — покажем обычным предупреждением поверх боя
-    if (sc.nameAt < 0) { A.play('bossRoar'); SS.emit('bossWarning', sc.def); }
-    // босс сразу встаёт на место, дальше обычный выход (enemies.updateBoss)
-    if (this.boss && this.boss.entering) this.boss.y = this.boss.baseY;
+    if (sc.kind === 'boss') {
+      if (!sc.spawned) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
+      // имя ещё не показали — покажем обычным предупреждением поверх боя
+      if (!sc.card) { A.play('bossRoar'); SS.emit('bossWarning', sc.def); }
+      // босс сразу встаёт на место, дальше обычный выход (enemies.updateBoss)
+      if (this.boss && this.boss.entering) this.boss.y = this.boss.baseY;
+    } else {
+      if (!sc.flashed) this.jumpFlash();
+      sc.warp = 0;
+    }
     this.endScene();
   };
 
-  // затемнение фона под боем
+  // 0..1: полосы выезжают за 0,45 с и уезжают за 0,45 с после конца
+  function sceneK(sc) {
+    return sc.out >= 0 ? 1 - ease3(sc.out / 0.45) : ease3(sc.t / 0.45);
+  }
+
+  // затемнение фона под боем; в прыжке гуще, и поверх него летят звёзды
   game.drawSceneDim = function (ctx) {
     const sc = this.scene, k = sceneK(sc);
     if (k <= 0) return;
-    ctx.fillStyle = 'rgba(0,0,0,' + (0.5 * k).toFixed(3) + ')';
+    const warp = sc.kind === 'jump' ? sc.warp : 0;
+    ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.92, 0.5 * k + 0.42 * warp).toFixed(3) + ')';
     ctx.fillRect(0, 0, G.W, G.H);
+    if (warp > 0.01) SS.intro.warpDraw(ctx, sc.stars, warp, G.FX + G.FW / 2, G.H * 0.42, Math.max(G.W, G.H) * 0.7, Math.min(1, warp * 1.6));
   };
-  // 0..1: полосы выезжают за 0,45 с и уезжают за 0,45 с после конца
-  function sceneK(sc) {
-    const ease = (q) => 1 - Math.pow(1 - U.clamp(q, 0, 1), 3);
-    return sc.out >= 0 ? 1 - ease(sc.out / 0.45) : ease(sc.t / 0.45);
-  }
 
-  // полосы кино и карточка с именем босса
+  // полосы кино и карточка
   game.drawScene = function (ctx) {
     const sc = this.scene, k = sceneK(sc);
     if (k <= 0) return;
@@ -1711,34 +1779,36 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, bh);
     ctx.fillRect(0, H - bh, W, bh);
-    ctx.fillStyle = G.hexA(sc.def.color, 0.55 * k);
+    ctx.fillStyle = G.hexA(sc.color, 0.55 * k);
     ctx.fillRect(0, bh, W, 1);
     ctx.fillRect(0, H - bh - 1, W, 1);
-    if (sc.nameAt < 0) return;
-    // карточка между боссом и кораблём игрока
-    const lt = sc.t - sc.nameAt, a = Math.min(1, lt / 0.25) * k;
+    const cd = sc.card;
+    if (!cd) return;
+    const lt = sc.t - cd.at, a = Math.min(1, lt / 0.25) * k;
     if (a <= 0) return;
-    const cx = G.FX + G.FW / 2, cy = H * 0.6, name = sc.def.name;
+    const cx = G.FX + G.FW / 2, cy = H * cd.y, name = cd.name;
     const size = Math.round(Math.min(32 * S, G.FW * 0.92 / (name.length * 0.82)));
     const grow = 1 + 0.12 * (1 - Math.min(1, lt / 0.35));
     // линия под именем раскрывается от центра
     const lw = G.FW * 0.36 * Math.min(1, lt / 0.4);
+    const maxW = G.FW * 0.92;
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = sc.def.color;
+    ctx.fillStyle = sc.color;
     ctx.font = '700 ' + Math.round(11 * S) + 'px Orbitron, Rajdhani, sans-serif';
-    const maxW = G.FW * 0.92;
-    ctx.fillText(sc.full ? 'НОВЫЙ БОСС' : 'БОСС', cx, cy - size * 0.95, maxW);
+    ctx.fillText(cd.cap, cx, cy - size * 0.95, maxW);
     ctx.fillRect(cx - lw, cy + size * 0.62, lw * 2, Math.max(1, 2 * S));
-    ctx.shadowColor = sc.def.color; ctx.shadowBlur = 18 * S;
+    ctx.shadowColor = sc.color; ctx.shadowBlur = 18 * S;
     ctx.fillStyle = '#fff';
     ctx.font = '900 ' + Math.round(size * grow) + 'px Orbitron, Rajdhani, sans-serif';
     ctx.fillText(name, cx, cy, maxW);
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,.78)';
-    ctx.font = '600 ' + Math.round(15 * S) + 'px Rajdhani, sans-serif';
-    ctx.fillText(sc.def.title, cx, cy + size * 0.62 + 18 * S, maxW);
+    if (cd.sub) {
+      ctx.fillStyle = 'rgba(255,255,255,.78)';
+      ctx.font = '600 ' + Math.round(15 * S) + 'px Rajdhani, sans-serif';
+      ctx.fillText(cd.sub, cx, cy + size * 0.62 + 18 * S, maxW);
+    }
     ctx.restore();
   };
 
@@ -2066,7 +2136,8 @@
     if (!p.alive) return;
     const blink = p.inv > 0 && this.state === 'play' && Math.floor(p.inv * 14) % 2 === 0;
     ctx.globalAlpha = blink ? 0.35 : 1;
-    const boost = this.buffs.rapid > 0 || run.skillFx.sk_overclock > 0 ? 1.3 : 1;
+    // в прыжке между секторами двигатели на форсаже
+    const boost = (this.buffs.rapid > 0 || run.skillFx.sk_overclock > 0 ? 1.3 : 1) + (this.scene && this.scene.kind === 'jump' ? this.scene.warp * 1.5 : 0);
     this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, p.x, p.y, p.w, p.tilt, this.t, boost);
     ctx.globalAlpha = 1;
     // щит

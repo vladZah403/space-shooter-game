@@ -33,8 +33,7 @@
       const FW = Math.min(W, 640), FX0 = (W - FW) / 2;
 
       // звёзды для прыжка: летят от центра к краям
-      const stars = [];
-      for (let i = 0; i < 220; i++) stars.push({ x: U.rand(-1, 1), y: U.rand(-1, 1), z: Math.random() });
+      const stars = intro.warpStars(220);
       // флот: портал, корабль, время появления; центральный — флагман
       const fleet = [
         { x: 0.22, y: 0.26, spr: 'shooter', w: 58, t0: 2.2 },
@@ -90,21 +89,8 @@
 
         // звёзды: в начале прыжок (длинные штрихи), потом спокойный полёт
         const warp = t < 1.4 ? 1 : Math.max(0.06, 1 - (t - 1.4) * 1.2);
-        const cx = W / 2, cy = H * 0.42, R = Math.max(W, H) * 0.7;
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.lineCap = 'round';
-        for (const st of stars) {
-          st.z -= dt * (0.12 + warp * 1.4);
-          if (st.z <= 0.02) { st.z = 1; st.x = U.rand(-1, 1); st.y = U.rand(-1, 1); }
-          const px = cx + st.x / st.z * R * 0.25, py = cy + st.y / st.z * R * 0.25;
-          const z2 = st.z + warp * 0.08;
-          const qx = cx + st.x / z2 * R * 0.25, qy = cy + st.y / z2 * R * 0.25;
-          const a = Math.min(1, (1 - st.z) * 1.6);
-          ctx.strokeStyle = 'rgba(' + (warp > 0.3 ? '150,210,255,' : '220,235,255,') + a.toFixed(2) + ')';
-          ctx.lineWidth = Math.max(1, (1 - st.z) * 2.6);
-          ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px + 0.01, py); ctx.stroke();
-        }
-        ctx.globalCompositeOperation = 'source-over';
+        intro.warpStep(stars, dt, warp);
+        intro.warpDraw(ctx, stars, warp, W / 2, H * 0.42, Math.max(W, H) * 0.7, 1);
         // вспышка выхода из прыжка
         if (t > 1.3 && t < 2.0) { ctx.fillStyle = 'rgba(190,225,255,' + (0.35 * (1 - (t - 1.3) / 0.7)).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
 
@@ -192,6 +178,36 @@
         }
       };
       raf = requestAnimationFrame(step);
+    },
+
+    // ── звёзды гиперпрыжка: общие для заставки и прыжка между секторами (game.jumpScene) ──
+    warpStars(n) {
+      const stars = [];
+      for (let i = 0; i < n; i++) stars.push({ x: U.rand(-1, 1), y: U.rand(-1, 1), z: Math.random() });
+      return stars;
+    },
+    // warp 0..1 — скорость полёта и длина штрихов
+    warpStep(stars, dt, warp) {
+      for (const st of stars) {
+        st.z -= dt * (0.12 + warp * 1.4);
+        if (st.z <= 0.02) { st.z = 1; st.x = U.rand(-1, 1); st.y = U.rand(-1, 1); }
+      }
+    },
+    warpDraw(ctx, stars, warp, cx, cy, R, alpha) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      const rgb = warp > 0.3 ? 'rgba(150,210,255,' : 'rgba(220,235,255,';
+      for (const st of stars) {
+        const px = cx + st.x / st.z * R * 0.25, py = cy + st.y / st.z * R * 0.25;
+        const z2 = st.z + warp * 0.08;
+        const qx = cx + st.x / z2 * R * 0.25, qy = cy + st.y / z2 * R * 0.25;
+        const a = Math.min(1, (1 - st.z) * 1.6) * alpha;
+        ctx.strokeStyle = rgb + a.toFixed(2) + ')';
+        ctx.lineWidth = Math.max(1, (1 - st.z) * 2.6);
+        ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px + 0.01, py); ctx.stroke();
+      }
+      ctx.restore();
     },
   };
   SS.intro = intro;
