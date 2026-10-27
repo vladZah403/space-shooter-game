@@ -421,6 +421,7 @@ body.cinema .banner{visibility:hidden}
 .wbtn .wres{position:absolute;left:8px;right:8px;bottom:5px;height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
 .wbtn .wres b{display:block;height:100%;background:var(--wc);transform-origin:left center}
 .wbtn .wres.reload b{opacity:.45}
+.wbtn .wres.off{opacity:0}
 .wbtn .wres.empty{background:rgba(255,77,94,.55);animation:blink .5s steps(2) infinite}
 .hud-actions{display:flex;align-items:flex-end;gap:7px;pointer-events:auto}
 .hud-skills{display:flex;gap:7px}

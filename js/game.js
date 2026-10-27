@@ -407,7 +407,8 @@
       return m.n > 0 ? { kind: 'mag', k: m.n / size, n: m.n, max: size } : { kind: 'reload', k: U.clamp(1 - m.t / b.reload, 0, 1) };
     }
     if (wid === 'lightning') return { kind: 'energy', k: run.energy };
-    if (wid === 'arc') return { kind: 'charge', k: run.arc };
+    // заряд серпа — бонус к урону, а не патроны: без движения шкалы нет совсем (иначе выглядит «разряжено»)
+    if (wid === 'arc') return run.arc > 0.04 ? { kind: 'charge', k: run.arc } : null;
     if (wid === 'laser' && run.focus.t > 0 && run.focus.n > 1) return { kind: 'focus', k: run.focus.n / b.focusMax };
     return null;
   };
@@ -540,12 +541,13 @@
       A.play('zap', full ? undefined : { vol: 0.4, rate: 1.6 });
     } else if (wid === 'arc') {
       // серп: волна-полумесяц летит вперёд, расширяется и прошивает всех на пути; заряд от движения — шире и сильнее
-      const ch = this.run.arc, k = base.min + (base.max - base.min) * ch, span = 1 + wl(wid, 'range') * 0.12, wk = span * (0.8 + 0.4 * ch);
-      const n = 1 + multi;
+      // «Мультивыстрел» не добавляет волн (экран заливало), а делает волну шире и сильнее
+      const ch = this.run.arc, k = base.min + (base.max - base.min) * ch, span = 1 + wl(wid, 'range') * 0.08;
+      const wk = span * (0.85 + 0.3 * ch) * (1 + multi * 0.08);
       const wave = (a, dmg, wmul) => shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg, r: base.thick * S,
         kind: 'wave', w: base.w0 * S * wk * wmul, w1: base.w1 * S * wk * wmul, wid, life: base.life * Math.sqrt(span), ch });
-      for (let i = 0; i < n; i++) wave((i - (n - 1) / 2) * 0.2, base.dmg * dmgMul * k * mk, 1);
-      if (spread) for (const a of [-0.4, 0.4]) wave(a, base.dmg * dmgMul * k * 0.6, 0.7);
+      wave(0, base.dmg * dmgMul * k * (1 + multi * 0.12), 1);
+      if (spread) for (const a of [-0.4, 0.4]) wave(a, base.dmg * dmgMul * k * 0.5, 0.6);
       A.play('arc');
     } else if (wid === 'darkmatter') {
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
@@ -610,6 +612,10 @@
       this.run.hits++;
       this.damageEnemy(e, b.dmg, { crit: true, src: 'arc' });
       FX.hit(e.x, e.y, '#bff9ff');
+      // каждый пробитый враг ослабляет волну; совсем слабая — гаснет
+      const ab = D.WEAPONS.arc.base;
+      b.dmg *= 1 - ab.pierceLoss;
+      if (b.hit.length >= Math.log(ab.minLeft) / Math.log(1 - ab.pierceLoss)) { b.dead = true; return; }
     }
   };
 
@@ -1360,10 +1366,13 @@
     return b;
   };
   // скорость вражеских снарядов растёт со сложностью и волной
-  game.bspd = function (v) { return v * G.S * this.diff.bspd * (1 + Math.min(this.wave ? this.wave.n : 1, 40) * 0.012); };
+  game.bspd = function (v) { return v * G.S * this.diff.bspd * (1 + Math.min(this.threatWave(), 40) * 0.012); };
+  // «волна угрозы»: номер волны со сдвигом сложности (diff.waveOffset) — по нему состав волн, темп огня,
+  // упреждение и новые атаки; прочность врагов и расписание боссов идут по настоящему номеру
+  game.threatWave = function () { return (this.wave ? this.wave.n : 1) + (this.diff.waveOffset || 0); };
   // упреждение: часть выстрелов летит туда, где корабль окажется, — постоянное движение в одну сторону
   // больше не спасает. Доля растёт от 3-й к 20-й волне и зависит от сложности (diff.lead)
-  game.leadK = function () { const n = this.wave ? this.wave.n : 1; return U.clamp((n - 3) / 17, 0, 1) * (this.diff.lead || 0); };
+  game.leadK = function () { return U.clamp((this.threatWave() - 3) / 17, 0, 1) * (this.diff.lead || 0); };
   game.aimAt = function (x, y, spd, type, spreadA, o) {
     const p = this.player, s = this.bspd(spd);
     let tx = p.x, ty = p.y;
@@ -1696,7 +1705,8 @@
     const n = this.wave ? this.wave.n + 1 : 1;
     const isBoss = n % 5 === 0;
     const sector = Math.floor((n - 1) / 5);
-    const budget = isBoss ? 0 : (9 + n * 4.4 + Math.pow(n, 1.28)) * this.diff.count;
+    const tn = n + (this.diff.waveOffset || 0);
+    const budget = isBoss ? 0 : (9 + tn * 4.4 + Math.pow(tn, 1.28)) * this.diff.count;
     this.wave = { n, boss: isBoss, budget, spent: 0, spawnT: 0.8, intro: n === 1 ? 1.2 : 1.6, done: false, clearT: 0, miniDone: !(n % 5 === 3 && n >= 8), startT: this.t };
     this.run.waveDamage = 0;
     // после прыжка (jumpScene) сектор уже сменён
@@ -1735,11 +1745,12 @@
     }
     if (!w.done) {
       w.spawnT -= dt;
-      const cap = Math.min(26 * Math.max(1, this.diff.count), (7 + w.n * 0.7) * this.diff.count);
+      const tn = this.threatWave();
+      const cap = Math.min(26 * Math.max(1, this.diff.count), (7 + tn * 0.7) * this.diff.count);
       if (w.spawnT <= 0 && alive < cap) withRng(this.run.waveRng, () => {
-        const cost = SS.enemies.spawnGroup(w.n, w.budget - w.spent);
+        const cost = SS.enemies.spawnGroup(tn, w.budget - w.spent);
         w.spent += cost;
-        w.spawnT = Math.max(0.42, 1.3 - w.n * 0.035) * U.rand(0.75, 1.25) / Math.pow(this.diff.count, 0.4);
+        w.spawnT = Math.max(0.42, 1.3 - tn * 0.035) * U.rand(0.75, 1.25) / Math.pow(this.diff.count, 0.4);
         if (!w.miniDone && w.spent > w.budget * 0.4) { w.miniDone = true; SS.enemies.spawnMini(w.n); }
         if (w.spent >= w.budget) w.done = true;
       });
@@ -2271,7 +2282,7 @@
         const w = waveGeom(b), fade = Math.min(1, b.life / 0.15);
         ctx.lineCap = 'round';
         // три слоя: мягкий ореол, неоновое тело, белая кромка
-        for (const [col, a, lw] of [['#3dc8ff', 0.16 + 0.1 * b.ch, 3], ['#7ff6ff', 0.55, 1.2], [b.ch > 0.66 ? '#ffffff' : '#e8ffff', 0.95, 0.45]]) {
+        for (const [col, a, lw] of [['#3dc8ff', 0.1 + 0.06 * b.ch, 2.6], ['#7ff6ff', 0.45, 1.1], [b.ch > 0.66 ? '#ffffff' : '#e8ffff', 0.9, 0.4]]) {
           ctx.globalAlpha = a * fade; ctx.strokeStyle = col; ctx.lineWidth = b.r * lw;
           ctx.beginPath(); ctx.arc(w.cx, w.cy, w.R, w.ang - w.span, w.ang + w.span); ctx.stroke();
         }
@@ -2291,6 +2302,16 @@
   game.drawWeaponRes = function (ctx, p, res) {
     const S = G.S, w = 3.5 * S, h = p.w * 0.6, x = p.x - p.w * 0.66 - w / 2, y = p.y - h * 0.4;
     const col = D.WEAPONS[p.weapon].color, empty = res.kind === 'energy' && res.k <= 0;
+    if (res.kind === 'charge') {
+      // заряд серпа — кольцо вокруг корабля: длина и яркость по заряду
+      const R = p.w * 0.66, a0 = -Math.PI / 2;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.25 + 0.55 * res.k;
+      ctx.strokeStyle = res.k > 0.66 ? '#e8ffff' : col; ctx.lineWidth = (1.5 + 1.5 * res.k) * S; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, a0 - Math.PI * res.k, a0 + Math.PI * res.k); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.globalCompositeOperation = 'source-over';
+      return;
+    }
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
     if (res.kind === 'mag') {

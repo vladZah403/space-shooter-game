@@ -574,7 +574,7 @@
     for (const b of ui._wBtns || []) {
       if (!b._res) continue;
       const r = g.weaponRes(b.dataset.w);
-      if (!r) continue;
+      if (!r) { if (b._resKind !== 'off') { b._resKind = 'off'; b._resK = -1; b._res.className = 'wres off'; } continue; }
       const kind = r.kind === 'energy' && r.k <= 0 ? 'empty' : r.kind, k = Math.round(r.k * 20) / 20;
       if (b._resKind !== kind) { b._resKind = kind; b._res.className = 'wres ' + kind; }
       if (b._resK !== k) { b._resK = k; b._resFill.style.transform = 'scaleX(' + k + ')'; }

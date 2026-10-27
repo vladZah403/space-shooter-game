@@ -20,13 +20,16 @@
     // 3.0: награда за сложность — только монеты (coins); множители очков и опыта убраны (score, xp = 1),
     // рекорды сравниваются внутри своей сложности. power — рекомендуемая «Боевая мощь», unlock — на какой
     // сложности нужно дойти до волны D.DIFF_UNLOCK_WAVE, чтобы открыть эту.
-    // eliteShield — элита со щитом и быстрее, bossRage — у боссов 4-я фаза «ярость», drops — шанс бонусов
+    // eliteShield — элита со щитом и быстрее, bossRage — у боссов 4-я фаза «ярость», drops — шанс бонусов.
+    // hp × count растёт как рекомендуемая мощь (Сложно ×3, Кошмар ×7, Бог ×15 к «Норме»): при рекомендуемой мощи
+    // враги умирают так же долго, как у новичка на «Норме». waveOffset — состав волн (типы, число врагов,
+    // темп огня, новые атаки) как на столько-то волн позже: на высоких сложностях с первых волн есть угроза
     zen:       { name: 'ЗЕН',       color: '#3dffd0', lead: 0,    count: 0.65, hp: 0.6,  spd: 0.8,  fire: 0.45, bspd: 0.75, elite: 0,    coins: 0.5,  score: 1, xp: 1, power: 0,    desc: 'Мало врагов и пуль — спокойный полёт' },
     easy:      { name: 'ЛЕГКО',     color: '#3dffa2', lead: 0.3,  count: 0.8,  hp: 0.8,  spd: 0.9,  fire: 0.7,  bspd: 0.85, elite: 0,    coins: 0.75, score: 1, xp: 1, power: 0,    desc: 'Враги слабее и реже стреляют' },
     normal:    { name: 'НОРМА',     color: '#3de0ff', lead: 0.6,  count: 1,    hp: 1,    spd: 1,    fire: 1,    bspd: 1,    elite: 0.03, coins: 1,    score: 1, xp: 1, power: 100,  desc: 'Задуманный баланс' },
-    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, count: 1.25, hp: 1.3,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1, xp: 1, power: 300,  unlock: 'normal',    eliteShield: true,    desc: 'Больше врагов, элита со щитами и ускорением' },
-    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, count: 1.5,  hp: 1.7,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 1, xp: 1, power: 700,  unlock: 'hard',      bossRage: true,      desc: 'Плотный огонь, у боссов дополнительная фаза ярости' },
-    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, count: 1.8, hp: 2.2, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 1, xp: 1, power: 1500, unlock: 'nightmare', eliteShield: true, bossRage: true, drops: 0.6, desc: 'Щиты у элиты, ярость боссов и меньше бонусов' },
+    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, waveOffset: 3,  count: 1.25, hp: 2.4,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1, xp: 1, power: 300,  unlock: 'normal',    eliteShield: true,    desc: 'Больше врагов, элита со щитами и ускорением' },
+    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, waveOffset: 6,  count: 1.5,  hp: 4.6,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 1, xp: 1, power: 700,  unlock: 'hard',      bossRage: true,      desc: 'Плотный огонь, у боссов дополнительная фаза ярости' },
+    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, waveOffset: 10, count: 1.8, hp: 8.3, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 1, xp: 1, power: 1500, unlock: 'nightmare', eliteShield: true, bossRage: true, drops: 0.6, desc: 'Щиты у элиты, ярость боссов и меньше бонусов' },
   };
   D.DIFF_UNLOCK_WAVE = 25;
   D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god'];
@@ -73,13 +76,13 @@
     // id 'arc' сохранён ради старых сохранений; с 3.0 это «Серп» — волны-полумесяцы вместо дуги-молнии
     arc: {
       name: 'СЕРП', color: '#7ff6ff', price: 1200, rate: { dmg: 3, speed: 3, area: 4, range: 3 }, tags: ['Прошивает строй', 'Манёвры'],
-      desc: 'Волны-полумесяцы расширяются в полёте и прошивают всех врагов на пути. Движение заряжает: волна шире и сильнее (×0,75…×1,5).',
-      // волна: ширина w0 → w1 за время жизни life, толщина thick; заряд 0..1 — полный за путь в charge ширин поля,
-      // без движения стекает drain в секунду; урон от min до max по заряду
-      base: { dmg: 26, cd: 0.42, speed: 560, life: 0.75, w0: 70, w1: 190, thick: 11, charge: 1.1, drain: 0.3, min: 0.75, max: 1.5 },
+      desc: 'Волны-полумесяцы расширяются в полёте и прошивают врагов, слабея с каждым (−20%). Движение заряжает: волна шире и сильнее (×0,75…×1,5).',
+      // волна: ширина w0 → w1 за время жизни life, толщина thick; каждое попадание −pierceLoss урона, ниже minLeft — гаснет;
+      // заряд 0..1 — полный за путь в charge ширин поля, без движения стекает drain в секунду; урон от min до max по заряду
+      base: { dmg: 26, cd: 0.42, speed: 560, life: 0.7, w0: 60, w1: 130, thick: 10, pierceLoss: 0.2, minLeft: 0.3, charge: 1.1, drain: 0.3, min: 0.75, max: 1.5 },
       ups: [
         { id: 'dmg', name: 'Мощность', max: 8, step: 0.12, unit: '% урона', costs: C([90, 150, 240, 360, 540, 780, 1100, 1600]) },
-        { id: 'range', name: 'Размах', max: 5, step: 0.12, unit: '% ширины и дальности', costs: C([160, 280, 450, 680, 1000]) },
+        { id: 'range', name: 'Размах', max: 5, step: 0.08, unit: '% ширины и дальности', costs: C([160, 280, 450, 680, 1000]) },
         { id: 'rate', name: 'Частота', max: 6, step: 0.08, unit: '% темпа', costs: C([110, 190, 300, 460, 680, 980]) },
       ],
     },
@@ -252,7 +255,7 @@
   D.PERKS = [
     { id: 'dmg',       ico: '🔥', name: 'МОЩЬ',            rar: 'common', max: 6,  desc: '+15% урона всем оружием' },
     { id: 'rate',      ico: '⚡', name: 'СКОРОСТРЕЛЬНОСТЬ', rar: 'common', max: 5,  desc: '+12% темп стрельбы' },
-    { id: 'multi',     ico: '🔱', name: 'МУЛЬТИВЫСТРЕЛ',   rar: 'rare',   max: 3,  desc: 'Ещё один снаряд в залпе с 60% урона (у серпа — ещё одна волна). Молния: +1 прыжок и +15% урона' },
+    { id: 'multi',     ico: '🔱', name: 'МУЛЬТИВЫСТРЕЛ',   rar: 'rare',   max: 3,  desc: 'Ещё один снаряд в залпе с 60% урона. Серп: волна шире и +12% урона. Молния: +1 прыжок и +15% урона' },
     { id: 'crit',      ico: '🎯', name: 'КРИТ',            rar: 'common', max: 4,  desc: '+8% шанс критического удара (×2 урон)' },
     { id: 'pierce',    ico: '🔩', name: 'БРОНЕБОЙ',        rar: 'rare',   max: 3,  desc: 'Снаряды пробивают ещё одного врага' },
     { id: 'magnet',    ico: '🧲', name: 'ГРАВИЗАХВАТ',     rar: 'common', max: 3,  desc: '+50% радиус сбора монет и кристаллов' },

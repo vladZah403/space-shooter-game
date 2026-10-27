@@ -280,8 +280,7 @@
   // СТРЕЛЬБА
   // ════════════════════════════════════════════════════════════
   function fireRate() {
-    const wn = game.wave ? game.wave.n : 1;
-    return game.diff.fire * (1 + Math.min(wn, 40) * 0.015);
+    return game.diff.fire * (1 + Math.min(game.threatWave(), 40) * 0.015);
   }
   function canShoot(e) {
     return game.player.alive && e.y > 10 && e.y < G.H * 0.78 && !e.leaving && e.alpha > 0.5 && e.x > -10 && e.x < G.FW + 10;
@@ -340,7 +339,7 @@
   E.NEW_FIRE = NEW_FIRE;
   function tickFire(e, dt) {
     const f = e.def.fire;
-    if (f && f.cd && !(f.from && game.wave.n < f.from)) {
+    if (f && f.cd && !(f.from && game.threatWave() < f.from)) {
       e.fireT -= dt;
       if (e.fireT <= 0) {
         e.fireT = f.cd / fireRate() * U.rand(0.8, 1.2) * (e.elite ? 0.75 : 1);
@@ -349,7 +348,7 @@
     }
     // второе орудие у тяжёлых кораблей
     const f2 = e.def.fire2;
-    if (f2 && !(f2.from && game.wave.n < f2.from)) {
+    if (f2 && !(f2.from && game.threatWave() < f2.from)) {
       e.fireT2 -= dt;
       if (e.fireT2 <= 0) {
         e.fireT2 = f2.cd / fireRate() * U.rand(0.85, 1.15);
@@ -373,7 +372,7 @@
   }
   // уклонение (с 6-й волны): враг замечает, что корабль под ним, и уходит с линии огня; реакция не мгновенная
   function dodge(e, dt) {
-    if (!game.wave || game.wave.n < 6 || !e.vx) return;
+    if (!game.wave || game.threatWave() < 6 || !e.vx) return;
     if (e.vxBase === undefined) e.vxBase = Math.abs(e.vx);
     e.vx = U.sign(e.vx) * U.damp(Math.abs(e.vx), e.vxBase, 1.4, dt);
     e.dodgeCd = (e.dodgeCd === undefined ? U.rand(0.6, 1.6) : e.dodgeCd) - dt;
