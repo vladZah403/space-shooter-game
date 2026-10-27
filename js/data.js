@@ -171,6 +171,10 @@
     ion:         { name: 'Ионный',         sprite: 'e_ion',       w: 52, hp: 120, spd: 75,  score: 600, coins: 5, xp: 4, ai: 'ion',       wave: 18, weight: 4 },
     crab:        { name: 'Крабоход',       sprite: 'e_crab',      w: 66, hp: 280, spd: 55,  score: 820, coins: 7, xp: 5, ai: 'crab',      wave: 21, weight: 4,
       fire: { kind: 'pincer', cd: 1.8, bullet: 'bolt', spd: 240 } },
+    lancer:      { name: 'Лансер',         sprite: 'interceptor', tint: 285, w: 52, hp: 95, spd: 80, score: 500, coins: 4, xp: 3, ai: 'hover', wave: 15, weight: 5,
+      fire: { kind: 'twin', cd: 2.1, bullet: 'plaser', spd: 330 } },
+    // обломки появляются только в событии «Космический мусор» (weight 0 — в обычных волнах их нет)
+    debris:      { name: 'Обломок',        sprite: 'fx_rock1',    w: 40, hp: 26,  spd: 120, score: 40,  coins: 3, xp: 0, ai: 'drift',     wave: 99, weight: 0 },
     biomech:     { name: 'Био-мех',        sprite: 'e_biomech',   w: 86, hp: 230, spd: 58,  score: 900, coins: 8, xp: 5, ai: 'bomber',    wave: 23, weight: 3, horizontal: true, weave: 38,
       fire: { kind: 'fan', cd: 1.3, count: 5, spread: 0.9, bullet: 'green', spd: 160, down: true } },
     // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
@@ -229,20 +233,30 @@
     { id: 'crit',      ico: '🎯', name: 'КРИТ',            rar: 'common', max: 4,  desc: '+8% шанс критического удара (×2 урон)' },
     { id: 'pierce',    ico: '🔩', name: 'БРОНЕБОЙ',        rar: 'rare',   max: 3,  desc: 'Снаряды пробивают ещё одного врага' },
     { id: 'magnet',    ico: '🧲', name: 'ГРАВИЗАХВАТ',     rar: 'common', max: 3,  desc: '+50% радиус сбора монет и кристаллов' },
-    { id: 'heal',      ico: '💚', name: 'РЕМОНТ',          rar: 'common', max: 99, desc: 'Восстановить 1 жизнь сейчас' },
+    { id: 'heal',      ico: '💚', name: 'РЕМОНТ',          rar: 'common', max: 99, filler: true, desc: 'Восстановить 1 жизнь сейчас' },
     { id: 'maxhp',     ico: '❤️', name: 'БРОНЯ',           rar: 'epic',   max: 2,  desc: '+1 к максимуму жизней и +1 жизнь' },
     { id: 'shieldgen', ico: '🛡️', name: 'ЩИТ-ГЕНЕРАТОР',   rar: 'rare',   max: 3,  desc: 'Щит восстанавливается сам (30 → 22 → 15 с)' },
     { id: 'drone',     ico: '🛰️', name: 'ДРОН-НАПАРНИК',   rar: 'epic',   max: 2,  desc: 'Дрон летит рядом и стреляет по врагам' },
     { id: 'nova',      ico: '💥', name: 'ДЕТОНАЦИЯ',       rar: 'rare',   max: 3,  desc: 'Враги взрываются при гибели и ранят соседей' },
     { id: 'cryo',      ico: '❄️', name: 'КРИО-СНАРЯДЫ',    rar: 'rare',   max: 2,  desc: 'Шанс 12% заморозить врага на 2 с' },
     { id: 'greed',     ico: '💰', name: 'ЖАДНОСТЬ',        rar: 'common', max: 3,  desc: '+30% монет до конца забега' },
-    { id: 'bomb',      ico: '💣', name: 'БОЕЗАПАС',        rar: 'common', max: 99, desc: '+1 бомба' },
+    { id: 'bomb',      ico: '💣', name: 'БОЕЗАПАС',        rar: 'common', max: 99, filler: true, desc: '+1 бомба' },
     { id: 'cooldown',  ico: '⏱️', name: 'ПЕРЕЗАРЯДКА',     rar: 'rare',   max: 3,  desc: '−15% перезарядка навыков и бомб' },
     { id: 'speed',     ico: '🚀', name: 'ФОРСАЖ',          rar: 'common', max: 2,  desc: '+15% скорость корабля и +5% уклонение' },
-    { id: 'vamp',      ico: '🧛', name: 'ВАМПИРИЗМ',       rar: 'epic',   max: 1,  desc: 'Каждые 40 уничтоженных врагов — +1 жизнь' },
+    { id: 'vamp',      ico: '🩸', name: 'КРОВОПИЙЦА',      rar: 'epic',   max: 1,  desc: 'Каждые 30 критических попаданий — +1 жизнь' },
     { id: 'luck',      ico: '🍀', name: 'УДАЧА',           rar: 'common', max: 2,  desc: '+40% шанс выпадения бонусов' },
     { id: 'titan',     ico: '🏹', name: 'ОХОТНИК НА ТИТАНОВ', rar: 'rare', max: 2,  desc: '+25% урона по боссам и мини-боссам' },
     { id: 'critdmg',   ico: '💢', name: 'СМЕРТЕЛЬНЫЙ УДАР', rar: 'rare',   max: 2,  desc: 'Критический удар наносит ещё +50% урона' },
+    // перки с компромиссом: другой стиль игры, а не «просто больше»
+    { id: 'glass',     ico: '💎', name: 'СТЕКЛЯННАЯ ПУШКА', rar: 'epic',   max: 1,  desc: '+50% урона, но максимум жизней — 1' },
+    { id: 'ricochet',  ico: '🎱', name: 'РИКОШЕТ',          rar: 'rare',   max: 1,  desc: 'Снаряды отскакивают от краёв экрана, урон −20%' },
+  ];
+
+  // ── Эволюции оружия: оружие в бою + перк на нужном уровне → новая форма ──
+  D.EVOLUTIONS = [
+    { weapon: 'laser',     perk: 'pierce', lvl: 3, name: 'ЛУЧ',                  desc: 'Лазер пробивает всех врагов на пути, урон +25%' },
+    { weapon: 'rocket',    perk: 'nova',   lvl: 3, name: 'КАССЕТНЫЕ БОЕГОЛОВКИ', desc: 'Каждый взрыв ракеты разбрасывает 4 малых заряда' },
+    { weapon: 'lightning', perk: 'cryo',   lvl: 2, name: 'ЛЕДЯНАЯ ЦЕПЬ',         desc: 'Молния замораживает каждую цель в цепи' },
   ];
 
   // ── Навыки (дерево за очки навыков) ─────────────────────────
@@ -334,6 +348,11 @@
     { id: 'dark',       name: 'ТЬМА',      price: 900,  colors: ['#e6d9ff', '#8a4dff', '#2a0d66'] },
     { id: 'lightsaber', name: 'ЛАЙТСАБЕР', price: 1200, colors: ['#ffffff', '#d2f8ff', '#3de0ff'] },
     { id: 'rainbow',    name: 'РАДУГА',    price: 2000, colors: 'rainbow' },
+    // шлейфы со спрайтом из каталога эффектов: рисуются за соплами поверх пламени
+    { id: 'twin',       name: 'ДВОЙНОЙ',   price: 1500, colors: ['#ffffff', '#7fe7ff', '#2a7bff'], fx: 'fx_tr_double' },
+    { id: 'boost',      name: 'ФОРСАЖ',    price: 1800, colors: ['#ffffff', '#6bd8ff', '#1a5cff'], fx: 'fx_tr_boost' },
+    { id: 'plume',      name: 'ШЛЕЙФ',     price: 2400, colors: ['#ffe1ff', '#e06bff', '#7a3dff'], fx: 'fx_tr_plasma' },
+    { id: 'spiral',     name: 'СПИРАЛЬ',   price: 3000, colors: ['#e6e0ff', '#9b6bff', '#3d2aff'], fx: 'fx_tr_spiral', spin: true },
   ];
 
   // ── Достижения ───────────────────────────────────────────────
@@ -380,6 +399,14 @@
     { id: 'daily3',          ico: '📅', name: 'Дисциплина',          desc: 'Выполните все 3 задания дня',       reward: 100 },
     { id: 'daily_7',         ico: '🔥', name: 'Легенда дисциплины',  desc: 'Заходите 7 дней подряд',            reward: 400 },
     { id: 'prestige1',       ico: '🌠', name: 'Легенда галактики',   desc: 'Совершите престиж',                 reward: 500 },
+    // 2.5
+    { id: 'evo1',            ico: '🧬', name: 'Мутация',             desc: 'Получите эволюцию оружия',          reward: 150 },
+    { id: 'evo_all',         ico: '🧪', name: 'Генный инженер',      desc: 'Получите все 3 эволюции',           reward: 600, stat: 'evoTypes', goal: 3 },
+    { id: 'glass10',         ico: '💎', name: 'Хрустальный ас',      desc: 'Волна 10 со «Стеклянной пушкой»',   reward: 300 },
+    { id: 'events10',        ico: '🌪️', name: 'Буревестник',         desc: 'Переживите 10 событий волны',       reward: 200, stat: 'events', goal: 10 },
+    { id: 'challenge1',      ico: '🎲', name: 'Принял вызов',        desc: 'Пройдите испытание дня (волна 10)', reward: 200 },
+    { id: 'challenge7',      ico: '🏵️', name: 'Чемпион испытаний',   desc: 'Пройдите 7 испытаний дня',          reward: 700, stat: 'challenges', goal: 7 },
+    { id: 'trail_fx',        ico: '🌀', name: 'Стиль пилота',        desc: 'Купите шлейф двигателя со спецэффектом', reward: 150 },
   ];
 
   // ── Ежедневные задания ──────────────────────────────────────
@@ -395,6 +422,8 @@
     { id: 'perks',   text: 'Получите улучшений: {n}',        goals: [8, 15, 25],            rewards: [50, 90, 140] },
     { id: 'pickups', text: 'Подберите бонусов: {n}',         goals: [6, 12, 20],            rewards: [50, 80, 120] },
     { id: 'minutes', text: 'Проведите в бою {n} мин',        goals: [5, 10, 15],            rewards: [50, 90, 140] },
+    { id: 'events',  text: 'Переживите событий волны: {n}',  goals: [1, 2, 3],              rewards: [60, 100, 150] },
+    { id: 'debris',  text: 'Разбейте обломков: {n}',         goals: [10, 20, 35],           rewards: [50, 90, 140] },
   ];
   D.DAILY_BONUS = 150; // за все три задания
 
@@ -421,12 +450,35 @@
     { name: 'ТРОН ОВЕРЛОРДА',     sky: ['#050108', '#1f0626'], neb: ['#b03dff', '#ff3d6b', '#3d1a8a'], star: '#f0dcff', planet: 285 },
   ];
 
+  // ── События волны: с 6-й волны иногда меняют правила на одну волну ──
+  D.EVENTS = [
+    { id: 'storm',   name: 'ИОННАЯ БУРЯ',       ico: '⚡', color: '#7fb8ff', desc: 'Молнии бьют в отмеченные места — и по врагам тоже' },
+    { id: 'meteors', name: 'МЕТЕОРИТНЫЙ ДОЖДЬ', ico: '☄️', color: '#ff8a3d', desc: 'Следите за линиями — по ним летят метеоры' },
+    { id: 'solar',   name: 'СОЛНЕЧНАЯ ВСПЫШКА', ico: '☀️', color: '#ffc83d', desc: 'Вспышки сжигают вражеские снаряды и ранят врагов' },
+    { id: 'debris',  name: 'КОСМИЧЕСКИЙ МУСОР', ico: '🌑', color: '#d8c3a5', desc: 'Сбивайте обломки — в них монеты' },
+  ];
+  D.EVENT_WAVE = 6;       // с какой волны бывают события
+  D.EVENT_CHANCE = 0.3;   // шанс события на обычной волне
+
+  // ── Испытание дня: одинаковые для всех правила на сутки, награда за 10-ю волну раз в день ──
+  D.CHALLENGE_MODS = [
+    { id: 'events',  name: 'Буйный космос',    desc: 'событие на каждой волне с 3-й' },
+    { id: 'glass',   name: 'Стеклянная пушка', desc: '+50% урона, но всего 1 жизнь' },
+    { id: 'swift',   name: 'Форсаж врагов',    desc: 'враги на 25% быстрее, монеты +50%' },
+    { id: 'elite',   name: 'Элитный флот',     desc: 'элитные враги втрое чаще' },
+    { id: 'weapon',  name: 'Оружие дня',       desc: 'только одно оружие: {w}' },
+    { id: 'perks',   name: 'Фора',             desc: 'старт с тремя случайными улучшениями' },
+    { id: 'nodrops', name: 'Без бонусов',      desc: 'бонусы не выпадают, но урон +30%' },
+  ];
+  D.CHALLENGE_WAVE = 10;
+  D.CHALLENGE_REWARD = 400;
+
   // Цена воскрешения за монеты (один раз за забег)
-  D.reviveCost = (wave) => 120 + wave * 35;
+  D.reviveCost = (wave) => Math.round(150 + wave * 35 + wave * wave * 2.5);
   // Опыт корабля: сколько нужно до следующего уровня
   D.shipXpNeed = (lvl) => Math.round(110 * Math.pow(lvl, 1.15) + 30);
   // Порог опыта забега для нового уровня (выбор улучшения)
-  D.perkXpNeed = (lvl) => Math.round(6 + lvl * 5 + lvl * lvl * 0.9);
+  D.perkXpNeed = (lvl) => (lvl <= 1 ? 6 : Math.round(4 + lvl * 5 + lvl * lvl * 0.9));
   // Престиж доступен с этого уровня корабля
   D.PRESTIGE_LVL = 25;
 

@@ -36,6 +36,7 @@
   // ════════════════════════════════════════════════════════════
   game.init = function () {
     G = SS.gfx; FX = SS.fx; A = SS.audio; M = SS.meta;
+    SS.events.init();
   };
 
   // отложенное действие по игровому времени (на паузе не идёт, при новом забеге сбрасывается)
@@ -49,10 +50,17 @@
     for (const tm of due) { try { tm.fn(); } catch (e) { console.error(e); } }
   };
 
-  game.start = function (diffId) {
-    const s = M.s;
+  // o.challenge — испытание дня { date, mods, weapon } (см. meta.challenge)
+  game.start = function (diffId, o) {
+    const s = M.s, ch = o && o.challenge;
     this.diffId = D.DIFFS[diffId] ? diffId : 'normal';
     this.diff = D.DIFFS[this.diffId];
+    if (ch) {
+      // правила дня меняют копию сложности, сама таблица сложностей не трогается
+      const d = this.diff = Object.assign({}, this.diff);
+      if (ch.mods.includes('swift')) { d.spd *= 1.25; d.coins *= 1.5; }
+      if (ch.mods.includes('elite')) d.elite = Math.max(0.09, d.elite * 3);
+    }
     s.settings.diff = this.diffId;
     this.clearWorld();
     const S = G.S;
@@ -60,10 +68,12 @@
       score: 0, coins: 0, kills: 0, bosses: 0, bossIds: [], combo: 0, comboT: 0, maxCombo: 0,
       level: 1, xp: 0, pendingPerks: 0, perks: {}, perkCount: 0, rerolls: 0,
       time: 0, shots: 0, hits: 0, pickups: 0, reviveUsed: false, phoenixUsed: false,
-      waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, killsForVampPerk: 0, detCount: 0,
+      waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
-      lastAchCheck: 0, sector: 0,
+      lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '',
+      challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
+    if (ch && ch.mods.includes('glass')) this.run.perks.glass = 1;
     this.st = this.computeStats();
     const st = this.st;
     const p = this.player = {
@@ -77,6 +87,9 @@
     p.shield = M.generalLevel('shield') >= 1;
     p.bombs = 1 + M.generalLevel('bombs') + (D.SHIPS[s.ship.model].stats.bombs || 0);
     p.wingCd = 0.2;
+    if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
+    if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
+    if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = this.perkChoices().find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
     this.buffs = {};
     this.wave = null;
     this.t = 0; this.timeScale = 1; this.slowT = 0;
@@ -98,6 +111,7 @@
     this.timers = [];
     this.ov = { rail: null, hole: null, arcs: [], beams: [], lasers: [] };
     SS.enemies.corpses.length = 0;
+    SS.events.reset();
     FX.clear();
   };
 
@@ -134,7 +148,7 @@
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
     if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
-      dmg: (1 + gl('power') * 0.07) * (1 + (ship.dmg || 0)) * pres.dmg * (1 + pk('dmg') * 0.15) * (sk('sk_sniper') ? 1.5 : 1),
+      dmg: (1 + gl('power') * 0.07) * (1 + (ship.dmg || 0)) * pres.dmg * (1 + pk('dmg') * 0.15) * (sk('sk_sniper') ? 1.5 : 1) * (pk('glass') ? 1.5 : 1) * (pk('ricochet') ? 0.8 : 1) * (this.run && this.run.noDrops ? 1.3 : 1),
       rate: (1 + gl('rate') * 0.05) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
       crit: 0.03 + gl('crit') * 0.04 + pk('crit') * 0.08 + (ship.crit || 0),
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5,
@@ -268,6 +282,7 @@
     this.processBlasts();
     this.updatePickups(dt);
     this.updateWaves(dt);
+    SS.events.update(dt);
     this.updateOverlays(dt);
     this.cleanup();
     FX.update(dt);
@@ -297,6 +312,9 @@
     const p = this.player, run = this.run, st = this.st;
     if (p.inv > 0) p.inv -= dt;
     if (p.bombCd > 0) p.bombCd -= dt;
+    if (p.lockT > 0) p.lockT -= dt;
+    if (this.buffs.freeze > 0 && FX.quality > 0 && Math.random() < dt * 45) FX.frost(Math.random() * G.FW, Math.random() * G.H * 0.85);
+    if (p.lockHot > 0) p.lockHot -= dt;
     for (const k in this.buffs) { if (this.buffs[k] > 0) { this.buffs[k] -= dt; if (this.buffs[k] <= 0) { delete this.buffs[k]; this.hudDirty = true; } } }
     for (const k in run.skillCd) if (run.skillCd[k] > 0) run.skillCd[k] = Math.max(0, run.skillCd[k] - dt);
     for (const k in run.skillFx) if (run.skillFx[k] > 0) run.skillFx[k] = Math.max(0, run.skillFx[k] - dt);
@@ -383,13 +401,15 @@
 
     if (wid === 'laser') {
       const lvl = wl(wid, 'dmg');
-      const sprite = lvl >= 8 && G.frame('fx_charge') ? 'fx_charge' : lvl >= 6 ? 'pb_laser' : lvl >= 3 ? 'pb_bolt_m' : 'pb_bolt_s';
-      const sw = (sprite === 'fx_charge' ? 18 : sprite === 'pb_laser' ? 13 : sprite === 'pb_bolt_m' ? 15 : 13) * S;
-      const n = 1 + multi, gap = 10 * S, pierce = wl(wid, 'pierce') + st.pierce;
+      const beam = this.evo('laser');
+      const sprite = (beam || lvl >= 8) && G.frame('fx_charge') ? 'fx_charge' : lvl >= 6 ? 'pb_laser' : lvl >= 3 ? 'pb_bolt_m' : 'pb_bolt_s';
+      const sw = (sprite === 'fx_charge' ? (beam ? 22 : 18) : sprite === 'pb_laser' ? 13 : sprite === 'pb_bolt_m' ? 15 : 13) * S;
+      const n = 1 + multi, gap = 10 * S, pierce = beam ? 99 : wl(wid, 'pierce') + st.pierce;
+      const dmgMul2 = beam ? dmgMul * 1.25 : dmgMul;
       const spd = base.speed * S;
       for (let i = 0; i < n; i++) {
         const ox = (i - (n - 1) / 2) * gap;
-        shot({ x: p.x + ox, y: nose, vx: 0, vy: -spd, dmg: base.dmg * dmgMul * mk, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
+        shot({ x: p.x + ox, y: nose, vx: 0, vy: -spd, dmg: base.dmg * dmgMul2 * mk, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
       }
       if (spread) for (const a of [-0.22, 0.22]) shot({ x: p.x, y: nose, vx: Math.sin(a) * spd, vy: -Math.cos(a) * spd, dmg: base.dmg * dmgMul * 0.8, r: 5 * S, kind: 'laser', sprite, w: sw, pierce, wid, life: 1.6 });
       A.play('laser');
@@ -470,7 +490,10 @@
       if (!best) break;
       hit.push(best);
       pts.push([best.x, best.y]);
-      FX.lightning(cx, cy, best.x, best.y, '#fff36b', 2.6 * G.S, 0.14);
+      const icy = this.evo('lightning');
+      FX.lightning(cx, cy, best.x, best.y, icy ? '#9be8ff' : '#fff36b', 2.6 * G.S, 0.14);
+      if (icy && !best.boss) best.frozen = 2;
+      FX.sprite('fx_bolt', best.x, best.y, { w0: 22 * G.S, w1: 34 * G.S, dur: 0.18, hold: 0.3, rot: U.rand(-0.6, 0.6), hue: 52, minor: true });
       this.damageEnemy(best, dmg * Math.pow(D.WEAPONS.lightning.base.falloff, j), { crit: true, src: 'lightning' });
       cx = best.x; cy = best.y; cur = best;
     }
@@ -530,7 +553,7 @@
   // ════════════════════════════════════════════════════════════
   game.updateBullets = function (dt) {
     const FW = G.FW, H = G.H, S = G.S;
-    const ric = this.skill('sk_ricochet');
+    const ric = this.skill('sk_ricochet') || this.perk('ricochet') > 0;
     for (const b of this.bullets) {
       if (b.dead) continue;
       b.age += dt; b.life -= dt;
@@ -601,6 +624,13 @@
 
   game.rocketBlast = function (b, direct) {
     FX.explode(b.x, b.y, 0.8, '#ff9f3d');
+    if (this.evo('rocket')) {
+      const R = b.aoeR * 1.1;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + Math.PI / 4, x = b.x + Math.cos(a) * R, y = b.y + Math.sin(a) * R;
+        this.after(0.1 + i * 0.05, () => this.blast(x, y, b.aoeR * 0.55, b.aoe * 0.45, '#ffb03d', 'rocket'));
+      }
+    }
     A.play('explodeS', { vol: 0.7 });
     for (const e of this.enemies) {
       if (!e.alive || !e.hittable || e === direct) continue;
@@ -608,7 +638,7 @@
     }
   };
   game.plasmaBlast = function (b, direct) {
-    FX.explode(b.x, b.y, 1.3, '#ff5cf0', { hue: 305 });
+    FX.explode(b.x, b.y, 1.3, '#ff5cf0', { kind: 'plasma', hue: 315 });
     FX.ring(b.x, b.y, 8, b.aoeR, '#ff8af5', 0.35, 4);
     FX.shake(0.12);
     A.play('explodeM', { vol: 0.6 });
@@ -619,7 +649,7 @@
     }
   };
   game.darkBurst = function (b) {
-    FX.explode(b.x, b.y, 1.2, '#b06bff', { hue: 275 });
+    FX.explode(b.x, b.y, 1.2, '#b06bff', { kind: 'plasma' });
     FX.ring(b.x, b.y, b.burstR, 4, '#d9b8ff', 0.3, 4);
     A.play('explodeM', { vol: 0.55, rate: 0.7 });
     for (const e of this.enemies) {
@@ -659,7 +689,7 @@
         const rr = e.r * 0.8 + p.r * 1.6;
         if (e.rx ? SS.enemies.hitTest(e, p.x, p.y, p.r * 1.6, 0.8) : U.dist2(e.x, e.y, p.x, p.y) < rr * rr) {
           if (!e.boss && !e.mini) { this.damageEnemy(e, 999999, { src: 'ram', noText: true }); }
-          this.hitPlayer(e.x, e.y);
+          this.hitPlayer(e.x, e.y, 'Столкновение: ' + (e.boss ? e.bdef.name : e.def.name || 'враг'));
         }
       }
     }
@@ -685,6 +715,7 @@
     let crit = false;
     if (o.crit && Math.random() < this.st.crit) {
       dmg *= this.st.critMul; crit = true;
+      if (this.perk('vamp') && ++this.run.critsForVamp >= 30) { this.run.critsForVamp = 0; this.heal(1, '🩸 +1 ЖИЗНЬ'); }
       if (Math.abs(this.t - (this.critFxT || -1)) > 0.08) {
         this.critFxT = this.t;
         FX.sprite('fx_flare', e.x + U.rand(-0.25, 0.25) * (e.rx ? e.rx : e.r), e.y + U.rand(-0.2, 0.2) * (e.ry ? e.ry : e.r), { w0: 26 * G.S, w1: 40 * G.S, dur: 0.22, hold: 0.3, hue: 45, rot: U.rand(-0.3, 0.3), minor: true });
@@ -759,6 +790,13 @@
     if (run.combo > run.maxCombo) run.maxCombo = run.combo;
     if (run.combo % 10 === 0) M.onCombo(run.combo);
     if (run.combo >= 50 && !run.fever) this.setFever(true);
+    if (run.combo === 10 || run.combo === 25) {
+      const big = run.combo === 25, col = big ? '#ffc83d' : '#3de0ff';
+      FX.text(G.FW / 2, G.H * 0.38, 'КОМБО ' + run.combo + '!', col, big ? 20 : 17, 1.1, -30);
+      FX.ring(this.player.x, this.player.y, this.player.w * 0.5, this.player.w * (big ? 2.2 : 1.6), col, 0.45, 4);
+      this.addScore(Math.round((big ? 1500 : 500) * this.wave.n * this.diff.score));
+      A.play('powerup', { rate: big ? 1.5 : 1.3, vol: 0.6 });
+    }
     const comboMul = 1 + Math.min(run.combo, 100) * 0.02;
     const waveMul = 1 + (this.wave.n - 1) * 0.08;
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
@@ -775,10 +813,10 @@
     if (e.mini) this.dropPowerup(e.x + 20 * S, e.y);
     // навыки и улучшения
     if (this.skill('sk_vamp')) { run.killsForVamp++; if (run.killsForVamp >= 25) { run.killsForVamp = 0; this.heal(1, '🧛 ВАМПИР'); } }
-    if (this.perk('vamp')) { run.killsForVampPerk++; if (run.killsForVampPerk >= 40) { run.killsForVampPerk = 0; this.heal(1, '🧛 +1'); } }
     if (this.skill('sk_detonator')) { run.detCount++; if (run.detCount % 5 === 0) this.blast(e.x, e.y, 80 * S, 40 * this.dmgMul(), '#ff9f3d', 'det'); }
     if (this.st.nova > 0) this.blast(e.x, e.y, (46 + this.st.nova * 14) * S, 12 * this.st.nova * this.dmgMul(), '#ffb03d', 'nova');
     if (e.def.split && !e.isChild) SS.enemies.split(e);
+    if (e.type === 'debris') M.trackMission('debris', 1);
     SS.tg.haptic('light');
     this.hudDirty = true;
   };
@@ -798,7 +836,7 @@
   // ════════════════════════════════════════════════════════════
   // УРОН ПО ИГРОКУ
   // ════════════════════════════════════════════════════════════
-  game.hitPlayer = function (sx, sy) {
+  game.hitPlayer = function (sx, sy, cause) {
     const p = this.player, run = this.run;
     if (!p.alive || p.inv > 0 || this.state !== 'play') return false;
     if (run.skillFx.sk_barrier > 0) return false;
@@ -806,6 +844,7 @@
       p.inv = 0.35;
       FX.text(p.x, p.y - p.w * 0.6, 'УКЛОНЕНИЕ', '#7fe7ff', 13, 0.7);
       FX.glowPuff(p.x, p.y, '#7fe7ff', 60 * G.S, 0.25);
+      FX.sprite('fx_dash', 0, 0, { follow: p, w0: p.w * 0.9, w1: p.w * 1.3, dur: 0.35, hold: 0.3, hue: 190 });
       SS.tg.haptic('light');
       return false;
     }
@@ -823,11 +862,13 @@
       return true;
     }
     p.lives--;
+    run.lastHit = cause || 'Вражеский огонь';
     run.waveDamage++;
     run.bossDamaged = true;
     p.inv = 1.8;
     this.clearBulletsAround(p.x, p.y, 130 * G.S);
     FX.explode(p.x, p.y, 1.2, '#ff5c7a');
+    FX.vignette('#ff2a48', 0.6, 0.85);
     FX.shake(0.55);
     A.play('playerHit');
     SS.tg.haptic('heavy');
@@ -836,6 +877,14 @@
     if (p.lives <= 0) this.playerDown();
     return true;
   };
+
+  // чем сбит игрок — показывается на экране итогов
+  const SHOT_NAMES = { mine: 'мина', needle: 'прицельный выстрел', long: 'прицельный выстрел', fire: 'огненный шар', ink: 'чернильная бомба',
+    egg: 'кладка роя', shard: 'осколок кристалла', feather: 'перо Феникса', junk: 'обломок', eye: 'взгляд Оверлорда', plaser: 'фиолетовый лазер' };
+  function hitCause(b, boss) {
+    const what = SHOT_NAMES[b.type] || 'вражеский снаряд';
+    return boss && boss.alive ? boss.bdef.name + ', ' + what : what[0].toUpperCase() + what.slice(1);
+  }
 
   game.clearBulletsAround = function (x, y, r) {
     for (const b of this.ebullets) {
@@ -884,7 +933,7 @@
     p.alive = false;
     this.state = 'dying';
     this.slowT = 1.2;
-    FX.explode(p.x, p.y, 2.6, '#7fe7ff');
+    FX.explode(p.x, p.y, 2.6, '#7fe7ff', { kind: 'super' });
     FX.flash('#ffffff', 0.5);
     A.play('explodeL');
     SS.tg.haptic('error');
@@ -906,7 +955,7 @@
     const p = this.player;
     this.run.reviveUsed = true;
     p.alive = true;
-    p.lives = Math.max(2, Math.ceil(p.maxLives / 2));
+    p.lives = Math.min(p.maxLives, Math.max(2, Math.ceil(p.maxLives / 2)));
     p.inv = 3;
     p.x = G.FW / 2; p.y = G.H * 0.8;
     this.state = 'play';
@@ -925,11 +974,11 @@
     this.state = 'over';
     const run = this.run;
     const result = M.finishRun({ score: run.score, wave: this.wave.n, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
-      time: run.time, diff: this.diffId, perks: run.perkCount, shots: run.shots, hits: run.hits });
+      time: run.time, diff: this.diffId, perks: run.perkCount, shots: run.shots, hits: run.hits, challenge: !!run.challenge });
     const summary = Object.assign({}, result, {
       score: run.score, wave: this.wave.n, sector: run.sector, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
       time: run.time, coins: run.coins, accuracy: run.shots ? Math.round(Math.min(1, run.hits / run.shots) * 100) : 0,
-      diff: this.diffId, level: run.level,
+      diff: this.diffId, level: run.level, cause: run.lastHit,
     });
     SS.tg.submitScore({ score: run.score, wave: this.wave.n, diff: this.diffId, time: run.time, kills: run.kills, bosses: run.bosses, shots: run.shots, hits: Math.min(run.hits, run.shots) });
     SS.emit('runEnd', summary);
@@ -949,7 +998,8 @@
     const S = G.S;
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H) * 1.1, '#ffb36b', 0.7, 10);
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H) * 0.8, '#ffffff', 0.5, 4);
-    FX.sprite('fx_ex_kill', p.x, p.y, { w0: 90 * S, w1: 420 * S, dur: 0.65, hold: 0.25, rot: Math.random() * U.TAU });
+    FX.sprite('fx_ex_kill', p.x, p.y, { w0: 90 * S, w1: 290 * S, dur: 0.6, hold: 0.25, rot: Math.random() * U.TAU });
+    FX.sprite('fx_shock', p.x, p.y, { w0: 60 * S, w1: 250 * S, dur: 0.55, hold: 0.25, hue: 28 });
     FX.flash('#ffd9a0', 0.55);
     FX.shake(0.8);
     A.play('bomb');
@@ -990,7 +1040,6 @@
     else if (id === 'sk_airstrike') this.airstrike();
     else if (id === 'sk_timewarp') {
       FX.flash('#3d6bff', 0.25); FX.ring(G.FW / 2, G.H / 2, 20, G.H, '#7fb8ff', 0.8, 6);
-      FX.sprite('fx_warp', G.FW / 2, G.H / 2, { w0: G.FW * 0.9, w1: G.FW * 1.3, sy: 0.6, dur: 0.9, hold: 0.3, alpha: 0.55, hue: 225 });
     }
     else if (id === 'sk_rail') { this.ov.rail = { t: 0, dur: sk.dur, tick: 0, charge: 0.35 }; A.play('railCharge'); }
     else if (id === 'sk_blackhole') { this.ov.hole = { x: G.FW / 2, y: G.H * 0.32, t: 0, dur: sk.dur, tick: 0 }; A.play('dark', { rate: 0.6 }); }
@@ -1007,7 +1056,7 @@
   game.novaWave = function (withDamage) {
     const p = this.player, S = G.S;
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H), '#bfe6ff', 0.6, 8);
-    FX.sprite('fx_sh_restore', p.x, p.y, { w0: 40 * S, w1: Math.max(G.FW, G.H) * 1.2, dur: 0.6, hold: 0.2, alpha: 0.8 });
+    FX.sprite('fx_shock', p.x, p.y, { w0: 40 * S, w1: 240 * S, dur: 0.5, hold: 0.25, alpha: 0.9 });
     FX.sprite('fx_flare', p.x, p.y, { w0: 60 * S, w1: 150 * S, dur: 0.45, hold: 0.25 });
     FX.flash('#cfeaff', 0.35);
     FX.shake(0.5);
@@ -1109,7 +1158,7 @@
     }
     // вертикальные лучи (дредноут, ионный, инквизитор) ранят один раз
     for (const bm of ov.beams) {
-      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(p.x, p.y); }
+      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(p.x, p.y, this.boss ? this.boss.bdef.name + ', луч' : 'Луч'); }
     }
     // поворотные лазеры: прикреплены к владельцу, могут следить за игроком
     const edt = dt * this.enemySlow();
@@ -1129,7 +1178,7 @@
         const dx = Math.cos(L.ang), dy = Math.sin(L.ang);
         const tt = U.clamp((p.x - o.x) * dx + (p.y - o.y) * dy, 0, L.len);
         const qx = o.x + dx * tt, qy = o.y + dy * tt;
-        if (Math.hypot(p.x - qx, p.y - qy) < L.w * 0.45 + p.r) this.hitPlayer(p.x, p.y);
+        if (Math.hypot(p.x - qx, p.y - qy) < L.w * 0.45 + p.r) this.hitPlayer(p.x, p.y, (L.owner && L.owner.bdef ? L.owner.bdef.name + ', ' : '') + 'лазер');
       }
     }
   };
@@ -1164,6 +1213,7 @@
     egg:     { sprite: 'eb_orb',    w: 26, r: 9,   color: '#a6ff3d', tint: 95 },
     junk:    { sprite: 'eb_fire',   w: 18, r: 7,   color: '#ff8a3d', tint: 20 },
     eye:     { sprite: 'eb_orb',    w: 17, r: 6,   color: '#ff3dd2', tint: 320 },
+    plaser:  { sprite: 'eb_plaser', w: 9,  r: 4,   color: '#c86bff', rotate: true },
   };
   game.EB = EB;
 
@@ -1249,7 +1299,7 @@
         const rr = pr + b.r * 0.75;
         if (Math.abs(b.x - p.x) < rr + 30 && Math.abs(b.y - p.y) < rr + 40 && U.segDist2(p.x, p.y, b.px, b.py, b.x, b.y) < rr * rr) {
           b.dead = true;
-          this.hitPlayer(b.x, b.y);
+          this.hitPlayer(b.x, b.y, hitCause(b, this.boss));
         }
       }
     }
@@ -1285,6 +1335,7 @@
     }
   };
   game.dropPowerup = function (x, y, type) {
+    if (!type && this.run.noDrops) return null;
     if (!type) {
       const p = this.player;
       const keys = Object.keys(D.POWERUPS).filter((k) => !(k === 'heal' && p.lives >= p.maxLives) && !(k === 'shield' && p.shield));
@@ -1351,7 +1402,14 @@
     FX.text(p.x, p.y - p.w * 0.7, def.name, def.color, 13, 1.0, -50);
     if (type === 'rapid') this.speedFx(G.hueOf(def.color));
     else if (type === 'star') FX.sprite('fx_flare', 0, 0, { follow: p, w0: p.w * 0.8, w1: p.w * 2.2, dur: 0.5, hold: 0.3, hue: 45 });
-    else if (type === 'freeze') FX.sprite('fx_dust', p.x, p.y, { w0: 60 * S, w1: 320 * S, dur: 0.8, hold: 0.3 });
+    else if (type === 'freeze') {
+      FX.ring(p.x, p.y, p.w * 0.5, Math.max(G.FW, G.H) * 0.9, '#bff4ff', 0.8, 5);
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * U.TAU;
+        FX.sprite('fx_flare', p.x + Math.cos(a) * p.w * 1.1, p.y + Math.sin(a) * p.w * 1.1, { w0: 18 * S, w1: 34 * S, dur: 0.5 + i * 0.04, hold: 0.3, hue: 190, rot: a });
+      }
+      for (const e of this.enemies) if (e.alive && !e.boss) FX.sprite('fx_flare', e.x, e.y, { w0: 16 * S, w1: 28 * S, dur: 0.45, hold: 0.3, hue: 190, minor: true });
+    }
     switch (type) {
       case 'heal': this.heal(1); break;
       case 'shield': p.shield = true; this.run.shieldRegenT = 0; this.shieldFx(); M.unlock('shield'); break;
@@ -1378,19 +1436,50 @@
     const avail = D.PERKS.filter((pk) => {
       const lv = this.perk(pk.id);
       if (lv >= pk.max) return false;
-      if (pk.id === 'heal' && p.lives >= p.maxLives) return false;
+      if (pk.filler) return false;
       if (pk.id === 'shieldgen' && this.st.shieldRegen && this.st.shieldRegen <= 15) return false;
+      if ((pk.id === 'maxhp' || pk.id === 'shieldgen') && this.perk('glass')) return false;
+      if (pk.id === 'glass' && p.lives < 1) return false;
+      if (pk.id === 'ricochet' && this.skill('sk_ricochet')) return false;
       return true;
     });
     const picks = [];
     const pool = avail.slice();
     while (picks.length < 3 && pool.length) {
-      const pk = U.pickWeighted(pool, (x) => D.RARITY[x.rar].w * (x.id === 'heal' ? (p.lives <= 1 ? 3 : 0.8) : 1));
+      const pk = U.pickWeighted(pool, (x) => D.RARITY[x.rar].w * (this.evoStep(x.id) ? 1.8 : 1));
       picks.push(pk);
       pool.splice(pool.indexOf(pk), 1);
     }
+    // утешительные карты: когда основное взято; на последней жизни «Ремонт» подменяет одну карту
+    const heal = D.PERKS.find((x) => x.id === 'heal'), ammo = D.PERKS.find((x) => x.id === 'bomb');
+    const canHeal = p.lives < p.maxLives;
+    if (canHeal && p.lives <= 1 && picks.length === 3 && Math.random() < 0.6) picks[2] = heal;
+    for (const f of [canHeal ? heal : null, ammo]) if (f && picks.length < 3 && !picks.includes(f)) picks.push(f);
     return picks;
   };
+  // эволюции оружия
+  game.evo = function (wid) { return !!(this.run && this.run.evo && this.run.evo[wid]); };
+  // эволюция, к которой ведёт перк (оружие в бою, эволюция ещё не получена)
+  game.evoStep = function (perkId) {
+    const p = this.player;
+    for (const ev of D.EVOLUTIONS) if (ev.perk === perkId && p.weapons.includes(ev.weapon) && !this.evo(ev.weapon)) return ev;
+    return null;
+  };
+  game.checkEvolutions = function () {
+    const p = this.player, run = this.run;
+    for (const ev of D.EVOLUTIONS) {
+      if (run.evo[ev.weapon] || !p.weapons.includes(ev.weapon) || this.perk(ev.perk) < ev.lvl) continue;
+      run.evo[ev.weapon] = true;
+      M.onEvolution(ev.weapon);
+      FX.text(G.FW / 2, G.H * 0.4, 'ЭВОЛЮЦИЯ: ' + ev.name, '#ff9ff3', 18, 1.8, -25);
+      FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.3, w1: p.w * 1.5, dur: 1.2, hold: 0.5, fadeIn: 0.1, hue: 300 });
+      FX.flash('#ff9ff3', 0.3);
+      A.play('levelup', { rate: 1.2 });
+      SS.emit('toast', { ico: '🧬', title: 'ЭВОЛЮЦИЯ ОРУЖИЯ', text: ev.name + ': ' + ev.desc, info: true, dur: 3200 });
+      if (p.weapon !== ev.weapon) this.setWeapon(ev.weapon);
+    }
+  };
+
   game.offerPerk = function () {
     this.state = 'perk';
     this.pointer.id = null;
@@ -1406,19 +1495,28 @@
     A.play('click');
     return this.perkChoices();
   };
-  game.choosePerk = function (id) {
-    if (this.state !== 'perk') return;
+  // действие перка; free — подарен правилами (не считается выбором и не идёт в задания)
+  game.grantPerk = function (id, free) {
     const run = this.run, p = this.player;
     run.perks[id] = (run.perks[id] || 0) + 1;
-    run.perkCount++;
-    run.pendingPerks = Math.max(0, run.pendingPerks - 1);
-    M.trackMission('perks', 1);
-    if (run.level >= 15) M.unlock('perk15');
+    if (!free) {
+      run.perkCount++;
+      run.pendingPerks = Math.max(0, run.pendingPerks - 1);
+      M.trackMission('perks', 1);
+      if (run.level >= 15) M.unlock('perk15');
+    }
     if (id === 'heal') p.lives = Math.min(p.maxLives, p.lives + 1);
     if (id === 'maxhp') { p.maxLives++; p.lives++; }
     if (id === 'bomb') p.bombs = Math.min(9, p.bombs + 1);
-    if (id === 'shieldgen' && !p.shield) { p.shield = true; this.shieldFx(); }
+    if (id === 'shieldgen' && !p.shield) { p.shield = true; if (!free) this.shieldFx(); }
+    if (id === 'glass') { p.maxLives = 1; p.lives = 1; }
     this.refreshStats();
+    this.checkEvolutions();
+  };
+  game.choosePerk = function (id) {
+    if (this.state !== 'perk') return;
+    const p = this.player;
+    this.grantPerk(id);
     A.play('perk');
     FX.glowPuff(p.x, p.y, '#3dffa2', 110 * G.S, 0.45);
     FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.2, w1: p.w * 1.35, dur: 0.85, hold: 0.45, fadeIn: 0.1 });
@@ -1444,10 +1542,13 @@
       G.bg.warp = 1;
     }
     SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector: n > 1 && (n - 1) % 5 === 0 });
+    SS.events.roll(this.wave);
+    if (this.run.challenge && n === D.CHALLENGE_WAVE) M.challengeDone(this.run.challenge);
     if (isBoss) {
       this.wave.intro = 3.2;
       this.after(2.6, () => SS.enemies.spawnBoss(n));
       SS.emit('bossWarning', D.BOSSES[(n / 5 - 1) % D.BOSSES.length]);
+      FX.vignette('#ff2a48', 2.4, 0.75, true);
       A.play('warning');
     }
     this.hudDirty = true;
@@ -1487,6 +1588,8 @@
     const bonus = Math.round(250 * w.n * this.diff.score * (perfect ? 2 : 1));
     this.addScore(bonus);
     if (perfect && w.n >= 5) M.unlock('no_hit_level');
+    if (w.n >= 10 && this.perk('glass')) M.unlock('glass10');
+    SS.events.finish();
     // собираем оставшиеся монеты и кристаллы
     for (const it of this.pickups) if (it.kind !== 'pu') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
@@ -1615,7 +1718,10 @@
     const sprite = variant || D.SHIPS[model].sprite;
     const cols = game.trailColors(trail);
     const L = { model, skin, trail, ss, ts, sprite, f: G.frame(sprite), cv: variant ? null : game.shipCanvas(model, skin),
-      flame: flameSprite(cols), glowCol: cols[1], noz: G.nozzles[sprite] || NOZ_DEFAULT };
+      flame: flameSprite(cols), glowCol: cols[1], noz: G.nozzles[sprite] || NOZ_DEFAULT,
+      tfx: tr && tr.fx ? G.frame(tr.fx) : null, spin: !!(tr && tr.spin) };
+    // шлейф рисуем только из главных сопел, чтобы у кораблей с 3–4 соплами не было каши
+    if (L.tfx) { const big = Math.max(...L.noz.map((n) => n[2])); L.tnoz = L.noz.filter((n) => n[2] >= big * 0.75); }
     if (!L.f) return L;
     looks.push(L);
     if (looks.length > 8) looks.shift();
@@ -1643,6 +1749,24 @@
       const gs = fw * 2.6;
       ctx.drawImage(G.glow(L.glowCol, 64), nx - gs / 2, ny - gs * 0.35, gs, gs);
     }
+    const tf = L.tfx, ti = tf && G.src(tf);
+    if (ti) {
+      for (const n of L.tnoz) {
+        const nx = (n[0] - 0.5) * w, ny = (n[1] - 0.5) * h, k = n[2] * (boost || 1);
+        if (L.spin) {
+          // спираль крутится прямо за соплом
+          const sz = w * 0.5 * k;
+          ctx.save(); ctx.translate(nx, ny + sz * 0.42); ctx.rotate(t * 5); ctx.scale(1, 0.72);
+          ctx.globalAlpha = 0.85;
+          ctx.drawImage(ti, tf[0], tf[1], tf[2], tf[3], -sz / 2, -sz / 2 * tf[3] / tf[2], sz, sz * tf[3] / tf[2]);
+          ctx.restore();
+        } else {
+          const tw = w * 0.36 * k, th = tw * tf[3] / tf[2] * (0.9 + 0.1 * Math.sin(t * 30 + n[0] * 7));
+          ctx.globalAlpha = 0.9;
+          ctx.drawImage(ti, tf[0], tf[1], tf[2], tf[3], nx - tw / 2, ny - th * 0.04, tw, th);
+        }
+      }
+    }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     const cv = L.cv;
@@ -1665,20 +1789,28 @@
     this.drawBullets(ctx);
     this.drawPlayer(ctx);
     this.drawEBullets(ctx);
+    SS.events.draw(ctx);
     this.drawOverlays(ctx);
     FX.drawFront(ctx);
     FX.drawTexts(ctx);
     ctx.restore();
     // эффекты экрана
     if (this.run.skillFx.sk_timewarp > 0 || this.buffs.freeze > 0) {
-      ctx.fillStyle = this.buffs.freeze > 0 ? 'rgba(120,220,255,.08)' : 'rgba(60,110,255,.09)';
+      const frz = this.buffs.freeze > 0;
+      ctx.fillStyle = frz ? 'rgba(120,220,255,.05)' : 'rgba(60,110,255,.06)';
       ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (frz ? 0.9 : 0.7) + 0.1 * Math.sin(this.t * 2.5);
+      ctx.drawImage(FX.vigCanvas(frz ? '#8fe9ff' : '#3d6bff'), 0, 0, W, H);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
     }
     if (this.player.alive && this.player.lives === 1) {
       ctx.globalAlpha = 0.55 + 0.35 * Math.sin(this.t * 5);
       ctx.drawImage(SS.main.vignetteRed(), 0, 0, W, H);
       ctx.globalAlpha = 1;
     }
+    FX.drawScreen(ctx, W, H);
     FX.drawFlash(ctx, W, H);
     // края поля на широких экранах
     if (G.FX > 1) {
@@ -1826,9 +1958,12 @@
         if (barrier) G.drawCanvas(ctx, G.tinted('fx_sh_bubble', { hue: 46 }), p.x, p.y, bw, 0);
         else G.draw(ctx, 'fx_sh_bubble', p.x, p.y, bw);
       }
-      ctx.globalAlpha = 0.75;
-      ctx.strokeStyle = col; ctx.lineWidth = 2 * S;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r, this.t * 2, this.t * 2 + U.TAU * 0.8); ctx.stroke();
+      // полное тонкое кольцо и бегущий по нему блик (дуга с разрывом выглядела как обрезанный щит)
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5 * S;
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, U.TAU); ctx.stroke();
+      ctx.globalAlpha = 0.9; ctx.lineWidth = 2.2 * S;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, this.t * 2.5, this.t * 2.5 + U.TAU * 0.22); ctx.stroke();
       if (!bubble) {
         ctx.globalAlpha = 0.4;
         ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.9, -this.t * 3, -this.t * 3 + U.TAU * 0.5); ctx.stroke();
@@ -1836,8 +1971,18 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
+    // прицел снайпера на корабле: держится пару секунд после наводки, перед выстрелом сжимается и мигает
+    if (p.lockT > 0) {
+      const hot = p.lockHot > 0, fade = Math.min(1, p.lockT / 0.4);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = fade * (hot ? 0.85 + 0.15 * Math.sin(this.t * 40) : 0.75 + 0.2 * Math.sin(this.t * 6));
+      G.draw(ctx, 'fx_lock', p.x, p.y, p.w * (hot ? 1.05 : 1.35 + 0.05 * Math.sin(this.t * 4)), this.t * (hot ? 4 : 1.2));
+      if (hot) G.draw(ctx, 'fx_lock', p.x, p.y, p.w * 1.05, this.t * 4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
     // точка хитбокса (видна при опасности — помогает уклоняться)
-    if (this.ebullets.length > 6 || p.lives === 1) {
+    if (this.ebullets.length > 6 || p.lives === 1 || this.pointer.id !== null) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.85;
       ctx.drawImage(G.glow('#ff5c7a', 32), p.x - 7 * S, p.y - 7 * S, 14 * S, 14 * S);

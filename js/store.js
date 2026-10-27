@@ -21,15 +21,15 @@
       general: {},
       ship: { model: 'ship1', models: ['ship1'], skin: 'default', skins: ['default'], trail: 'ice', trails: ['ice', 'fire'] },
       stats: { games: 0, kills: 0, bosses: 0, bossTypes: [], bestScore: 0, bestWave: 0, maxCombo: 0, playTime: 0,
-        coinsEarned: 0, perks: 0, deaths: 0, shots: 0, diff },
+        coinsEarned: 0, perks: 0, deaths: 0, shots: 0, diff, events: 0, challenges: 0, evos: [] },
       achievements: {},
-      daily: { date: '', missions: [], bonus: false, loginDate: '', streak: 0, seen: '' },
+      daily: { date: '', missions: [], bonus: false, loginDate: '', streak: 0, seen: '', ch: { date: '', best: 0, wave: 0, done: false } },
       settings: { music: 70, sfx: 80, musicStyle: 'synthwave', quality: 'auto', vibro: true, sens: 1.25,
-        dmgNums: true, shake: true, fps: false, diff: 'normal' },
+        dmgNums: true, shake: true, fps: false, diff: 'normal', intro: true },
       lb: [],
       seenIntro: false,
       notes: [],
-      patch: 21,
+      patch: 25,
     };
   }
 
@@ -111,8 +111,12 @@
     patchNotes(data) {
       if (data && !(data.patch >= 21) && data.stats && data.stats.games > 0) {
         if (!this.s.notes.some((n) => n.type === 'v21' || n.type === 'v2')) this.s.notes.push({ type: 'v21' });
+      } else if (data && data.patch >= 21 && !(data.patch >= 24) && data.stats && data.stats.games > 0) {
+        if (!this.s.notes.some((n) => n.type === 'v24')) this.s.notes.push({ type: 'v24' });
+      } else if (data && data.patch >= 24 && !(data.patch >= 25) && data.stats && data.stats.games > 0) {
+        if (!this.s.notes.some((n) => n.type === 'v25')) this.s.notes.push({ type: 'v25' });
       }
-      this.s.patch = 21;
+      this.s.patch = 25;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
@@ -318,6 +322,7 @@
       if (!this.spend(t.price)) return false;
       this.s.ship.trails.push(id);
       this.s.ship.trail = id;
+      if (t.fx) this.unlock('trail_fx');
       store.save();
       return true;
     },
@@ -415,6 +420,7 @@
         case 'skillsLearned': return Object.keys(s.skills).length;
         case 'shipsOwned': return s.ship.models.filter((m) => D.SHIPS[m]).length;
         case 'shipLvl': return s.shipLvl;
+        case 'evoTypes': return (st.evos || []).length;
         default: return st[stat] || 0;
       }
     },
@@ -483,6 +489,50 @@
       store.soon();
     },
 
+    // ── эволюции оружия ──
+    onEvolution(wid) {
+      const st = this.s.stats;
+      if (!st.evos.includes(wid)) st.evos.push(wid);
+      this.unlock('evo1');
+      this.checkAchievements();
+    },
+
+    // ── испытание дня: правила одинаковы у всех в этот день (зерно — только дата) ──
+    challenge() {
+      const today = U.today(), rnd = U.seeded(U.hashStr('challenge:' + today));
+      const pool = D.CHALLENGE_MODS.map((m) => m.id), mods = [];
+      while (mods.length < 2) {
+        const id = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
+        // стеклянная пушка без бонусов и форы — слишком жёстко для награды раз в день
+        if (id === 'nodrops' && mods.includes('glass') || id === 'glass' && mods.includes('nodrops')) continue;
+        mods.push(id);
+      }
+      const ws = D.WEAPON_ORDER.filter((w) => w !== 'laser');
+      return { date: today, mods, weapon: ws[Math.floor(rnd() * ws.length)] };
+    },
+    challengeState() {
+      const d = this.s.daily, today = U.today();
+      if (!d.ch || d.ch.date !== today) d.ch = { date: today, best: 0, wave: 0, done: false };
+      return d.ch;
+    },
+    modText(id, ch) {
+      const m = D.CHALLENGE_MODS.find((x) => x.id === id);
+      return m ? m.desc.replace('{w}', D.WEAPONS[ch.weapon].name) : id;
+    },
+    // дошли до нужной волны — награда раз в день
+    challengeDone(ch) {
+      const c = this.challengeState();
+      if (c.done || ch.date !== c.date) return false;
+      c.done = true;
+      this.s.stats.challenges = (this.s.stats.challenges || 0) + 1;
+      this.addCoins(D.CHALLENGE_REWARD, false);
+      this.unlock('challenge1');
+      this.checkAchievements();
+      SS.emit('toast', { ico: '🎲', title: 'ИСПЫТАНИЕ ДНЯ ПРОЙДЕНО', text: '+' + D.CHALLENGE_REWARD + ' монет', dur: 3200 });
+      store.save();
+      return true;
+    },
+
     // ── награда за вход ──
     loginStatus() {
       const d = this.s.daily, today = U.today();
@@ -541,6 +591,7 @@
       if (run.diff === 'god' && run.wave >= 15) this.unlock('god_mode_clear');
       if (run.shots >= 150 && run.hits / run.shots >= 0.8) this.unlock('accuracy80');
       if (run.time >= 600) this.unlock('survive_10min');
+      if (run.challenge) { const c = this.challengeState(); c.best = Math.max(c.best, run.score); c.wave = Math.max(c.wave, run.wave); }
 
       s.lb.push({ score: run.score, wave: run.wave, diff: run.diff, date: Date.now() });
       s.lb.sort((a, b) => b.score - a.score);

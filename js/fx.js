@@ -15,7 +15,7 @@
   const textPool = new SS.Pool(() => ({}));
 
   const fx = {
-    parts: [], expl: [], rings: [], texts: [], beams: [], sprites: [],
+    parts: [], expl: [], rings: [], texts: [], beams: [], sprites: [], scr: [], _vig: {},
     trauma: 0, shakeX: 0, shakeY: 0,
     flashA: 0, flashColor: '#fff',
     maxParts: 500,
@@ -27,7 +27,7 @@
     clear() {
       for (const p of this.parts) partPool.put(p);
       for (const t of this.texts) textPool.put(t);
-      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0; this.sprites.length = 0;
+      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0; this.sprites.length = 0; this.scr.length = 0;
       this.trauma = 0; this.flashA = 0;
     },
 
@@ -87,12 +87,18 @@
       this.rings.push({ x, y, r0, r1, color, life: dur, max: dur, w: width || 3 });
     },
     // взрыв: size ~ 1 (малый) … 4 (босс)
-    // o: { kind: 'crit' — огненный с кольцами (элита), 'kill' — с электрическими разрядами (мини-боссы); hue — перекраска }
+    // o: { kind: 'crit' — огненный с кольцами (элита), 'kill' — с электрическими разрядами (мини-боссы),
+    //      'ship' — корабль разлетается на обломки, 'plasma' — удар плазмы, 'super' — гибель игрока,
+    //      'boss' — финальный взрыв босса; hue — перекраска }
     explode(x, y, size, color, o) {
       size = size || 1;
       const g = G(), S = g.S;
       const kind = o && o.kind;
-      const name = kind === 'crit' ? 'fx_ex_crit' : kind === 'kill' || size >= 2.5 ? 'fx_ex_kill' : size >= 1.5 ? 'fx_ex_l' : size >= 0.95 ? 'fx_ex_m' : 'fx_ex_s';
+      const base = kind === 'kill' || size >= 2.5 ? 'fx_ex_kill' : size >= 1.5 ? 'fx_ex_l' : size >= 0.95 ? 'fx_ex_m' : 'fx_ex_s';
+      let name = kind === 'crit' ? 'fx_ex_crit' : kind === 'plasma' ? 'fx_hit_plasma' : kind === 'super' ? 'fx_superblast' : kind === 'boss' ? 'fx_superex'
+        : kind === 'ship' ? (size >= 1.5 ? 'fx_kd_l' : size >= 0.95 ? 'fx_kd_m' : 'fx_kd_s') : base;
+      // кадр из позднего атласа ещё не скачан — обычный взрыв
+      if (!g.frames[name] || !g.src(g.frames[name])) name = base;
       if (g.frames[name]) {
         const hue = o && o.hue;
         this.expl.push({ x, y, life: 0, dur: 0.36 + size * 0.07, w: (44 + size * 30) * S * (kind ? 1.15 : 1), rot: Math.random() * U.TAU, name, cv: hue == null ? null : g.tinted(name, { hue }) });
@@ -177,6 +183,41 @@
       if (open) this.sprite('fx_portal_out', x, y, { w0: w * 0.25, w1: w, dur: 0.5, hold: 0.55, hue });
       else this.sprite('fx_portal_in', x, y, { w0: w, w1: w * 0.15, dur: 0.4, hold: 0.5, hue });
     },
+    // мягкая цветная виньетка по краям экрана (урон, тревога босса, заморозка) — плавный градиент,
+    // а не растянутый на весь экран спрайт
+    vigCanvas(color) {
+      const W = G().W, H = G().H, key = color + W + 'x' + H;
+      if (this._vig[key]) return this._vig[key];
+      const c = document.createElement('canvas');
+      c.width = Math.max(2, Math.round(W / 3)); c.height = Math.max(2, Math.round(H / 3));
+      const x = c.getContext('2d'), cx = c.width / 2, cy = c.height / 2;
+      x.scale(1, c.height / c.width);
+      const g = x.createRadialGradient(cx, cx, c.width * 0.42, cx, cx, c.width * 0.5 * Math.hypot(1, c.height / c.width) * 1.02);
+      g.addColorStop(0, G().hexA(color, 0)); g.addColorStop(0.55, G().hexA(color, 0.22)); g.addColorStop(1, G().hexA(color, 0.75));
+      x.fillStyle = g; x.fillRect(0, 0, c.width, c.width);
+      this._vig[key] = c;
+      return c;
+    },
+    vignette(color, dur, alpha, pulse) {
+      for (const s of this.scr) if (s.color === color) { s.life = 0; s.dur = dur; s.a = Math.max(s.a, alpha); s.pulse = !!pulse; return; }
+      this.scr.push({ color, life: 0, dur, a: alpha, pulse: !!pulse });
+    },
+    drawScreen(ctx, W, H) {
+      if (!this.scr.length) return;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const s of this.scr) {
+        const k = s.life / s.dur;
+        ctx.globalAlpha = s.a * (s.pulse ? 0.45 + 0.55 * Math.abs(Math.sin(s.life * 5)) : 1) * (k < 0.12 ? k / 0.12 : 1 - Math.max(0, k - 0.45) / 0.55);
+        ctx.drawImage(this.vigCanvas(s.color), 0, 0, W, H);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    },
+    // снежинка инея: медленно падает и гаснет (заморозка)
+    frost(x, y) {
+      const p = this._p(P_EMBER, x, y, U.rand(-12, 12), U.rand(25, 55), U.rand(1.4, 2.4), U.rand(2.2, 3.6), Math.random() < 0.5 ? '#e6fbff' : '#9be8ff');
+      if (p) p.drag = 0.3;
+    },
     flash(color, a) { this.flashColor = color || '#fff'; this.flashA = Math.max(this.flashA, a || 0.5); },
     shake(amount) { if (this.shakeOn) this.trauma = Math.min(1, this.trauma + amount); },
 
@@ -206,6 +247,7 @@
         if (s.life >= s.dur) { this.sprites.splice(i, 1); continue; }
         s.rot += s.vr * dt; s.oy += s.vy * dt;
       }
+      for (let i = this.scr.length - 1; i >= 0; i--) { const s = this.scr[i]; s.life += dt; if (s.life >= s.dur) this.scr.splice(i, 1); }
       for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.life -= dt; if (r.life <= 0) this.rings.splice(i, 1); }
       for (let i = this.beams.length - 1; i >= 0; i--) { const b = this.beams[i]; b.life -= dt; if (b.life <= 0) this.beams.splice(i, 1); }
       for (let i = this.texts.length - 1; i >= 0; i--) {

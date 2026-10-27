@@ -42,6 +42,22 @@ svg{width:1em;height:1em;flex-shrink:0}
 .boot-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .25s}
 .boot-txt{font-size:13px;color:var(--muted);letter-spacing:1px}
 
+/* ── Заставка при запуске ── */
+#intro{position:fixed;inset:0;z-index:90;background:#02030b;transition:opacity .5s;overflow:hidden}
+#intro[hidden]{display:none}
+#intro.out{opacity:0;pointer-events:none}
+#introCv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.intro-cap{position:absolute;left:16px;right:16px;top:50%;text-align:center;font-family:var(--font-h);font-weight:700;font-size:clamp(14px,4.2vw,21px);
+  letter-spacing:.3em;color:#e3f6ff;text-shadow:0 0 18px rgba(61,224,255,.65),0 2px 8px #000;opacity:0;transform:translateY(8px);transition:opacity .45s,transform .45s,letter-spacing 1.6s}
+.intro-cap.on{opacity:1;transform:none;letter-spacing:.14em}
+.intro-logo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(1.3);
+  transition:opacity .5s,transform .9s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+#intro.logo-on .intro-logo{opacity:1;transform:none}
+#intro.logo-on .intro-cap{opacity:0}
+.intro-skip{position:absolute;left:0;right:0;bottom:calc(20px + env(safe-area-inset-bottom));text-align:center;font-size:12px;letter-spacing:2px;
+  color:rgba(200,220,255,.55);animation:introBlink 1.8s ease-in-out infinite}
+@keyframes introBlink{50%{opacity:.35}}
+
 /* ── Общие элементы ── */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 18px;border-radius:var(--r-sm);
   background:var(--panel2);border:1px solid var(--line2);font-family:var(--font-h);font-weight:700;font-size:13px;letter-spacing:1.5px;
@@ -746,3 +762,7 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .diff-best{font-family:var(--font);font-size:11px;font-weight:600;letter-spacing:0;color:var(--dim)}
 .diff-desc2{text-align:center;font-size:13.5px;color:var(--muted);min-height:18px;line-height:1.25;margin-top:-2px}
 .ars-hint b{color:var(--text);font-weight:700}
+
+/* геймдизайн: эволюции, причина гибели */
+.perk-evo{margin-top:5px;font-size:12px;font-weight:700;color:#ff9ff3;letter-spacing:.2px}
+.go-cause{text-align:center;color:#ff8fa3;font-size:13px;font-weight:600;margin-top:4px;min-height:16px}

@@ -40,10 +40,12 @@
       syncDiffGo();
     });
     $('#btnDiffGo').addEventListener('click', () => {
-      const id = D.DIFFS[ui._diffSel] ? ui._diffSel : 'normal';
-      store.s.settings.diff = id; store.soon();
       ui.hide('#scr-diff');
       A.play('click'); T.haptic('medium');
+      // испытание дня всегда на «Норме», правила — в meta.challenge
+      if (ui._diffSel === 'daily') { ui.startRun('normal', { challenge: M.challenge() }); return; }
+      const id = D.DIFFS[ui._diffSel] ? ui._diffSel : 'normal';
+      store.s.settings.diff = id; store.soon();
       ui.startRun(id);
     });
 
@@ -59,14 +61,14 @@
 
     // пауза
     $('#btnResume').addEventListener('click', () => { A.play('click'); game.resume(); });
-    $('#btnRestart').addEventListener('click', () => ui.dialog({ ico: 'retry', title: 'НАЧАТЬ ЗАНОВО?', text: 'Прогресс этого забега будет потерян', ok: 'ЗАНОВО', onOk: () => { ui.hide('#scr-pause'); ui.startRun(game.diffId); } }));
+    $('#btnRestart').addEventListener('click', () => ui.dialog({ ico: 'retry', title: 'НАЧАТЬ ЗАНОВО?', text: 'Прогресс этого забега будет потерян', ok: 'ЗАНОВО', onOk: () => { ui.hide('#scr-pause'); ui.startRun(game.diffId, ui._runOpts); } }));
     $('#btnQuit').addEventListener('click', () => ui.dialog({ ico: 'home', title: 'ВЫЙТИ В МЕНЮ?', text: 'Забег будет завершён.\nСобранные монеты останутся у вас.', ok: 'ВЫЙТИ', onOk: () => { ui.hide('#scr-pause'); game.gameOver(); } }));
     $('#pauseMusic').addEventListener('click', () => toggleVol('music'));
     $('#pauseSfx').addEventListener('click', () => toggleVol('sfx'));
     $('#pauseVibe').addEventListener('click', () => { store.s.settings.vibro = !store.s.settings.vibro; store.soon(); syncPauseToggles(); T.haptic('medium'); });
 
     // итоги
-    $('#btnRetry').addEventListener('click', () => { A.play('click'); ui.startRun(game.diffId); });
+    $('#btnRetry').addEventListener('click', () => { A.play('click'); ui.startRun(game.diffId, ui._runOpts); });
     $('#btnGoMenu').addEventListener('click', () => { A.play('back'); ui.toMenu(); });
     $('#btnShare').addEventListener('click', () => ui.share());
 
@@ -102,6 +104,7 @@
     SS.on('shipLevel', (lvl, r) => ui.toast({ ico: '🚀', title: 'УРОВЕНЬ КОРАБЛЯ ' + lvl, text: '+1 очко навыка', rew: '+' + r.coins }));
     SS.on('toast', (t) => ui.toast(t));
     SS.on('waveStart', (w) => ui.waveBanner(w));
+    SS.on('waveEvent', (d) => { ui.banner('<div class="b2">' + d.ico + ' ' + d.name + '</div><div class="b3">' + U.escape(d.desc) + '</div>', 'small', 2600); T.haptic('warning'); });
     SS.on('waveClear', (w) => { if (!game.wave.boss) ui.banner('<div class="b2">ВОЛНА ' + w.n + ' ЗАЧИЩЕНА</div><div class="b3">' + (w.perfect ? '★ БЕЗ УРОНА ×2 ★  ' : '') + '+' + U.fmt(w.bonus) + '</div>', w.perfect ? 'gold small' : 'small', 1800); });
     SS.on('bossWarning', (def) => ui.bossWarn(def));
     SS.on('bossDefeated', (d) => ui.banner('<div class="b1">БОСС ПОВЕРЖЕН</div><div class="b2">' + d.def.name + '</div><div class="b3">+' + U.fmt(d.pts) + '</div>', 'gold', 2600));
@@ -295,6 +298,13 @@
     return rec;
   }
   function syncDiffGo() {
+    if (ui._diffSel === 'daily') {
+      const ch = M.challenge();
+      $('#btnDiffGo span').textContent = 'В БОЙ • ИСПЫТАНИЕ';
+      $('#diffDesc2').innerHTML = '<b style="color:#ff5cf0">Испытание дня</b>: сложность «Норма», ' + ch.mods.map((m) => U.escape(M.modText(m, ch))).join('; ') +
+        '. Дойдите до волны ' + D.CHALLENGE_WAVE + ' — награда раз в день.';
+      return;
+    }
     const d = D.DIFFS[ui._diffSel] || D.DIFFS.normal;
     $('#btnDiffGo span').textContent = 'В БОЙ • ' + (d.short || d.name);
     $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc;
@@ -305,7 +315,13 @@
     const rec = recommendedDiff();
     const lives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
     $('#diffLives').innerHTML = ic('heart') + 'Жизней: <b>' + lives + '</b> на любой сложности';
-    $('#diffList').innerHTML = D.DIFF_ORDER.map((id) => {
+    // испытание дня — первой строкой
+    const ch = M.challenge(), cs = M.challengeState();
+    const chRow = '<button class="diff-row daily' + (ui._diffSel === 'daily' ? ' sel' : '') + '" data-diff="daily" style="--dc:#ff5cf0">' +
+      '<div class="dr-main"><div class="diff-name">ИСПЫТАНИЕ ДНЯ' + (cs.wave ? '<span class="diff-best">сегодня: волна ' + cs.wave + '</span>' : '') + '</div>' +
+      '<div class="diff-meta">' + ch.mods.map((m) => '<span>' + U.escape(D.CHALLENGE_MODS.find((x) => x.id === m).name) + '</span>').join('') + '</div></div>' +
+      '<div class="diff-rew">' + (cs.done ? '✓<small>получено</small>' : ic('coin') + ' ' + D.CHALLENGE_REWARD + '<small>за волну ' + D.CHALLENGE_WAVE + '</small>') + '</div></button>';
+    $('#diffList').innerHTML = chRow + D.DIFF_ORDER.map((id) => {
       const d = D.DIFFS[id], best = s.stats.diff[id] || { wave: 0 };
       const meta = [['Враги', d.count], ['Броня', d.hp], ['Огонь', d.fire]]
         .filter((x) => x[1] !== 1).map((x) => '<span class="' + (x[1] > 1 ? 'up' : 'down') + '">' + x[0] + ' <b>' + pct(x[1]) + '</b></span>').join('');
@@ -368,14 +384,17 @@
     ui._msTimer = setInterval(() => { if (ui.cur !== 'missions') { clearInterval(ui._msTimer); return; } tickMsTimer(); }, 30000);
   };
 
-  ui.startRun = function (diffId) {
+  ui.startRun = function (diffId, opts) {
+    // повтор забега сохраняет правила испытания, но только в тот же день
+    if (opts && opts.challenge && opts.challenge.date !== U.today()) opts = { challenge: M.challenge() };
+    ui._runOpts = opts || null;
     ['#scr-menu', '#scr-gameover', '#scr-pause', '#scr-perk', '#scr-revive'].forEach(ui.hide);
     Object.values(SUBS).forEach(ui.hide);
     stopHangarAnim();
     ui.cur = 'game';
     ui.runEvents = [];
     document.body.classList.remove('toasts-bottom');
-    game.start(diffId);
+    game.start(diffId, opts);
     ui.showHud();
     T.back(null);
     T.closingConfirm(true);
@@ -508,14 +527,18 @@
       if (c.fever !== run.fever) { c.fever = run.fever; el.combo.classList.toggle('fever', run.fever); }
     }
     // бонусы
-    let buffKey = '';
+    const perfect = run.waveDamage === 0 && g.wave && !g.wave.cleared && g.state === 'play';
+    let buffKey = perfect ? 'P' : '';
     for (const k in g.buffs) buffKey += k + Math.ceil(g.buffs[k]);
     if (run.skillFx.sk_overclock > 0) buffKey += 'oc' + Math.ceil(run.skillFx.sk_overclock);
     if (run.overload > 0) buffKey += 'ol' + Math.ceil(run.overload);
+    const wev = SS.events.active();
+    if (wev) buffKey += 'ev' + wev.id;
     if (c.buffs !== buffKey) {
       c.buffs = buffKey;
       const icons = { power: 'fire', spread: 'bolt', multi: 'plus', rapid: 'bolt', magnet: 'magnet', freeze: 'snow' };
-      let h = '';
+      let h = wev ? '<div class="buff" style="--bc:' + wev.color + '">' + wev.ico + ' ' + wev.name + '</div>' : '';
+      if (perfect) h += '<div class="buff" style="--bc:#3dffa2">' + ic('star') + 'БЕЗ УРОНА ×2</div>';
       for (const k of Object.keys(g.buffs)) { const def = D.POWERUPS[k]; h += '<div class="buff" style="--bc:' + def.color + '">' + ic(icons[k] || 'star') + Math.ceil(g.buffs[k]) + 'с</div>'; }
       if (run.skillFx.sk_overclock > 0) h += '<div class="buff" style="--bc:#3de0ff">' + ic('bolt') + 'РАЗГОН ' + Math.ceil(run.skillFx.sk_overclock) + 'с</div>';
       if (run.overload > 0) h += '<div class="buff" style="--bc:#ffc83d">' + ic('bolt') + 'ПЕРЕГРУЗКА</div>';
@@ -639,7 +662,9 @@
       b.style.setProperty('--pc', rar.color);
       let pips = '';
       if (pk.max > 1 && pk.max < 99) { for (let i = 0; i < pk.max; i++) pips += '<i class="' + (i < lv ? 'on' : i === lv ? 'new' : '') + '"></i>'; }
-      b.innerHTML = '<div class="perk-ico">' + pk.ico + '</div><div class="perk-info"><div class="perk-name">' + pk.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + pk.desc + '</div>' + (pips ? '<div class="perk-lv">' + pips + '</div>' : '') + '</div><div class="perk-rar">' + rar.name + '</div>';
+      const ev = game.evoStep(pk.id);
+      const evo = ev ? '<div class="perk-evo">🧬 ' + (lv + 1 >= ev.lvl ? 'ЭВОЛЮЦИЯ СЕЙЧАС: ' : 'К эволюции ' + (lv + 1) + '/' + ev.lvl + ': ') + ev.name + '</div>' : '';
+      b.innerHTML = '<div class="perk-ico">' + pk.ico + '</div><div class="perk-info"><div class="perk-name">' + pk.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + pk.desc + '</div>' + evo + (pips ? '<div class="perk-lv">' + pips + '</div>' : '') + '</div><div class="perk-rar">' + rar.name + '</div>';
       b.addEventListener('click', () => {
         if (b.classList.contains('wait')) return;
         ui.hide('#scr-perk');
@@ -686,6 +711,7 @@
     $('#goTitle').textContent = sum.isRecord ? 'НОВЫЙ РЕКОРД' : 'КОРАБЛЬ ПОДБИТ';
     $('#goTitle').classList.toggle('win', !!sum.isRecord);
     $('#goSub').textContent = D.DIFFS[sum.diff].name + ' • награды ×' + fmtMul(D.DIFFS[sum.diff].coins) + ' • Волна ' + sum.wave;
+    $('#goCause').textContent = sum.cause ? 'Сбит: ' + sum.cause : '';
     $('#goRecord').hidden = !sum.isRecord;
     $('#goBest').textContent = U.fmt(s.stats.bestScore);
     $('#goStats').innerHTML = [
@@ -834,7 +860,13 @@
         const card = document.createElement('button');
         card.className = 'item-card' + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
         const cols = game.trailColors(tr.id);
-        card.appendChild(spriteCard((x, sz) => {
+        const tf = tr.fx && G.frame(tr.fx);
+        if (tf && G.src(tf)) card.appendChild(spriteCard((x, sz) => {
+          const k = Math.min(sz * 0.9 / tf[3], sz * 0.9 / tf[2]);
+          x.globalCompositeOperation = 'lighter';
+          x.drawImage(G.src(tf), tf[0], tf[1], tf[2], tf[3], (sz - tf[2] * k) / 2, (sz - tf[3] * k) / 2, tf[2] * k, tf[3] * k);
+        }, 64));
+        else card.appendChild(spriteCard((x, sz) => {
           const g = x.createLinearGradient(0, sz * 0.15, 0, sz * 0.95);
           g.addColorStop(0, cols[0]); g.addColorStop(0.3, cols[1]); g.addColorStop(1, 'rgba(0,0,0,0)');
           x.fillStyle = g;
@@ -1135,7 +1167,8 @@
       '<div class="set-row col"><div class="set-line"><label>' + ic('star') + 'Качество</label></div>' + seg('quality', [['auto', 'Авто'], ['high', 'Высокое'], ['medium', 'Среднее'], ['low', 'Низкое']]) + '</div>' +
       '<div class="set-row"><label>' + ic('bolt') + 'Тряска экрана</label>' + sw('shake') + '</div>' +
       '<div class="set-row"><label>' + ic('target') + 'Цифры урона</label>' + sw('dmgNums') + '</div>' +
-      '<div class="set-row"><label>' + ic('chart') + 'Показывать FPS</label>' + sw('fps') + '</div></div>' +
+      '<div class="set-row"><label>' + ic('chart') + 'Показывать FPS</label>' + sw('fps') + '</div>' +
+      '<div class="set-row"><label>' + ic('play') + 'Заставка при запуске</label><button class="btn sm" id="btnIntro" style="margin-left:auto">СМОТРЕТЬ</button>' + sw('intro') + '</div></div>' +
       '<div class="set-title">УПРАВЛЕНИЕ</div><div class="set-group">' +
       range('sens', 0.6, 2.4, 0.05, [ic('ship') + 'Чувствительность', (v) => '×' + (+v).toFixed(2)]) +
       '<div class="set-row"><label>' + ic('vibe') + 'Вибрация</label>' + sw('vibro') + '</div></div>' +
@@ -1179,6 +1212,7 @@
       if (key === 'fps') $('#fps').hidden = !st.fps;
       if (key === 'shake') SS.fx.shakeOn = st.shake;
     }));
+    $('#btnIntro').addEventListener('click', () => { A.play('click'); SS.intro.play(() => {}); });
     $('#btnReset').addEventListener('click', () => ui.dialog({ ico: 'retry', title: 'СБРОС ПРОГРЕССА', text: 'Будут удалены монеты, оружие, прокачка, корабли, навыки, рекорды и достижения.\nЭто нельзя отменить!', ok: 'УДАЛИТЬ ВСЁ', danger: true, onOk: () => {
       ui.dialog({ ico: 'skull', title: 'ТОЧНО?', text: 'Последнее предупреждение.', ok: 'ДА, СБРОСИТЬ', danger: true, onOk: () => { store.reset(); A.play('explodeM'); ui.toast({ ico: '🗑️', title: 'ГОТОВО', text: 'Прогресс сброшен', info: true }); ui.renderSettings(); } });
     } }));

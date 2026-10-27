@@ -487,9 +487,18 @@
       const n = quality >= 2 ? set.layers.length : 1;
       for (let li = 0; li < n; li++) {
         const L = set.layers[li];
-        const off = (this.scroll * L.speed) % H;
-        ctx.drawImage(L.c, 0, off - H, W, H);
-        ctx.drawImage(L.c, 0, off, W, H);
+        // плитка с полями из противоположного края: при сглаживании на стыке двух копий берётся настоящее
+        // содержимое, а не прозрачность (иначе через весь экран шла тёмная горизонтальная линия)
+        if (!L.cp) {
+          const c = L.c, pd = 2, cp = mk(c.width, c.height + pd * 2), x = cp.getContext('2d');
+          x.drawImage(c, 0, pd);
+          x.drawImage(c, 0, c.height - pd, c.width, pd, 0, 0, c.width, pd);
+          x.drawImage(c, 0, 0, c.width, pd, 0, c.height + pd, c.width, pd);
+          L.cp = cp; L.pd = pd;
+        }
+        const off = (this.scroll * L.speed) % H, sw = L.c.width, sh = L.c.height;
+        ctx.drawImage(L.cp, 0, L.pd, sw, sh, 0, off - H, W, H);
+        ctx.drawImage(L.cp, 0, L.pd, sw, sh, 0, off, W, H);
       }
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
@@ -542,9 +551,18 @@
         }
       }
       // пыль скорости
-      if (quality > 0) {
+      // только во время гиперпрыжка: в обычном полёте одиночные штрихи выглядели как царапины на экране,
+      // а движение и так передают звёзды; у штриха затухающий хвост
+      if (quality > 0 && stretch > 0.05) {
         ctx.fillStyle = '#9fc4ff';
-        for (const d of this.dust) { ctx.globalAlpha = d.a * (1 + stretch * 4); ctx.fillRect(d.x, d.y - d.len * (1 + stretch * 6), 1, d.len * (1 + stretch * 6)); }
+        const k = Math.min(1, stretch * 3);
+        for (const d of this.dust) {
+          const len = d.len * (1 + stretch * 6);
+          ctx.globalAlpha = d.a * 2.5 * k;
+          ctx.fillRect(d.x, d.y - len * 0.4, 1, len * 0.4);
+          ctx.globalAlpha = d.a * 1.1 * k;
+          ctx.fillRect(d.x, d.y - len, 1, len * 0.6);
+        }
       }
       ctx.globalAlpha = 1;
     },

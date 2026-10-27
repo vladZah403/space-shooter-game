@@ -27,6 +27,8 @@ ENV/
 
 # Database - НЕ загружать на Git!
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 space_shooter.db
@@ -45,8 +47,7 @@ space_shooter.db
 .DS_Store
 Thumbs.db
 
-# Секретные данные - НЕ загружать на Git!
-config.py
+# Секретные данные - НЕ загружать на Git! (config.py без секретов: токен читается из .env)
 .env
 
 # Временные файлы

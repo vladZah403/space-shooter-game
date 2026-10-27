@@ -11,7 +11,7 @@
   let uid = 100000;
 
   const COLORS = {
-    scout: '#ff5c4d', drone: '#5cff7a', shooter: '#c06bff', assault: '#3dffd0', kamikaze: '#ff9f3d', interceptor: '#cfd8ff',
+    scout: '#ff5c4d', drone: '#5cff7a', lancer: '#c86bff', debris: '#d8c3a5', shooter: '#c06bff', assault: '#3dffd0', kamikaze: '#ff9f3d', interceptor: '#cfd8ff',
     heavy: '#ffd23d', splitter: '#7dff6b', bomber: '#aab4d8', sniper: '#5cb8ff', shielder: '#7fd8ff', techno: '#ff5c7a',
     hunter: '#b06bff', armored: '#ff9f3d', heavyfighter: '#ff4d5e', bombardier: '#ffb03d', redoubt: '#c48bff', cruiser: '#ff5c7a',
     bug: '#9dff5c', ram: '#ff6a2a', swarm: '#a6ff3d', crystal: '#3dffd2', minelayer: '#ff5c4d', platform: '#ffc83d',
@@ -23,7 +23,7 @@
   const COST = { scout: 1, drone: 0.55, shooter: 2, assault: 2, kamikaze: 1.2, interceptor: 2.5, heavy: 5, splitter: 2.2,
     bomber: 4, sniper: 3, shielder: 4.5, techno: 3.5, hunter: 3.5, armored: 8, heavyfighter: 4.5, bombardier: 5, redoubt: 5.5,
     cruiser: 9, bug: 0.5, ram: 2.5, swarm: 4, crystal: 3, minelayer: 4, platform: 5.5, ghost: 3.5, orbit: 4.5, parasite: 4.5,
-    ion: 5, crab: 7, biomech: 7, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0 };
+    ion: 5, crab: 7, biomech: 7, lancer: 4, debris: 0, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0 };
 
   // эллиптические хитбоксы для крупных кораблей (доли ширины/высоты спрайта)
   const HITBOX = {
@@ -56,7 +56,7 @@
     return game.diff.hp * (1 + (w - 1) * 0.14) * (1 + Math.max(0, w - 20) * 0.05) * (1 + Math.max(0, w - 30) * 0.06);
   };
 
-  // o: x, y, scale, hpMul, tint, child, noElite, elite, idx, amp, side, larva
+  // o: x, y, scale, hpMul, tint, child, noElite, elite, idx, amp, side, larva, sprite
   E.spawn = function (type, o) {
     o = o || {};
     const def = D.ENEMIES[type];
@@ -64,7 +64,7 @@
     const S = G.S, wn = game.wave ? game.wave.n : 1, diff = game.diff;
     const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004);
     // в дальних секторах флот противника обновляется — новые облики кораблей
-    const sprite = def.alt && wn > 10 && Math.random() < 0.6 ? def.alt : def.sprite;
+    const sprite = o.sprite || (def.alt && wn > 10 && Math.random() < 0.6 ? def.alt : def.sprite);
     const scale = (elite ? 1.12 : 1) * (o.scale || 1);
     const w = Math.min(def.w * S * scale, def.horizontal ? G.FW * 0.75 : 9999);
     const asp = G.aspect(sprite);
@@ -392,9 +392,11 @@
       } else if (e.st === 1) {
         e.t -= dt;
         e.aim = Math.atan2(p.y - e.y, p.x - e.x);
+        p.lockT = 2.5; // корабль в прицеле снайпера
         if (e.t <= 0) { e.st = 2; e.t = 0.3; }
       } else if (e.st === 2) {
         e.t -= dt;
+        p.lockT = 2.5; p.lockHot = 0.35;
         if (e.t <= 0) {
           if (canShoot(e)) {
             const s = game.bspd(f.spd);
@@ -814,7 +816,7 @@
       }
       if (c.t >= c.dur) {
         E.corpses.splice(i, 1);
-        FX.explode(c.x, c.y, 4, c.color);
+        FX.explode(c.x, c.y, 4, c.color, { kind: 'boss' });
         FX.ring(c.x, c.y, 20, Math.max(G.FW, G.H), '#ffffff', 0.8, 8);
         FX.flash('#ffffff', 0.7);
         FX.shake(1);
@@ -833,7 +835,7 @@
     const S = G.S;
     const size = U.clamp(Math.max(e.w, e.h * 0.8) / (48 * S), 0.6, 2.6);
     const col = COLORS[e.type] || '#ffb03d';
-    FX.explode(e.x, e.y, size, size > 1.4 ? '#ffb03d' : col, e.mini ? { kind: 'kill' } : e.elite ? { kind: 'crit' } : null);
+    FX.explode(e.x, e.y, size, size > 1.4 ? '#ffb03d' : col, e.mini ? { kind: 'kill' } : e.elite ? { kind: 'crit' } : Math.random() < 0.5 ? { kind: 'ship' } : null);
     if (e.mini) { FX.explode(e.x - e.w * 0.25, e.y, 1.4, col); FX.explode(e.x + e.w * 0.25, e.y, 1.4, '#ffb03d'); }
     if (FX.quality > 0) FX.debris(e.x, e.y, col, Math.round(size * 3), 140);
     A.play(size > 1.5 ? 'explodeM' : 'explodeS', { vol: size > 1.5 ? 0.8 : 0.6 });
@@ -901,7 +903,7 @@
     game.boss = b;
     game.enemies.push(b);
     game.run.bossDamaged = false;
-    FX.sprite('fx_warp', G.FW / 2, (SS.ui ? SS.ui.topInset() : 120) + 30 * S, { w0: G.FW * 0.6, w1: G.FW * 1.05, sy: 0.32, dur: 1.6, hold: 0.45, fadeIn: 0.15, alpha: 0.85, hue: G.hueOf(bdef.color) });
+    FX.sprite('fx_warp', G.FW / 2, (SS.ui ? SS.ui.topInset() : 120) + 50 * S, { w0: 120 * S, w1: 230 * S, dur: 1.5, hold: 0.45, fadeIn: 0.15, alpha: 0.8, hue: G.hueOf(bdef.color) });
     A.play('bossRoar');
     FX.shake(0.4);
     SS.emit('bossSpawn', b);
@@ -959,6 +961,7 @@
     },
     sniper(b) {
       if (!b.aim && timer(b, 'snipe', bcd(b, 2.4), 1.2)) b.aim = { t: 0.95 };
+      if (b.aim) { game.player.lockT = 2.5; if (b.aim.t <= 0.22) game.player.lockHot = 0.35; }
       if (b.aim) {
         b.aim.t -= b._dt;
         if (b.aim.t > 0.22) b.aim.ang = [-1, 1].map((sd) => Math.atan2(game.player.y - (b.y + b.h * 0.2), game.player.x - (b.x + sd * b.w * 0.32)));
@@ -1328,6 +1331,8 @@
         ctx.globalAlpha = 0.16 + 0.14 * Math.abs(Math.sin(e.age * 20));
         ctx.fillStyle = '#ff3d3d';
         ctx.fillRect(e.lane - e.w * 0.35, e.y, e.w * 0.7, G.H - e.y);
+        ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(e.age * 10));
+        G.draw(ctx, 'fx_warn', e.lane, G.H * 0.8, 26 * S);
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
       }
@@ -1407,6 +1412,13 @@
         ctx.globalCompositeOperation = 'source-over';
       }
       // прицел снайпера
+      if ((def.ai === 'kamikaze' || def.ai === 'hunter') && e.st === 1) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(e.age * 12));
+        G.draw(ctx, 'fx_warn', e.x, e.y - e.h * 0.7, 24 * S);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
       if (def.ai === 'sniper' && (e.st === 1 || e.st === 2) && e.aim !== undefined) {
         const locked = e.st === 2;
         ctx.globalCompositeOperation = 'lighter';

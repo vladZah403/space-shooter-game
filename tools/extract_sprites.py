@@ -20,19 +20,20 @@ from PIL import Image, ImageFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы,
 # 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли),
-# 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты)
-SHEET_FILES = [
-    '1e686660-f0c5-45ad-b686-2c52b70b7c31.png',
-    'cbe8f71c5f0f1e02f95103d6.png',
-    'e684480d1e02f95105ba02d6.png',
-    '58950900f95105ba2e3301d6.png',
-    '474146f9cc384056462ba0e9.png',
-    'f6d4464578889a1640491feb.png',
-    'e97e246221c488d4b7615ad4.png',
-    '51531b61c7e2336021c45cd4.png',
-    '21ffd0e0336021c488d45bd4.png',
-    'Neon Space Shooter VFX Sheet.png',
-]
+# 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты), 10 — каталог эффектов (экраны, индикаторы, разрушения)
+SHEET_FILES = [os.path.join('art', f) for f in (
+    'sheet00_main.png',
+    'sheet01_player_ships.png',
+    'sheet02_enemies.png',
+    'sheet03_bosses.png',
+    'sheet04_classic_bosses.png',
+    'sheet05_bosses_21.png',
+    'sheet06_enemies_21.png',
+    'sheet07_ships_21.png',
+    'sheet08_customization.png',
+    'sheet09_vfx.png',
+    'sheet10_vfx_catalogue.png',
+)]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
 PREV = sys.argv[1] if len(sys.argv) > 1 else None
@@ -41,7 +42,8 @@ SHEETS = [Image.open(os.path.join(ROOT, f)).convert('RGB').load() for f in SHEET
 SPX = SHEETS[0]
 
 # имя: ((x0, y0, x1, y1) включительно, режим[, лист[, опции]])
-# опции: rot — 180 разворачивает спрайт носом вверх; max — предел большей стороны в пикселях
+# опции: rot — 180 разворачивает спрайт носом вверх; deg — поворот на произвольный угол (выпрямить наклон);
+# max — предел большей стороны в пикселях; split — разрезать на n связных кусков
 SPRITES = {
     # корабли игрока (нарисованное пламя отрезано по низу корпуса)
     'ship1': ((44, 95, 153, 217), 'solid'),
@@ -167,7 +169,7 @@ SPRITES = {
     'fx_rocket2':     ((645, 139, 698, 252), 'glow', 9),
     'fx_plasma2':     ((946, 94, 1073, 247), 'add', 9),    # плазменный шар (перекрашивается в цвет оружия)
     'fx_storm':       ((1290, 78, 1403, 256), 'add', 9),   # заряд поворотного лазера босса
-    'fx_vortex':      ((1405, 78, 1515, 256), 'add', 9),   # тёмная материя, чёрная дыра
+    'fx_vortex':      ((1405, 66, 1515, 256), 'add', 9),   # тёмная материя, чёрная дыра
     'fx_ex_s':        ((21, 463, 92, 543), 'add', 9),
     'fx_ex_m':        ((97, 437, 194, 558), 'add', 9),
     'fx_ex_l':        ((196, 418, 312, 563), 'add', 9),
@@ -175,12 +177,12 @@ SPRITES = {
     'fx_ex_kill':     ((439, 384, 596, 568), 'add', 9),
     'fx_sh_bubble':   ((768, 423, 888, 559), 'add', 9),
     'fx_sh_break':    ((890, 427, 990, 557), 'add', 9),
-    'fx_sh_restore':  ((992, 413, 1092, 550), 'add', 9),
+    'fx_sh_restore':  ((992, 396, 1092, 556), 'add', 9),
     'fx_speed':       ((1114, 440, 1177, 556), 'add', 9),
     'fx_regen':       ((1189, 434, 1265, 555), 'add', 9),
     'fx_beam':        ((1268, 392, 1355, 566), 'add', 9),
     'fx_crosshair':   ((1357, 437, 1442, 554), 'add', 9),
-    'fx_pickup':      ((1444, 434, 1521, 553), 'add', 9),
+    'fx_pickup':      ((1444, 422, 1521, 562), 'add', 9),
     'fx_tr_engine':   ((31, 765, 86, 871), 'add', 9),
     'fx_tr_rocket':   ((269, 721, 340, 896), 'add', 9),
     'fx_mine':        ((464, 771, 506, 825), 'glow', 9),
@@ -189,14 +191,37 @@ SPRITES = {
     'fx_portal_in':   ((823, 744, 914, 887), 'add', 9),
     'fx_portal_out':  ((917, 735, 1010, 889), 'add', 9),
     'fx_rock':        ((1136, 737, 1231, 885), 'solid', 9, {'split': 6}),  # обломки -> fx_rock1..6
-    'fx_dust':        ((1232, 735, 1326, 880), 'add', 9),
     'fx_warp':        ((1327, 740, 1430, 873), 'add', 9),
-    'fx_flare':       ((1431, 727, 1523, 885), 'add', 9),
+    'fx_flare':       ((1431, 704, 1523, 892), 'add', 9),
+
+    # ── лист 10: каталог эффектов ──
+    'fx_kd_s':        ((566, 62, 657, 197), 'add', 10),    # разрушение корабля: малое, среднее, большое
+    'fx_kd_m':        ((658, 62, 750, 197), 'add', 10),
+    'fx_kd_l':        ((751, 55, 849, 197), 'add', 10),
+    'fx_hit_plasma':  ((851, 55, 942, 197), 'add', 10),    # удар плазмы (тёмная материя, плазма)
+    'fx_superblast':  ((944, 55, 1052, 197), 'add', 10),   # гибель игрока
+    'fx_superex':     ((408, 45, 548, 197), 'add', 10),    # финальный взрыв босса
+    'fx_bolt':        ((203, 575, 288, 703), 'add', 10),   # удар молнии
+    'fx_shock':       ((450, 575, 550, 703), 'add', 10),   # ударная волна (бомба, нова)
+    'fx_lock':        ((1140, 345, 1225, 462), 'add', 10), # захват цели снайпером
+    'fx_warn':        ((1380, 365, 1445, 450), 'add', 10), # предупреждение
+    'fx_dash':        ((757, 812, 833, 928), 'add', 10),   # рывок (уклонение)
+    # следы двигателя для ангара (наклонные выпрямлены поворотом deg)
+    'fx_tr_double':   ((1158, 72, 1220, 216), 'add', 10),
+    'fx_tr_boost':    ((1232, 64, 1303, 218), 'add', 10, {'deg': 6}),
+    'fx_tr_plasma':   ((1320, 64, 1412, 218), 'add', 10, {'deg': 27}),
+    'fx_tr_spiral':   ((1418, 62, 1513, 214), 'add', 10),
+    # события волны: ионная буря, метеоры (-> fx_meteor1..3), солнечная вспышка
+    'fx_ion':         ((1048, 824, 1143, 930), 'add', 10),
+    'fx_meteor':      ((1142, 820, 1242, 926), 'add', 10, {'split': 3}),
+    'fx_solar':       ((1242, 820, 1331, 930), 'add', 10),
+    # фиолетовый лазер врага (лист 9)
+    'eb_plaser':      ((1108, 100, 1141, 246), 'add', 9),
 }
 
 # поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
 # (первый босс «Страж» нарисован спрайтом 'boss' и лежит в основном атласе)
-LATE = {n for n in SPRITES if n.startswith('b_')} | {'e_destroyer', 'e_cruiser_h'}
+LATE = {n for n in SPRITES if n.startswith('b_') or n.startswith('fx_scr_')} | {'e_destroyer', 'e_cruiser_h', 'fx_superblast', 'fx_superex'}
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
 NOZZLES = {
@@ -249,7 +274,7 @@ def bg_estimate(x0, y0, x1, y1):
 
 # радиус морфологического закрытия: не даёт заливке фона «протечь» внутрь
 # корпуса через тёмные щели (у босса тёмный металл почти совпадает с фоном)
-CLOSE = {'boss': 5, 'interceptor': 2, 'assault': 2, 'techno': 2, 'bomber': 2, 'shielder': 2,
+CLOSE = {'pu_spread': 4, 'boss': 5, 'interceptor': 2, 'assault': 2, 'techno': 2, 'bomber': 2, 'shielder': 2,
          'e_heavyfighter': 3, 'e_redoubt': 3, 'e_bombardier': 3, 'e_destroyer': 4, 'e_cruiser_h': 4, 'e_cruiser': 4,
          'b_spider': 5, 'b_battleship': 5, 'b_battleship2': 5, 'b_mothership': 5, 'b_heavycruiser': 5,
          'ship4': 2, 'ship5': 2, 'ship6': 2,
@@ -322,7 +347,7 @@ def remove_holes(x0, y0, w, h, outside, bg, min_area=250, max_mean=9.0):
                     outside[j] = 1
 
 
-def extract_solid(x0, y0, x1, y1, close_r=0):
+def extract_solid(x0, y0, x1, y1, close_r=0, holes=True):
     w, h = x1 - x0 + 1, y1 - y0 + 1
     bg = bg_estimate(x0, y0, x1, y1)
     out = Image.new('RGBA', (w, h), (0, 0, 0, 0))
@@ -335,7 +360,7 @@ def extract_solid(x0, y0, x1, y1, close_r=0):
         return d < 9
 
     outside = flood_outside(x0, y0, w, h, trav)
-    if not close_r:
+    if not close_r and holes:
         remove_holes(x0, y0, w, h, outside, bg)
     if close_r:
         m = Image.new('L', (w, h), 0)
@@ -353,7 +378,8 @@ def extract_solid(x0, y0, x1, y1, close_r=0):
                 if mp[x, y]:
                     blocked[y * w + x] = 1
         outside = flood_outside(x0, y0, w, h, trav, blocked)
-    remove_holes(x0, y0, w, h, outside, bg)
+    if holes:
+        remove_holes(x0, y0, w, h, outside, bg)
     for y in range(h):
         for x in range(w):
             c = SPX[x0 + x, y0 + y]
@@ -460,6 +486,21 @@ def split_parts(img, n):
     return parts
 
 
+def edge_fade(img, n):
+    """Мягкое затухание свечения к краям рамки: на плотном листе соседние эффекты почти касаются,
+    и без него край ореола обрывался прямой линией."""
+    w, h = img.size
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            d = min(x, y, w - 1 - x, h - 1 - y)
+            if d < n:
+                r, g, b, a = px[x, y]
+                if a:
+                    px[x, y] = (r, g, b, int(a * (d + 1) / (n + 1)))
+    return img
+
+
 def despeckle(img, min_area=30):
     """Убирает мелкие оторванные пятна (звёзды фона), чтобы они не раздували рамку кадра."""
     w, h = img.size
@@ -524,12 +565,17 @@ def main():
         SPX = SHEETS[spec[2] if len(spec) > 2 else 0]
         opt = spec[3] if len(spec) > 3 else {}
         if mode == 'solid':
-            img = despeckle(extract_solid(*box, close_r=CLOSE.get(name, 0)))
+            img = despeckle(extract_solid(*box, close_r=CLOSE.get(name, 0), holes=not name.startswith('pu_')))
         elif mode == 'glow':
             img = despeckle(extract_glow(*box), 12)
         else:
             img = extract_add(*box)
+            # каталог эффектов (лист 10) свёрстан плотно — края ореолов гасим, кроме экранных рамок
+            if len(spec) > 2 and spec[2] == 10 and not name.startswith('fx_scr_'):
+                img = edge_fade(img, 8)
         img, bb = trim(img)
+        if opt.get('deg'):
+            img, _ = trim(img.rotate(opt['deg'], resample=Image.BICUBIC, expand=True))
         if opt.get('split'):
             for i, part in enumerate(split_parts(img, opt['split'])):
                 images[name + str(i + 1)] = (part, mode)
