@@ -71,7 +71,7 @@
       time: 0, shots: 0, hits: 0, pickups: 0, reviveUsed: false, phoenixUsed: false,
       waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
-      lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '',
+      lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '', energy: 1, arc: 0, focus: { uid: 0, n: 0, t: 0 },
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
     if (ch && ch.mods.includes('glass')) this.run.perks.glass = 1;
@@ -81,7 +81,7 @@
       x: G.FW / 2, y: G.H * 0.8, w: 56 * S * (D.SHIPS[M.s.ship.model].scale || 1), r: 6 * S, pickR: 28 * S,
       lives: 0, maxLives: 0, shield: false, inv: 2.0, bombs: 0, bombCd: 0,
       tilt: 0, vxs: 0, alive: true,
-      weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, side: 1,
+      weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, mag: {}, side: 1,
     };
     p.maxLives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
     p.lives = p.maxLives;
@@ -286,6 +286,13 @@
 
     this.updateTimers(dt);
     this.runTimers(dt);
+    // заряд дуги копится от движения корабля (только в бою), без движения стекает
+    if (p.weapons.includes('arc')) {
+      const ab = D.WEAPONS.arc.base, mv = this.state === 'play' && p.lx !== undefined ? Math.hypot(p.x - p.lx, p.y - p.ly) : 0;
+      run.arc = U.clamp(run.arc + mv / (G.FW * ab.charge) - dt * ab.drain, 0, 1);
+    }
+    p.lx = p.x; p.ly = p.y;
+    if (run.focus.t > 0) run.focus.t -= dt;
     if (p.alive && this.state === 'play') this.fireWeapons(dt);
     this.updateDrones(dt);
     this.updateBullets(dt);
@@ -368,16 +375,45 @@
     return d;
   };
 
+  // ── магазин (ракеты, дробовик): серия выстрелов, потом перезарядка. Она идёт для всех оружий
+  //    в слотах, даже невыбранных: выпустил залп — переключился — вернулся с полным магазином ──
+  function magSize(wid) { return D.WEAPONS[wid].base.mag + (wid === 'rocket' ? wl(wid, 'salvo') : 0); }
+  game.mag = function (wid) {
+    const def = D.WEAPONS[wid];
+    if (!def || !def.base.mag) return null;
+    return this.player.mag[wid] || (this.player.mag[wid] = { n: magSize(wid), t: 0 });
+  };
+  game.updateMags = function (dt) {
+    const p = this.player;
+    for (const wid of p.weapons) {
+      const m = this.mag(wid);
+      if (!m || m.n > 0) continue;
+      m.t -= dt * this.rateMul() * (1 + wl(wid, 'rate') * 0.08);
+      if (m.t <= 0) {
+        m.n = magSize(wid);
+        if (wid === p.weapon) A.play('click', { rate: 1.6, vol: 0.5 });
+        this.hudDirty = true;
+      }
+    }
+  };
+
   game.fireWeapons = function (dt) {
     const p = this.player;
     const wid = p.weapon;
     const def = D.WEAPONS[wid];
     if (!def) return;
+    this.updateMags(dt);
+    const m = this.mag(wid);
     let cd = def.base.cd / (1 + (wl(wid, 'rate') * 0.08));
     p.wcd[wid] = (p.wcd[wid] || 0) - dt * this.rateMul();
     let guard = 0;
+    // тёмная материя: новая сфера — только когда прошлая схлопнулась
+    const sphere = wid === 'darkmatter' && this.bullets.some((b) => !b.dead && b.kind === 'dark');
     while (p.wcd[wid] <= 0 && guard++ < 3) {
+      // магазин пуст — ждём перезарядку, первый выстрел после неё сразу
+      if ((m && m.n <= 0) || sphere) { p.wcd[wid] = 0; break; }
       this.fire(wid);
+      if (m && --m.n <= 0) { m.t = def.base.reload; this.hudDirty = true; }
       p.wcd[wid] += cd;
     }
     if (p.wcd[wid] < -cd) p.wcd[wid] = 0;
@@ -441,7 +477,8 @@
       FX.glowPuff(p.x, nose, '#ffd23d', 40 * S, 0.1);
       A.play('shotgun');
     } else if (wid === 'rocket') {
-      const n = base.salvo + wl(wid, 'salvo') + multi;
+      // одна ракета из залпа (+ ракеты от «Мультивыстрела»); размер залпа — магазин (magSize)
+      const n = 1 + multi;
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
       const rs = wl(wid, 'dmg') >= 4 ? 'fx_rocket2' : 'fx_rocket', rw = (rs === 'fx_rocket2' ? 14 : 13) * S;
       for (let i = 0; i < n; i++) {
@@ -464,16 +501,19 @@
       if (spread) for (const a of [-0.35, 0.35]) shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * 0.6, aoe: base.aoe * dmgMul * 0.6, aoeR: radius * 0.8, r: 10 * S, kind: 'plasma', cv, w: 30 * pw, wid, life: 2.6 });
       A.play('plasma');
     } else if (wid === 'lightning') {
-      const jumps = base.chain + wl(wid, 'chain') + (this.skill('sk_conductor') ? 2 : 0) + multi;
+      // полный разряд тратит энергию (только если нашёл цель); без энергии — слабая искра в одну цель
+      const run = this.run, full = run.energy > 0;
+      const jumps = full ? base.chain + wl(wid, 'chain') + (this.skill('sk_conductor') ? 2 : 0) + multi : 0;
       const range = base.range * S * (1 + wl(wid, 'range') * 0.15);
-      const ldmg = base.dmg * dmgMul * (1 + multi * 0.15);
-      this.chainLightning(p.x, nose, ldmg, jumps, range, 360 * S);
-      if (spread) this.chainLightning(p.x, nose, ldmg * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
-      A.play('zap');
+      const ldmg = base.dmg * dmgMul * (1 + multi * 0.15) * (full ? 1 : base.spark);
+      if (this.chainLightning(p.x, nose, ldmg, jumps, range, 360 * S, false, !full) && full) { run.energy = Math.max(0, run.energy - base.cost); this.hudDirty = true; }
+      if (spread && full) this.chainLightning(p.x, nose, ldmg * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
+      A.play('zap', full ? undefined : { vol: 0.4, rate: 1.6 });
     } else if (wid === 'arc') {
       const range = base.range * S * (1 + wl(wid, 'range') * 0.12);
       const half = base.angle * 0.5 + multi * 0.12 + (spread ? 0.3 : 0);
-      this.arcStrike(p.x, p.y - p.w * 0.2, range, half, base.dmg * dmgMul * (1 + multi * 0.2));
+      const ch = base.min + (base.max - base.min) * this.run.arc;
+      this.arcStrike(p.x, p.y - p.w * 0.2, range, half, base.dmg * dmgMul * (1 + multi * 0.2) * ch, this.run.arc);
       A.play('arc');
     } else if (wid === 'darkmatter') {
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
@@ -489,7 +529,8 @@
   };
 
   // цепная молния: ищет ближайшую цель выше корабля, затем прыгает
-  game.chainLightning = function (x, y, dmg, jumps, range, firstRange, alt) {
+  // weak — искра без энергии: тоньше и бледнее
+  game.chainLightning = function (x, y, dmg, jumps, range, firstRange, alt, weak) {
     const hit = [];
     let cx = x, cy = y, cur = null;
     const pts = [[x, y]];
@@ -507,9 +548,9 @@
       hit.push(best);
       pts.push([best.x, best.y]);
       const icy = this.evo('lightning');
-      FX.lightning(cx, cy, best.x, best.y, icy ? '#9be8ff' : '#fff36b', 2.6 * G.S, 0.14);
+      FX.lightning(cx, cy, best.x, best.y, icy ? '#9be8ff' : weak ? '#e9e6c0' : '#fff36b', (weak ? 1.2 : 2.6) * G.S, 0.14);
       if (icy && !best.boss) best.frozen = 2;
-      FX.sprite('fx_bolt', best.x, best.y, { w0: 22 * G.S, w1: 34 * G.S, dur: 0.18, hold: 0.3, rot: U.rand(-0.6, 0.6), hue: 52, minor: true });
+      if (!weak) FX.sprite('fx_bolt', best.x, best.y, { w0: 22 * G.S, w1: 34 * G.S, dur: 0.18, hold: 0.3, rot: U.rand(-0.6, 0.6), hue: 52, minor: true });
       this.damageEnemy(best, dmg * Math.pow(D.WEAPONS.lightning.base.falloff, j), { crit: true, src: 'lightning' });
       cx = best.x; cy = best.y; cur = best;
     }
@@ -517,10 +558,12 @@
       // разряд «в пустоту» — просто визуал
       FX.lightning(x, y, x + U.rand(-30, 30) * G.S, y - 120 * G.S, '#fff36b', 2 * G.S, 0.1);
     } else this.run.hits++;
+    return hit.length;
   };
 
-  // дуга: все враги в секторе перед кораблём
-  game.arcStrike = function (x, y, range, half, dmg) {
+  // дуга: все враги в секторе перед кораблём; charge 0..1 — заряд от движения (дуга ярче и толще)
+  game.arcStrike = function (x, y, range, half, dmg, charge) {
+    const col = charge > 0.66 ? '#e8ffff' : '#7ff6ff', lw = 1 + (charge || 0) * 0.8;
     const base = -Math.PI / 2;
     let hits = 0;
     for (const e of this.enemies) {
@@ -530,14 +573,14 @@
       const a = Math.atan2(e.y - y, e.x - x);
       if (Math.abs(U.angleDiff(base, a)) > half + Math.atan2(e.r, Math.max(d, 1))) continue;
       this.damageEnemy(e, dmg, { crit: true, src: 'arc' });
-      FX.lightning(x, y, e.x, e.y, '#7ff6ff', 2.2 * G.S, 0.12);
+      FX.lightning(x, y, e.x, e.y, col, 2.2 * lw * G.S, 0.12);
       hits++;
     }
     if (hits) this.run.hits++;
     this.ov.arcs.push({ x, y, range, half, life: 0.16, max: 0.16 });
     for (let i = 0; i < 3; i++) {
       const a = base + U.rand(-half, half), r = range * U.rand(0.55, 0.95);
-      FX.lightning(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r, '#7ff6ff', 1.6 * G.S, 0.1);
+      FX.lightning(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r, col, 1.6 * lw * G.S, 0.1);
     }
   };
 
@@ -661,15 +704,19 @@
       if (this.inBlast(e, b.x, b.y, b.aoeR)) this.damageEnemy(e, b.aoe, { src: 'rocket', heavy: true });
     }
   };
+  // рост плазмы: доля пути до полной силы 0..1 и множитель урона base.min..base.max
+  function plasmaGrow(b) { const pb = D.WEAPONS.plasma.base; return U.clamp(b.age * Math.hypot(b.vx, b.vy) / (G.H * pb.grow), 0, 1); }
+  function plasmaK(b) { const pb = D.WEAPONS.plasma.base; return b.wid === 'plasma' ? pb.min + (pb.max - pb.min) * plasmaGrow(b) : 1; }
   game.plasmaBlast = function (b, direct) {
-    FX.explode(b.x, b.y, 1.3, '#ff5cf0', { kind: 'plasma', hue: 315 });
-    FX.ring(b.x, b.y, 8, b.aoeR, '#ff8af5', 0.35, 4);
-    FX.shake(0.12);
+    const g = b.wid === 'plasma' ? plasmaGrow(b) : 1, k = plasmaK(b), R = b.aoeR * (0.8 + 0.3 * g);
+    FX.explode(b.x, b.y, 0.9 + 0.6 * g, '#ff5cf0', { kind: 'plasma', hue: 315 });
+    FX.ring(b.x, b.y, 8, R, '#ff8af5', 0.35, 4);
+    FX.shake(0.06 + 0.1 * g);
     A.play('explodeM', { vol: 0.6 });
     for (const e of this.enemies) {
       if (!e.alive || !e.hittable) continue;
       const d = Math.hypot(e.x - b.x, e.y - b.y);
-      if (this.inBlast(e, b.x, b.y, b.aoeR)) this.damageEnemy(e, b.aoe * (1 - Math.min(1, d / b.aoeR) * 0.45), { src: 'plasma', heavy: true });
+      if (this.inBlast(e, b.x, b.y, R)) this.damageEnemy(e, b.aoe * k * (1 - Math.min(1, d / R) * 0.45), { src: 'plasma', heavy: true });
     }
   };
   game.darkBurst = function (b) {
@@ -698,9 +745,14 @@
         else if (U.segDist2(e.x, e.y, b.px, b.py, b.x, b.y) > rr * rr) continue;
         this.run.hits++;
         if (b.kind === 'rocket') { this.damageEnemy(e, b.dmg, { crit: true, src: 'rocket', heavy: true }); this.rocketBlast(b, e); b.dead = true; break; }
-        if (b.kind === 'plasma') { this.damageEnemy(e, b.dmg, { crit: true, src: 'plasma', heavy: true }); this.plasmaBlast(b, e); b.dead = true; break; }
-        this.damageEnemy(e, b.dmg, { crit: true, src: b.wid, cryo: true, conductor: true });
-        FX.hit(b.x, b.y, b.kind === 'pellet' ? '#ffd23d' : '#7fe7ff');
+        if (b.kind === 'plasma') { this.damageEnemy(e, b.dmg * plasmaK(b), { crit: true, src: 'plasma', heavy: true }); this.plasmaBlast(b, e); b.dead = true; break; }
+        // дробь в упор бьёт сильнее; лазер — «фокус» по одной цели
+        let mul = 1, hitCol = b.kind === 'pellet' ? '#ffd23d' : '#7fe7ff';
+        if (b.kind === 'pellet' && b.age < D.WEAPONS.shotgun.base.closeT) mul = D.WEAPONS.shotgun.base.closeMul;
+        if (b.wid === 'laser') mul = this.laserFocus(e);
+        if (mul >= 1.3) hitCol = '#ffffff';
+        this.damageEnemy(e, b.dmg * mul, { crit: true, src: b.wid, cryo: true, conductor: true });
+        FX.hit(b.x, b.y, hitCol);
         if (b.pierce > 0) { b.pierce--; b.hit.push(e.uid); }
         else { b.dead = true; break; }
       }
@@ -717,6 +769,16 @@
         }
       }
     }
+  };
+
+  // фокус лазера: попадания подряд по одной цели (без пауз дольше focusT) усиливают урон
+  game.laserFocus = function (e) {
+    const lb = D.WEAPONS.laser.base, f = this.run.focus;
+    if (f.uid !== e.uid || f.t <= 0) { f.uid = e.uid; f.n = 0; }
+    f.t = lb.focusT;
+    const mul = 1 + lb.focus * f.n;
+    if (f.n < lb.focusMax) f.n++;
+    return mul;
   };
 
   // ════════════════════════════════════════════════════════════
@@ -769,7 +831,15 @@
     }
     e.hp -= dmg;
     e.flash = 0.07;
-    if (e.boss) this.run.bossDamage += dmg;
+    if (e.boss) {
+      this.run.bossDamage += dmg;
+      // с молнией в слотах босс роняет энергоблоки по мере урона — иначе против него молния без энергии
+      if (this.player.weapons.includes('lightning')) {
+        const step = e.maxHp * D.WEAPONS.lightning.base.bossStep;
+        e.enAcc = (e.enAcc || 0) + dmg;
+        while (e.enAcc >= step) { e.enAcc -= step; this.dropEnergy(e.x + U.rand(-0.3, 0.3) * e.w, e.y + e.h * 0.3, 1); }
+      }
+    }
     if (o.cryo && this.st.cryo > 0 && !e.boss && Math.random() < this.st.cryo) e.frozen = 2;
     if (o.conductor && this.skill('sk_conductor') && Math.random() < 0.08) {
       const other = this.nearestOther(e, 140 * G.S);
@@ -830,6 +900,8 @@
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
+    // энергоблоки для молнии — только если она в слотах
+    if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini ? 3 : e.elite ? 2 : Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0);
     // бонусы
     const luck = this.st.luck * (e.mini ? 100 : 1);
     const chance = (0.028 + (e.def.coins || 1) * 0.006) * luck * (this.diffId === 'zen' ? 1.5 : 1);
@@ -1370,6 +1442,9 @@
       left -= v;
     }
   };
+  game.dropEnergy = function (x, y, n) {
+    for (let i = 0; i < n; i++) { const it = pick('en', x, y, 1); it.vx *= 0.5; }
+  };
   game.dropPowerup = function (x, y, type) {
     if (!type && this.run.noDrops) return null;
     if (!type) {
@@ -1392,8 +1467,9 @@
       it.age += dt; it.spin += dt * 6;
       const dx = p.x - it.x, dy = p.y - it.y, d = Math.hypot(dx, dy);
       const mr = it.kind === 'pu' ? st.magnet * 0.6 : st.magnet;
-      // монеты и кристаллы сами летят к кораблю через 2.5 с — на телефоне их легко упустить
-      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr)) || (it.kind !== 'pu' && it.age > 2.5))) {
+      // монеты и кристаллы сами летят к кораблю через 2.5 с — на телефоне их легко упустить;
+      // энергоблоки молнии нужно собрать самому (или магнитом)
+      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr)) || (it.kind !== 'pu' && it.kind !== 'en' && it.age > 2.5))) {
         it.pull = true;
         const sp = (380 + it.age * 120) * S;
         it.vx = U.damp(it.vx, dx / (d || 1) * sp, 9, dt);
@@ -1421,6 +1497,9 @@
       run.xp += it.val;
       A.play('xp');
       while (run.xp >= D.perkXpNeed(run.level)) { run.xp -= D.perkXpNeed(run.level); run.level++; run.pendingPerks++; }
+    } else if (it.kind === 'en') {
+      run.energy = Math.min(1, run.energy + D.WEAPONS.lightning.base.block);
+      A.play('zap', { vol: 0.35, rate: 2 });
     } else {
       this.applyPowerup(it.pu);
       run.pickups++;
@@ -2074,6 +2153,15 @@
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(big ? xpBig : xp, it.x - s / 2, it.y - s / 2, s, s);
+      } else if (it.kind === 'en') {
+        // энергоблок: пульсирует, перед исчезновением мигает
+        const s = 20 * S * (1 + Math.sin(it.age * 7) * 0.08), en = G.proc('energy');
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(G.glow('#fff36b', 64), it.x - s * 1.1, it.y - s * 1.1, s * 2.2, s * 2.2);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = it.age > 8 ? 0.5 + 0.5 * Math.sin(it.age * 20) : 1;
+        ctx.drawImage(en, it.x - s * 0.39, it.y - s / 2, s * 0.78, s);
       } else {
         const def = D.POWERUPS[it.pu];
         const s = 34 * S * (1 + Math.sin(it.age * 5) * 0.05);
@@ -2133,7 +2221,7 @@
       } else if (b.cv || b.sprite) {
         // отскочившие от верха снаряды тают
         if (b.fade) ctx.globalAlpha = U.clamp(b.life / b.fade, 0, 1) * 0.85;
-        if (b.cv) G.drawCanvas(ctx, b.cv, b.x, b.y, b.w, b.kind === 'plasma' ? b.age * 4 : 0);
+        if (b.cv) G.drawCanvas(ctx, b.cv, b.x, b.y, b.wid === 'plasma' ? b.w * (0.7 + 0.5 * plasmaGrow(b)) : b.w, b.kind === 'plasma' ? b.age * 4 : 0);
         else G.draw(ctx, b.sprite, b.x, b.y, b.w, ang);
         ctx.globalAlpha = 1;
       }

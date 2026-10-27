@@ -264,6 +264,19 @@
       x.fillStyle = 'rgba(255,255,255,.55)'; x.beginPath(); x.ellipse(s * 0.36, s * 0.3, s * 0.12, s * 0.06, -0.6, 0, U.TAU); x.fill();
       return c;
     },
+    // энергоблок молнии: ячейка с разрядом
+    energy() {
+      const w = 28, h = 36, c = mk(w, h), x = c.getContext('2d');
+      const g = x.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#fffbd0'); g.addColorStop(0.45, '#ffe23d'); g.addColorStop(1, '#c98a06');
+      x.fillStyle = '#6b5000'; x.fillRect(9, 0, 10, 5);
+      x.beginPath(); x.moveTo(7, 4); x.arcTo(26, 4, 26, 35, 5); x.arcTo(26, 35, 2, 35, 5); x.arcTo(2, 35, 2, 4, 5); x.arcTo(2, 4, 26, 4, 5); x.closePath();
+      x.fillStyle = g; x.fill();
+      x.strokeStyle = '#7a5600'; x.lineWidth = 2; x.stroke();
+      x.fillStyle = '#fff';
+      x.beginPath(); x.moveTo(16, 8); x.lineTo(8, 21); x.lineTo(13, 21); x.lineTo(11, 31); x.lineTo(20, 17); x.lineTo(15, 17); x.lineTo(17, 8); x.closePath(); x.fill();
+      return c;
+    },
     xp() {
       const s = 40, c = mk(s, s), x = c.getContext('2d');
       x.shadowColor = '#3dffa2'; x.shadowBlur = 10;
