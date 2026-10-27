@@ -916,7 +916,7 @@
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
     // энергоблоки для молнии — только если она в слотах
-    if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini ? 3 : e.elite ? 2 : Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0);
+    if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini ? 2 : e.elite || Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0);
     // бонусы
     const luck = this.st.luck * (e.mini ? 100 : 1);
     const chance = (0.028 + (e.def.coins || 1) * 0.006) * luck * (this.diffId === 'zen' ? 1.5 : 1);
@@ -1457,7 +1457,13 @@
       left -= v;
     }
   };
+  // не больше, чем не хватает до полной энергии с учётом уже лежащих блоков, и не больше maxOnScreen на экране
   game.dropEnergy = function (x, y, n) {
+    const lb = D.WEAPONS.lightning.base;
+    let lying = 0;
+    for (const it of this.pickups) if (!it.dead && it.kind === 'en') lying++;
+    const need = Math.ceil((1 - this.run.energy) / lb.block - 0.01) - lying;
+    n = Math.min(n, need, lb.maxOnScreen - lying);
     for (let i = 0; i < n; i++) { const it = pick('en', x, y, 1); it.vx *= 0.5; }
   };
   game.dropPowerup = function (x, y, type) {
