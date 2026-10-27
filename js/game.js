@@ -24,7 +24,7 @@
     buffs: {}, blasts: [],
     keys: {},
     pointer: { id: null, x: 0, y: 0, downT: 0, downX: 0, downY: 0, moved: 0, lastTap: 0, lastTapX: 0, lastTapY: 0 },
-    ov: { rail: null, hole: null, arcs: [], beams: [], lasers: [] },
+    ov: { rail: null, hole: null, beams: [], lasers: [] },
     attract: { t: 0 },
     hudDirty: true,
     timers: [],
@@ -111,7 +111,7 @@
     this.boss = null;
     this.timers = [];
     if (this.scene) { this.scene = null; SS.emit('cinema', false); }
-    this.ov ={ rail: null, hole: null, arcs: [], beams: [], lasers: [] };
+    this.ov = { rail: null, hole: null, beams: [], lasers: [] };
     SS.enemies.corpses.length = 0;
     SS.events.reset();
     FX.clear();
@@ -447,7 +447,7 @@
     const b = bulletPool.get();
     b.x = o.x; b.y = o.y; b.px = o.x; b.py = o.y; b.vx = o.vx; b.vy = o.vy;
     b.dmg = o.dmg; b.r = o.r; b.kind = o.kind; b.sprite = o.sprite || null; b.cv = o.cv || null; b.w = o.w;
-    b.pierce = o.pierce || 0; b.hit.length = 0; b.life = o.life || 2.4; b.age = 0;
+    b.pierce = o.pierce || 0; b.hit.length = 0; b.life = b.life0 = o.life || 2.4; b.age = 0; b.w1 = o.w1 || 0; b.ch = o.ch || 0;
     b.homing = o.homing || 0; b.aoe = o.aoe || 0; b.aoeR = o.aoeR || 0; b.acc = o.acc || 0; b.maxSpd = o.maxSpd || 0;
     b.bounced = false; b.fade = 0; b.tick = 0; b.tickT = o.tickT || 0; b.pull = o.pull || 0; b.burst = o.burst || 0; b.burstR = o.burstR || 0;
     b.rot = 0; b.wid = o.wid || ''; b.dead = false; b.target = null;
@@ -525,10 +525,13 @@
       if (spread && full) this.chainLightning(p.x, nose, ldmg * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
       A.play('zap', full ? undefined : { vol: 0.4, rate: 1.6 });
     } else if (wid === 'arc') {
-      const range = base.range * S * (1 + wl(wid, 'range') * 0.12);
-      const half = base.angle * 0.5 + multi * 0.12 + (spread ? 0.3 : 0);
-      const ch = base.min + (base.max - base.min) * this.run.arc;
-      this.arcStrike(p.x, p.y - p.w * 0.2, range, half, base.dmg * dmgMul * (1 + multi * 0.2) * ch, this.run.arc);
+      // серп: волна-полумесяц летит вперёд, расширяется и прошивает всех на пути; заряд от движения — шире и сильнее
+      const ch = this.run.arc, k = base.min + (base.max - base.min) * ch, span = 1 + wl(wid, 'range') * 0.12, wk = span * (0.8 + 0.4 * ch);
+      const n = 1 + multi;
+      const wave = (a, dmg, wmul) => shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg, r: base.thick * S,
+        kind: 'wave', w: base.w0 * S * wk * wmul, w1: base.w1 * S * wk * wmul, wid, life: base.life * Math.sqrt(span), ch });
+      for (let i = 0; i < n; i++) wave((i - (n - 1) / 2) * 0.2, base.dmg * dmgMul * k * mk, 1);
+      if (spread) for (const a of [-0.4, 0.4]) wave(a, base.dmg * dmgMul * k * 0.6, 0.7);
       A.play('arc');
     } else if (wid === 'darkmatter') {
       const radius = base.radius * S * (1 + wl(wid, 'aoe') * 0.15);
@@ -576,26 +579,23 @@
     return hit.length;
   };
 
-  // дуга: все враги в секторе перед кораблём; charge 0..1 — заряд от движения (дуга ярче и толще)
-  game.arcStrike = function (x, y, range, half, dmg, charge) {
-    const col = charge > 0.66 ? '#e8ffff' : '#7ff6ff', lw = 1 + (charge || 0) * 0.8;
-    const base = -Math.PI / 2;
-    let hits = 0;
+  // ── серп: волна — дуга окружности радиуса R, выгнутая по курсу; полуширина растёт за время жизни ──
+  function waveGeom(b) {
+    const half = (b.w + (b.w1 - b.w) * Math.min(1, b.age / b.life0)) / 2, R = half * 1.6, ang = Math.atan2(b.vy, b.vx);
+    return { R, ang, cx: b.x - Math.cos(ang) * R, cy: b.y - Math.sin(ang) * R, span: Math.asin(Math.min(1, half / R)) };
+  }
+  // враг задет, если его центр у дуги (с учётом размера); каждого — один раз за волну
+  game.waveHits = function (b) {
+    const w = waveGeom(b);
     for (const e of this.enemies) {
-      if (!e.alive || !e.hittable) continue;
-      const d = Math.hypot(e.x - x, e.y - y);
-      if (d > range + e.r) continue;
-      const a = Math.atan2(e.y - y, e.x - x);
-      if (Math.abs(U.angleDiff(base, a)) > half + Math.atan2(e.r, Math.max(d, 1))) continue;
-      this.damageEnemy(e, dmg, { crit: true, src: 'arc' });
-      FX.lightning(x, y, e.x, e.y, col, 2.2 * lw * G.S, 0.12);
-      hits++;
-    }
-    if (hits) this.run.hits++;
-    this.ov.arcs.push({ x, y, range, half, life: 0.16, max: 0.16 });
-    for (let i = 0; i < 3; i++) {
-      const a = base + U.rand(-half, half), r = range * U.rand(0.55, 0.95);
-      FX.lightning(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r, col, 1.6 * lw * G.S, 0.1);
+      if (!e.alive || !e.hittable || b.hit.includes(e.uid)) continue;
+      const er = e.rx ? Math.max(e.rx, e.ry) * 0.8 : e.r;
+      if (Math.abs(Math.hypot(e.x - w.cx, e.y - w.cy) - w.R) > b.r + er) continue;
+      if (Math.abs(U.angleDiff(w.ang, Math.atan2(e.y - w.cy, e.x - w.cx))) > w.span + er / w.R) continue;
+      b.hit.push(e.uid);
+      this.run.hits++;
+      this.damageEnemy(e, b.dmg, { crit: true, src: 'arc' });
+      FX.hit(e.x, e.y, '#bff9ff');
     }
   };
 
@@ -751,6 +751,7 @@
     const enemies = this.enemies;
     for (const b of this.bullets) {
       if (b.dead || b.kind === 'dark') continue;
+      if (b.kind === 'wave') { this.waveHits(b); continue; }
       for (const e of enemies) {
         if (!e.alive || !e.hittable) continue;
         if (b.hit.length && b.hit.includes(e.uid)) continue;
@@ -1260,7 +1261,6 @@
         ov.hole = null;
       }
     }
-    for (let i = ov.arcs.length - 1; i >= 0; i--) { ov.arcs[i].life -= dt; if (ov.arcs[i].life <= 0) ov.arcs.splice(i, 1); }
     for (let i = ov.beams.length - 1; i >= 0; i--) {
       const bm = ov.beams[i];
       bm.t += dt;
@@ -2239,6 +2239,16 @@
         ctx.strokeStyle = '#c9a0ff'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, b.rot * 0.3, b.rot * 0.3 + U.TAU * 0.75); ctx.stroke();
         ctx.globalAlpha = 1;
+      } else if (b.kind === 'wave') {
+        // серп: широкое свечение + яркая кромка; заряженная волна белее, к концу полёта гаснет
+        const w = waveGeom(b), fade = Math.min(1, b.life / 0.15);
+        ctx.lineCap = 'round';
+        // три слоя: мягкий ореол, неоновое тело, белая кромка
+        for (const [col, a, lw] of [['#3dc8ff', 0.16 + 0.1 * b.ch, 3], ['#7ff6ff', 0.55, 1.2], [b.ch > 0.66 ? '#ffffff' : '#e8ffff', 0.95, 0.45]]) {
+          ctx.globalAlpha = a * fade; ctx.strokeStyle = col; ctx.lineWidth = b.r * lw;
+          ctx.beginPath(); ctx.arc(w.cx, w.cy, w.R, w.ang - w.span, w.ang + w.span); ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
       } else if (b.cv || b.sprite) {
         // отскочившие от верха снаряды тают
         if (b.fade) ctx.globalAlpha = U.clamp(b.life / b.fade, 0, 1) * 0.85;
@@ -2404,16 +2414,6 @@
   game.drawOverlays = function (ctx) {
     const p = this.player, S = G.S, ov = this.ov;
     ctx.globalCompositeOperation = 'lighter';
-    for (const a of ov.arcs) {
-      const k = a.life / a.max;
-      ctx.globalAlpha = k * 0.22;
-      ctx.fillStyle = '#7ff6ff';
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.arc(a.x, a.y, a.range, -Math.PI / 2 - a.half, -Math.PI / 2 + a.half); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = k * 0.8;
-      ctx.strokeStyle = '#d9fdff'; ctx.lineWidth = 2 * S;
-      ctx.beginPath(); ctx.arc(a.x, a.y, a.range, -Math.PI / 2 - a.half, -Math.PI / 2 + a.half); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
     // рельса
     if (ov.rail && p.alive) {
       const r = ov.rail;
