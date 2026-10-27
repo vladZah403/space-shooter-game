@@ -656,12 +656,26 @@
   // ════════════════════════════════════════════════════════════
   // ПАУЗА / УЛУЧШЕНИЯ / ВОСКРЕШЕНИЕ
   // ════════════════════════════════════════════════════════════
+  // сборка забега (3.0): пилот, модули корабля и улучшения — чем этот забег отличается от прошлого
+  function buildHtml(run) {
+    if (!run) return '';
+    const pil = D.PILOTS[run.pilot] || D.PILOTS.kai;
+    const chip = (ico, n, title, cls) => '<span class="rb-chip ' + cls + '" title="' + U.escape(title) + '">' + ico + (n > 1 ? '<b>' + n + '</b>' : '') + '</span>';
+    const mods = D.MODULES.filter((m) => run.mods[m.id]).map((m) => chip(m.ico, run.mods[m.id], m.name, 'mod')).join('');
+    const perks = D.PERKS.filter((p) => run.perks[p.id] && !p.filler).map((p) => chip(p.ico, run.perks[p.id], p.name, 'perk')).join('');
+    return '<div class="rb-head"><span class="rb-pilot" style="color:' + pil.color + '">' + pil.ico + ' ' + pil.name + '</span><small>СБОРКА ЗАБЕГА</small></div>' +
+      (mods ? '<div class="rb-row"><small>Модули</small>' + mods + '</div>' : '') +
+      (perks ? '<div class="rb-row"><small>Улучшения</small>' + perks + '</div>' : '') +
+      (!mods && !perks ? '<div class="rb-empty">Пока пусто — модули на станциях, улучшения за кристаллы</div>' : '');
+  }
+
   ui.showPause = function () {
     const g = game, run = g.run;
     $('#pauseInfo').innerHTML =
       '<div class="pi-cell"><small>Счёт</small><b>' + U.fmtShort(run.score) + '</b></div>' +
       '<div class="pi-cell"><small>Волна</small><b>' + (g.wave ? g.wave.n : 1) + '</b></div>' +
       '<div class="pi-cell"><small>Монеты</small><b>' + U.fmt(run.coins) + '</b></div>';
+    $('#pauseBuild').innerHTML = buildHtml(run);
     syncPauseToggles();
     ui.show('#scr-pause');
     T.back(() => game.resume());
@@ -806,6 +820,7 @@
       ['skull', 'Враги', U.fmt(sum.kills)], ['crown', 'Боссы', sum.bosses], ['bolt', 'Комбо', '×' + sum.maxCombo],
       ['chart', 'Уровень', sum.level], ['target', 'Точность', sum.accuracy + '%'], ['retry', 'Время', U.fmtTime(sum.time)],
     ].map((x) => '<div class="go-stat">' + ic(x[0]) + '<small>' + x[1] + '</small><b>' + x[2] + '</b></div>').join('');
+    $('#goBuild').innerHTML = buildHtml(game.run);
     $('#goCoins').textContent = '+' + U.fmt(sum.coins + (sum.lvlCoins || 0));
     $('#goXp').textContent = '+' + U.fmt(sum.xp);
     // анимация счёта

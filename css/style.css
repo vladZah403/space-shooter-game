@@ -533,6 +533,18 @@ body.cinema .banner{visibility:hidden}
 
 /* ═══ ПАУЗА ═══ */
 .pause-info{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 6px}
+/* сборка забега (3.0) */
+.run-build{margin:6px 0 8px;padding:10px 12px;border-radius:14px;background:rgba(6,10,28,.6);border:1px solid rgba(255,255,255,.07);text-align:left}
+.run-build:empty{display:none}
+.rb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rb-pilot{font-family:var(--font-h);font-weight:700;font-size:12px;letter-spacing:1.5px}
+.rb-head small,.rb-row small{font-family:var(--font-h);font-size:9px;letter-spacing:1.5px;color:var(--dim)}
+.rb-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px}
+.rb-row small{width:100%}
+.rb-chip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;font-size:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.rb-chip.mod{border-color:rgba(255,200,61,.45);background:rgba(255,200,61,.08)}
+.rb-chip b{position:absolute;right:-4px;bottom:-4px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#3de0ff;color:#04121f;font-size:9px;font-family:var(--font-h);line-height:14px;text-align:center}
+.rb-empty{font-size:12px;color:var(--muted)}
 .pi-cell{text-align:center;padding:8px 4px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
 .pi-cell small{display:block;font-size:11px;color:var(--dim);font-weight:600}
 .pi-cell b{font-family:var(--font-h);font-size:14px}
