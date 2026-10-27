@@ -63,6 +63,8 @@
       if (ch.mods.includes('elite')) d.elite = Math.max(0.09, d.elite * 3);
     }
     s.settings.diff = this.diffId;
+    // страховка от фарма лёгкой сложности (M.overpowerK) — считается один раз на забег
+    this.coinK = M.overpowerK(this.diffId);
     this.clearWorld();
     const S = G.S;
     this.run = {
@@ -162,7 +164,7 @@
       wings: ship.wings || 0,
       magnet: sk('sk_magnet') ? 9999 : 120 * S * (1 + gl('magnet') * 0.2) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1),
+      coins: this.diff.coins / this.diff.count * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
       luck: (1 + gl('luck') * 0.12) * (1 + pk('luck') * 0.4),
       speed: (1 + (ship.speed || 0)) * (1 + gl('engine') * 0.04) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
       dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0)),

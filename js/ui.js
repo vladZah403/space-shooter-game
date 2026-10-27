@@ -34,6 +34,12 @@
     $('#diffList').addEventListener('click', (e) => {
       const b = e.target.closest('.diff-row');
       if (!b) return;
+      if (b.classList.contains('locked')) {
+        const d = D.DIFFS[b.dataset.diff];
+        A.play('error'); T.haptic('error');
+        ui.toast({ ico: '🔒', title: 'ЗАКРЫТО', text: 'Дойдите до волны ' + D.DIFF_UNLOCK_WAVE + ' на сложности «' + D.DIFFS[d.unlock].name + '»', info: true });
+        return;
+      }
       ui._diffSel = b.dataset.diff;
       $$('#diffList .diff-row').forEach((r) => r.classList.toggle('sel', r === b));
       A.play('click'); T.haptic('select');
@@ -293,11 +299,10 @@
   // ════════════════════════════════════════════════════════════
   function fmtMul(v) { return String(Math.round(v * 100) / 100).replace('.', ','); }
   function pct(v) { const d = Math.round((v - 1) * 100); return (d > 0 ? '+' : '−') + Math.abs(d) + '%'; }
-  // совет: следующая сложность, когда на текущей пройдено 25 волн
-  function recommendedDiff() {
-    const st = store.s.stats.diff, order = D.DIFF_ORDER;
+  // совет: самая высокая открытая сложность, до которой дотягивает Боевая мощь
+  function recommendedDiff(power) {
     let rec = 'normal';
-    for (const id of ['normal', 'hard', 'nightmare']) if (((st[id] && st[id].wave) || 0) >= 25) rec = order[order.indexOf(id) + 1];
+    for (const id of D.DIFF_ORDER) if (M.diffUnlocked(id) && D.DIFFS[id].power >= 100 && power >= D.DIFFS[id].power) rec = id;
     return rec;
   }
   function syncDiffGo() {
@@ -308,16 +313,20 @@
         '. Дойдите до волны ' + D.CHALLENGE_WAVE + ' — награда раз в день.';
       return;
     }
-    const d = D.DIFFS[ui._diffSel] || D.DIFFS.normal;
+    const d = D.DIFFS[ui._diffSel] || D.DIFFS.normal, power = M.power();
     $('#btnDiffGo span').textContent = 'В БОЙ • ' + (d.short || d.name);
-    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc;
+    // мощь ниже рекомендуемой — предупреждаем, но не запрещаем
+    const weak = d.power && power < d.power ? '<br><b style="color:#ff8a3d">⚠️ Рекомендуемая мощь ' + U.fmt(d.power) + '+, у вас ' + U.fmt(power) + ' — будет тяжело</b>' : '';
+    const k = M.overpowerK(ui._diffSel, power);
+    const easy = k < 1 ? '<br><b style="color:#ffc83d">Вы намного сильнее этой сложности — монеты ×' + fmtMul(d.coins * k) + ' вместо ×' + fmtMul(d.coins) + '</b>' : '';
+    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc + weak + easy;
   }
   ui.showDiff = function () {
     const s = store.s;
-    ui._diffSel = D.DIFFS[s.settings.diff] ? s.settings.diff : 'normal';
-    const rec = recommendedDiff();
+    ui._diffSel = D.DIFFS[s.settings.diff] && M.diffUnlocked(s.settings.diff) ? s.settings.diff : 'normal';
+    const power = M.power(), rec = recommendedDiff(power);
     const lives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
-    $('#diffLives').innerHTML = ic('heart') + 'Жизней: <b>' + lives + '</b> на любой сложности';
+    $('#diffLives').innerHTML = ic('heart') + 'Жизней: <b>' + lives + '</b> • ⚡ Боевая мощь: <b>' + U.fmt(power) + '</b>';
     // испытание дня — первой строкой
     const ch = M.challenge(), cs = M.challengeState();
     const chRow = '<button class="diff-row daily' + (ui._diffSel === 'daily' ? ' sel' : '') + '" data-diff="daily" style="--dc:#ff5cf0">' +
@@ -325,14 +334,15 @@
       '<div class="diff-meta">' + ch.mods.map((m) => '<span>' + U.escape(D.CHALLENGE_MODS.find((x) => x.id === m).name) + '</span>').join('') + '</div></div>' +
       '<div class="diff-rew">' + (cs.done ? '✓<small>получено</small>' : ic('coin') + ' ' + D.CHALLENGE_REWARD + '<small>за волну ' + D.CHALLENGE_WAVE + '</small>') + '</div></button>';
     $('#diffList').innerHTML = chRow + D.DIFF_ORDER.map((id) => {
-      const d = D.DIFFS[id], best = s.stats.diff[id] || { wave: 0 };
-      const meta = [['Враги', d.count], ['Броня', d.hp], ['Огонь', d.fire]]
-        .filter((x) => x[1] !== 1).map((x) => '<span class="' + (x[1] > 1 ? 'up' : 'down') + '">' + x[0] + ' <b>' + pct(x[1]) + '</b></span>').join('');
-      return '<button class="diff-row' + (id === ui._diffSel ? ' sel' : '') + '" data-diff="' + id + '" style="--dc:' + d.color + '">' +
-        '<div class="dr-main"><div class="diff-name">' + d.name + (id === rec ? '<span class="diff-rec">СОВЕТУЕМ</span>' : '') +
+      const d = D.DIFFS[id], best = s.stats.diff[id] || { wave: 0 }, open = M.diffUnlocked(id);
+      const meta = open ? [['Враги', d.count], ['Броня', d.hp], ['Огонь', d.fire]]
+        .filter((x) => x[1] !== 1).map((x) => '<span class="' + (x[1] > 1 ? 'up' : 'down') + '">' + x[0] + ' <b>' + pct(x[1]) + '</b></span>').join('')
+        : '<span>' + ic('lock') + ' Откроется: волна ' + D.DIFF_UNLOCK_WAVE + ' на «' + D.DIFFS[d.unlock].name + '»</span>';
+      return '<button class="diff-row' + (id === ui._diffSel ? ' sel' : '') + (open ? '' : ' locked') + '" data-diff="' + id + '" style="--dc:' + d.color + '">' +
+        '<div class="dr-main"><div class="diff-name">' + d.name + (open && id === rec ? '<span class="diff-rec">СОВЕТУЕМ</span>' : '') +
         (best.wave ? '<span class="diff-best">рекорд: волна ' + best.wave + '</span>' : '') + '</div>' +
         '<div class="diff-meta">' + (meta || '<span>Обычные враги и награды</span>') + '</div></div>' +
-        '<div class="diff-rew">' + ic('coin') + ' ×' + fmtMul(d.coins) + '<small>опыт ×' + fmtMul(d.xp) + '</small></div></button>';
+        '<div class="diff-rew">' + ic('coin') + ' ×' + fmtMul(d.coins * M.overpowerK(id, power)) + '<small>' + (d.power ? 'мощь ' + U.fmt(d.power) + '+' : 'любая мощь') + '</small></div></button>';
     }).join('');
     syncDiffGo();
     ui.show('#scr-diff');
@@ -831,7 +841,7 @@
     ui._preview = null;
     const sh = D.SHIPS[s.ship.model];
     $('#hangarShipName').textContent = sh.name;
-    $('#hangarShipStats').innerHTML = sh.perks.map((p) => '<span class="stat-chip">' + p + '</span>').join('');
+    $('#hangarShipStats').innerHTML = '<span class="stat-chip power">⚡ Боевая мощь ' + U.fmt(M.power()) + '</span>' + sh.perks.map((p) => '<span class="stat-chip">' + p + '</span>').join('');
     list.innerHTML = '';
     if (tab === 'models') {
       for (const id of D.SHIP_ORDER) {
@@ -939,26 +949,8 @@
       (max ? '<button class="btn sm up2-buy max" disabled>' + ic('check') + 'MAX</button>'
         : '<button class="btn sm up2-buy ' + (poor ? 'poor' : 'gold') + '" ' + attr + (poor ? ' disabled' : '') + '><span class="pr">' + ic('coin', 'coin-ico') + U.fmt(cost) + '</span><small>' + (poor ? 'не хватает' : 'улучшить') + '</small></button>') + '</div>';
   }
-  function weaponLevels(wid) { const o = {}; for (const up of D.WEAPONS[wid].ups) o[up.id] = M.weaponLevel(wid, up.id); return o; }
-  // примерный урон в секунду ПО ОДНОЙ ЦЕЛИ с учётом прокачки оружия и корабля (без улучшений забега) —
-  // так оружие честно сравнивается; урон по площади видно по шкале «Площадь». Бонусы урона складываются
-  // (как в game.computeStats); особенности оружия — в среднем по бою. Сверено со стендом урона
-  function weaponPower(wid) {
-    const w = D.WEAPONS[wid], b = w.base, lv = weaponLevels(wid);
-    const dm = 1 + (lv.dmg || 0) * 0.12 + M.generalLevel('power') * 0.07, rate = 1 + M.generalLevel('rate') * 0.05;
-    const up = 1 + (lv.rate || 0) * 0.08, cd = b.cd / up;
-    // магазин: выстрелов в секунду с учётом перезарядки
-    const perSec = b.mag ? (b.mag + (wid === 'rocket' ? lv.salvo || 0 : 0)) / ((b.mag + (wid === 'rocket' ? lv.salvo || 0 : 0) - 1) * cd + b.reload / up) : 1 / cd;
-    let dps = 0;
-    if (wid === 'laser') dps = b.dmg * dm / cd * (1 + b.focus * b.focusMax * 0.9);
-    else if (wid === 'arc') dps = b.dmg * dm / cd * (b.min + b.max) / 2;
-    else if (wid === 'shotgun') dps = b.dmg * dm * (b.pellets + (lv.pellets || 0)) * 0.65 * perSec;
-    else if (wid === 'rocket') dps = b.dmg * dm * perSec;
-    else if (wid === 'plasma') dps = (b.dmg + b.aoe) * dm / cd * (b.min + b.max) / 2;
-    else if (wid === 'lightning') dps = b.dmg * dm / cd;
-    else if (wid === 'darkmatter') dps = (b.dmg * (b.life / b.tick) * 0.6 + b.burst) * dm / Math.max(cd, b.life);
-    return Math.round(dps * rate);
-  }
+  // примерный урон в секунду по одной цели с прокачкой оружия и «Корабля» (без улучшений забега) — M.weaponDps
+  function weaponPower(wid) { return Math.round(M.weaponDps(wid)); }
   function canUpgrade(wid) {
     const c = store.s.coins;
     return D.WEAPONS[wid].ups.some((up) => { const l = M.weaponLevel(wid, up.id); return l < up.max && c >= up.costs[l]; });

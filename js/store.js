@@ -498,6 +498,51 @@
       this.checkAchievements();
     },
 
+    // ── урон оружия в секунду ПО ОДНОЙ ЦЕЛИ (примерно, сверено со стендом урона) ──
+    // full — с бонусами корабля и престижа (для Боевой мощи); иначе — прокачка оружия и «Корабль» в арсенале
+    weaponDps(wid, full) {
+      const w = D.WEAPONS[wid], b = w.base, lv = (wid2) => this.weaponLevel(wid, wid2);
+      const ship = D.SHIPS[this.s.ship.model].stats, pres = this.prestigeBonus();
+      const dm = 1 + lv('dmg') * 0.12 + this.generalLevel('power') * 0.07 + (full ? (ship.dmg || 0) + pres.dmg - 1 : 0);
+      const rate = (1 + this.generalLevel('rate') * 0.05) * (full ? 1 + (ship.rate || 0) : 1);
+      const up = 1 + lv('rate') * 0.08, cd = b.cd / up;
+      const mag = b.mag ? b.mag + (wid === 'rocket' ? lv('salvo') : 0) : 0;
+      const perSec = mag ? mag / ((mag - 1) * cd + b.reload / up) : 1 / cd;
+      let dps = 0;
+      if (wid === 'laser') dps = b.dmg * dm / cd * (1 + b.focus * b.focusMax * 0.9);
+      else if (wid === 'arc') dps = b.dmg * dm / cd * (b.min + b.max) / 2;
+      else if (wid === 'shotgun') dps = b.dmg * dm * (b.pellets + lv('pellets')) * 0.65 * perSec;
+      else if (wid === 'rocket') dps = b.dmg * dm * perSec;
+      else if (wid === 'plasma') dps = (b.dmg + b.aoe) * dm / cd * (b.min + b.max) / 2;
+      else if (wid === 'lightning') dps = b.dmg * dm / cd;
+      else if (wid === 'darkmatter') dps = (b.dmg * (b.life / b.tick) * 0.6 + b.burst) * dm / Math.max(cd, b.life);
+      return dps * rate;
+    },
+    // ── Боевая мощь (3.0): урон лучшего оружия × живучесть × навыки. Новичок ≈ 120, всё на максимуме ≈ 2500 ──
+    power() {
+      const s = this.s, ship = D.SHIPS[s.ship.model].stats;
+      let dps = 0;
+      for (const wid of s.weapons.owned) if (D.WEAPONS[wid]) dps = Math.max(dps, this.weaponDps(wid, true));
+      const lives = D.BASE_LIVES + this.generalLevel('hull') + (ship.lives || 0) + this.generalLevel('shield') * 0.5;
+      const skills = Object.keys(s.skills).filter((k) => s.skills[k]).length;
+      return Math.round(dps * Math.sqrt(lives / D.BASE_LIVES) * (1 + skills * 0.03) * 1.4);
+    },
+    // сложность открыта: первые три сразу; дальше — волна D.DIFF_UNLOCK_WAVE на предыдущей.
+    // Где уже есть рекорд (играли до 3.0) — остаётся открытой
+    diffUnlocked(id) {
+      const d = D.DIFFS[id], st = this.s.stats.diff;
+      if (!d) return false;
+      if (!d.unlock || SS.DEV || (st[id] && st[id].wave > 0)) return true;
+      return ((st[d.unlock] && st[d.unlock].wave) || 0) >= D.DIFF_UNLOCK_WAVE;
+    },
+    // страховка: если мощь в 3+ раза выше рекомендуемой, монеты плавно снижаются до ×0,5 (к 6 разам)
+    overpowerK(id, power) {
+      const rec = D.DIFFS[id] && D.DIFFS[id].power;
+      if (!rec) return 1;
+      const r = (power === undefined ? this.power() : power) / rec;
+      return r <= 3 ? 1 : Math.max(0.5, 1 - (r - 3) / 6);
+    },
+
     // ── испытание дня: правила одинаковы у всех в этот день (зерно — только дата) ──
     challenge() {
       const today = U.today(), rnd = U.seeded(U.hashStr('challenge:' + today));

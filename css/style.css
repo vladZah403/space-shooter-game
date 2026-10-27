@@ -207,6 +207,9 @@ svg{width:1em;height:1em;flex-shrink:0}
 .ship-stage-name{position:absolute;left:14px;top:12px;font-family:var(--font-h);font-weight:900;font-size:16px;letter-spacing:2px}
 .ship-stage-stats{position:absolute;left:14px;bottom:10px;right:14px;display:flex;flex-wrap:wrap;gap:6px}
 .stat-chip{font-size:12px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(6,18,36,.86);color:var(--cyan);border:1px solid rgba(61,224,255,.25)}
+.stat-chip.power{color:var(--gold);border-color:rgba(255,200,61,.4)}
+.diff-row.locked{opacity:.5;filter:grayscale(.6)}
+.diff-row.locked .diff-meta svg{width:12px;height:12px;vertical-align:-1px}
 .grid-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .item-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:14px;background:var(--panel);border:1px solid var(--line);text-align:center;transition:transform .12s}
 .item-card:active{transform:scale(.95)}
