@@ -95,9 +95,9 @@
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
-      if ((e.code === 'Escape' || e.code === 'KeyP') && (g.state === 'play' || g.state === 'pause')) { g.state === 'play' ? g.pause() : g.resume(); return; }
+      if ((e.code === 'Escape' || e.code === 'KeyP') && (g.canSteer() || g.state === 'pause')) { g.state === 'pause' ? g.resume() : g.pause(); return; }
       if (e.code === 'Escape' && SS.ui) { SS.ui.back(); return; }
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && g.state === 'play') e.preventDefault();
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && g.canSteer()) e.preventDefault();
       g.onKey(e, true);
     });
     window.addEventListener('keyup', (e) => g.onKey(e, false));
@@ -110,7 +110,7 @@
   function onHidden(hidden) {
     const g = SS.game;
     if (hidden) {
-      if (g.state === 'play') g.pause();
+      if (g.canSteer()) g.pause();
       SS.audio.suspend();
       SS.store.save();
     } else {
@@ -120,7 +120,7 @@
   }
   document.addEventListener('visibilitychange', () => onHidden(document.hidden));
   window.addEventListener('pagehide', () => SS.store.save());
-  window.addEventListener('blur', () => { if (SS.game.state === 'play' && !document.hasFocus()) SS.game.pause(); });
+  window.addEventListener('blur', () => { if (SS.game.canSteer() && !document.hasFocus()) SS.game.pause(); });
   SS.on('appActive', (on) => onHidden(!on));
 
   // ── игровой цикл ──

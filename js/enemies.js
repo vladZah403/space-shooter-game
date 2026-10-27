@@ -904,8 +904,8 @@
     game.enemies.push(b);
     game.run.bossDamaged = false;
     FX.sprite('fx_warp', G.FW / 2, (SS.ui ? SS.ui.topInset() : 120) + 50 * S, { w0: 120 * S, w1: 230 * S, dur: 1.5, hold: 0.45, fadeIn: 0.15, alpha: 0.8, hue: G.hueOf(bdef.color) });
-    A.play('bossRoar');
-    FX.shake(0.4);
+    // в кат-сцене рёв и тряска — вместе с карточкой имени (game.sceneName)
+    if (game.state !== 'cutscene') { A.play('bossRoar'); FX.shake(0.4); }
     SS.emit('bossSpawn', b);
     SS.emit('intensity');
   };

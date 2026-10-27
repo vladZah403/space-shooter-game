@@ -350,7 +350,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .status.wait{background:rgba(61,224,255,.08);color:var(--cyan);border:1px solid rgba(61,224,255,.25)}
 
 /* ═══ HUD ═══ */
-.hud{position:fixed;inset:0;z-index:20;pointer-events:none}
+.hud{position:fixed;inset:0;z-index:20;pointer-events:none;transition:opacity .35s}
+body.cinema .hud{opacity:0}
+body.cinema .hud *{pointer-events:none!important}
+body.cinema .banner{visibility:hidden}
 .hud-btn{pointer-events:auto;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
   background:rgba(8,12,30,.8);border:1px solid rgba(130,170,255,.22);color:#dfe8ff;transition:transform .08s}
 .hud-btn svg{font-size:20px}

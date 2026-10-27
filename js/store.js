@@ -28,6 +28,7 @@
         dmgNums: true, shake: true, fps: false, diff: 'normal', intro: true },
       lb: [],
       seenIntro: false,
+      bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
       patch: 25,
     };

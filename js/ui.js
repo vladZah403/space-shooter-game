@@ -107,6 +107,7 @@
     SS.on('waveEvent', (d) => { ui.banner('<div class="b2">' + d.ico + ' ' + d.name + '</div><div class="b3">' + U.escape(d.desc) + '</div>', 'small', 2600); T.haptic('warning'); });
     SS.on('waveClear', (w) => { if (!game.wave.boss) ui.banner('<div class="b2">ВОЛНА ' + w.n + ' ЗАЧИЩЕНА</div><div class="b3">' + (w.perfect ? '★ БЕЗ УРОНА ×2 ★  ' : '') + '+' + U.fmt(w.bonus) + '</div>', w.perfect ? 'gold small' : 'small', 1800); });
     SS.on('bossWarning', (def) => ui.bossWarn(def));
+    SS.on('cinema', (on) => document.body.classList.toggle('cinema', on));
     SS.on('bossDefeated', (d) => ui.banner('<div class="b1">БОСС ПОВЕРЖЕН</div><div class="b2">' + d.def.name + '</div><div class="b3">+' + U.fmt(d.pts) + '</div>', 'gold', 2600));
     SS.on('perkOffer', (ch) => ui.showPerks(ch));
     SS.on('reviveOffer', (cost) => ui.showRevive(cost));

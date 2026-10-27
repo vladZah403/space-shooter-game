@@ -15,7 +15,7 @@
   let uid = 1;
 
   const game = {
-    state: 'idle',          // idle | play | pause | perk | dying | revive | over
+    state: 'idle',          // idle | play | cutscene | pause | perk | dying | revive | over
     diffId: 'normal', diff: D.DIFFS.normal,
     t: 0, timeScale: 1, slowT: 0,
     player: null,
@@ -28,6 +28,7 @@
     attract: { t: 0 },
     hudDirty: true,
     timers: [],
+    scene: null,            // кат-сцена (см. bossScene)
   };
   SS.game = game;
 
@@ -109,13 +110,15 @@
     this.enemies.length = 0; this.drones.length = 0; this.blasts.length = 0;
     this.boss = null;
     this.timers = [];
-    this.ov = { rail: null, hole: null, arcs: [], beams: [], lasers: [] };
+    if (this.scene) { this.scene = null; SS.emit('cinema', false); }
+    this.ov ={ rail: null, hole: null, arcs: [], beams: [], lasers: [] };
     SS.enemies.corpses.length = 0;
     SS.events.reset();
     FX.clear();
   };
 
   game.pause = function () {
+    if (this.state === 'cutscene') this.skipScene();
     if (this.state !== 'play') return;
     this.state = 'pause';
     this.pointer.id = null;
@@ -177,16 +180,18 @@
   // ════════════════════════════════════════════════════════════
   // ВВОД
   // ════════════════════════════════════════════════════════════
+  // в кат-сцене корабль можно вести, но не стрелять
+  game.canSteer = function () { return this.state === 'play' || this.state === 'cutscene'; };
   game.onPointerDown = function (e) {
     const pt = this.pointer;
-    if (this.state !== 'play') return;
+    if (!this.canSteer()) return;
     if (pt.id !== null && pt.id !== e.pointerId) return;
     pt.id = e.pointerId; pt.x = e.clientX; pt.y = e.clientY;
     pt.downT = performance.now(); pt.downX = e.clientX; pt.downY = e.clientY; pt.moved = 0;
   };
   game.onPointerMove = function (e) {
     const pt = this.pointer;
-    if (pt.id !== e.pointerId || this.state !== 'play') return;
+    if (pt.id !== e.pointerId || !this.canSteer()) return;
     const sens = M.s.settings.sens || 1.25;
     const dx = (e.clientX - pt.x) * sens, dy = (e.clientY - pt.y) * sens;
     pt.x = e.clientX; pt.y = e.clientY;
@@ -198,9 +203,11 @@
     const pt = this.pointer;
     if (pt.id !== e.pointerId) return;
     pt.id = null;
-    if (this.state !== 'play') return;
     const now = performance.now();
     const quick = now - pt.downT < 230 && pt.moved < 18;
+    // короткое касание пропускает кат-сцену (ведение пальцем — нет)
+    if (this.state === 'cutscene') { if (quick) this.skipScene(); return; }
+    if (this.state !== 'play') return;
     if (quick) {
       if (now - pt.lastTap < 320 && Math.hypot(e.clientX - pt.lastTapX, e.clientY - pt.lastTapY) < 60) { this.useBomb(); pt.lastTap = 0; }
       else { pt.lastTap = now; pt.lastTapX = e.clientX; pt.lastTapY = e.clientY; }
@@ -208,6 +215,7 @@
   };
   game.onKey = function (e, down) {
     this.keys[e.code] = down;
+    if (down && this.state === 'cutscene' && (e.code === 'Space' || e.code === 'Enter')) { this.skipScene(); return; }
     if (!down || this.state !== 'play') return;
     if (e.code === 'KeyB' || e.code === 'Space') this.useBomb();
     if (e.code === 'KeyQ') this.useSkill(0);
@@ -233,7 +241,7 @@
   // ГЛАВНЫЙ ЦИКЛ
   // ════════════════════════════════════════════════════════════
   game.frame = function (rdt) {
-    if (this.state === 'play' || this.state === 'dying') {
+    if (this.state === 'play' || this.state === 'dying' || this.state === 'cutscene') {
       if (this.slowT > 0) { this.slowT -= rdt; this.timeScale = U.lerp(this.timeScale, 0.3, 0.2); }
       else this.timeScale = U.lerp(this.timeScale, 1, Math.min(1, rdt * 6));
       const dt = Math.min(rdt, 1 / 30) * this.timeScale;
@@ -256,7 +264,7 @@
     const edt = dt * slow;
 
     // ── управление с клавиатуры ──
-    if (p.alive && this.state === 'play') {
+    if (p.alive && this.canSteer()) {
       let kx = 0, ky = 0;
       const k = this.keys;
       if (k.ArrowLeft || k.KeyA) kx--; if (k.ArrowRight || k.KeyD) kx++;
@@ -282,6 +290,7 @@
     this.processBlasts();
     this.updatePickups(dt);
     this.updateWaves(dt);
+    if (this.scene) this.updateScene(dt);
     SS.events.update(dt);
     this.updateOverlays(dt);
     this.cleanup();
@@ -1544,7 +1553,9 @@
     SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector: n > 1 && (n - 1) % 5 === 0 });
     SS.events.roll(this.wave);
     if (this.run.challenge && n === D.CHALLENGE_WAVE) M.challengeDone(this.run.challenge);
-    if (isBoss) {
+    if (isBoss && this.state === 'play') this.bossScene(n);
+    else if (isBoss) {
+      // игрок как раз погибает — без кат-сцены, как раньше
       this.wave.intro = 3.2;
       this.after(2.6, () => SS.enemies.spawnBoss(n));
       SS.emit('bossWarning', D.BOSSES[(n / 5 - 1) % D.BOSSES.length]);
@@ -1616,6 +1627,119 @@
       for (const it of this.pickups) it.pull = true;
       this.waveCleared();
     });
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // КАТ-СЦЕНА ВЫХОДА БОССА
+  //  Затемнение, полосы кино, босс выходит, карточка с именем, рёв.
+  //  Полная сцена — при первой встрече с боссом, дальше короткая.
+  //  Корабль можно вести, но он неуязвим и не стреляет; касание — пропуск.
+  // ════════════════════════════════════════════════════════════
+  game.bossScene = function (n) {
+    const def = D.BOSSES[(n / 5 - 1) % D.BOSSES.length];
+    const seen = M.s.bossSeen || (M.s.bossSeen = []);
+    const full = !seen.includes(def.id);
+    if (full) { seen.push(def.id); SS.store.soon(); }
+    // когда выходит босс, когда появляется карточка с именем, когда сцена заканчивается
+    const sc = full ? { spawnT: 0.9, nameT: 2.4, end: 4.4 } : { spawnT: 0.1, nameT: 0.5, end: 1.8 };
+    this.scene = Object.assign(sc, { n, def, full, t: 0, out: -1, spawned: false, nameAt: -1 });
+    this.state = 'cutscene';
+    for (const b of this.ebullets) b.dead = true;
+    A.muffle(true);
+    A.play('warning');
+    SS.emit('cinema', true);
+  };
+
+  game.updateScene = function (dt) {
+    const sc = this.scene;
+    // сцена закончилась — полосы ещё уезжают
+    if (sc.out >= 0) { sc.out += dt; if (sc.out > 0.45) this.scene = null; return; }
+    sc.t += dt;
+    if (!sc.spawned && sc.t >= sc.spawnT) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
+    if (sc.nameAt < 0 && sc.t >= sc.nameT) this.sceneName();
+    if (sc.t >= sc.end) this.endScene();
+  };
+
+  game.sceneName = function () {
+    const sc = this.scene;
+    sc.nameAt = sc.t;
+    A.play('bossRoar');
+    FX.shake(sc.full ? 0.6 : 0.4);
+    SS.tg.haptic('warning');
+  };
+
+  game.endScene = function () {
+    const sc = this.scene;
+    if (!sc || this.state !== 'cutscene') return;
+    sc.out = 0;
+    this.state = 'play';
+    this.player.inv = Math.max(this.player.inv, 0.5);
+    A.muffle(false);
+    SS.emit('cinema', false);
+    this.hudDirty = true;
+  };
+
+  game.skipScene = function () {
+    const sc = this.scene;
+    if (!sc || this.state !== 'cutscene') return;
+    if (!sc.spawned) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
+    // имя ещё не показали — покажем обычным предупреждением поверх боя
+    if (sc.nameAt < 0) { A.play('bossRoar'); SS.emit('bossWarning', sc.def); }
+    // босс сразу встаёт на место, дальше обычный выход (enemies.updateBoss)
+    if (this.boss && this.boss.entering) this.boss.y = this.boss.baseY;
+    this.endScene();
+  };
+
+  // затемнение фона под боем
+  game.drawSceneDim = function (ctx) {
+    const sc = this.scene, k = sceneK(sc);
+    if (k <= 0) return;
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.5 * k).toFixed(3) + ')';
+    ctx.fillRect(0, 0, G.W, G.H);
+  };
+  // 0..1: полосы выезжают за 0,45 с и уезжают за 0,45 с после конца
+  function sceneK(sc) {
+    const ease = (q) => 1 - Math.pow(1 - U.clamp(q, 0, 1), 3);
+    return sc.out >= 0 ? 1 - ease(sc.out / 0.45) : ease(sc.t / 0.45);
+  }
+
+  // полосы кино и карточка с именем босса
+  game.drawScene = function (ctx) {
+    const sc = this.scene, k = sceneK(sc);
+    if (k <= 0) return;
+    const W = G.W, H = G.H, S = G.S, bh = Math.round(H * 0.11 * k);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, bh);
+    ctx.fillRect(0, H - bh, W, bh);
+    ctx.fillStyle = G.hexA(sc.def.color, 0.55 * k);
+    ctx.fillRect(0, bh, W, 1);
+    ctx.fillRect(0, H - bh - 1, W, 1);
+    if (sc.nameAt < 0) return;
+    // карточка между боссом и кораблём игрока
+    const lt = sc.t - sc.nameAt, a = Math.min(1, lt / 0.25) * k;
+    if (a <= 0) return;
+    const cx = G.FX + G.FW / 2, cy = H * 0.6, name = sc.def.name;
+    const size = Math.round(Math.min(32 * S, G.FW * 0.92 / (name.length * 0.82)));
+    const grow = 1 + 0.12 * (1 - Math.min(1, lt / 0.35));
+    // линия под именем раскрывается от центра
+    const lw = G.FW * 0.36 * Math.min(1, lt / 0.4);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = sc.def.color;
+    ctx.font = '700 ' + Math.round(11 * S) + 'px Orbitron, Rajdhani, sans-serif';
+    const maxW = G.FW * 0.92;
+    ctx.fillText(sc.full ? 'НОВЫЙ БОСС' : 'БОСС', cx, cy - size * 0.95, maxW);
+    ctx.fillRect(cx - lw, cy + size * 0.62, lw * 2, Math.max(1, 2 * S));
+    ctx.shadowColor = sc.def.color; ctx.shadowBlur = 18 * S;
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 ' + Math.round(size * grow) + 'px Orbitron, Rajdhani, sans-serif';
+    ctx.fillText(name, cx, cy, maxW);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,.78)';
+    ctx.font = '600 ' + Math.round(15 * S) + 'px Rajdhani, sans-serif';
+    ctx.fillText(sc.def.title, cx, cy + size * 0.62 + 18 * S, maxW);
+    ctx.restore();
   };
 
   // ════════════════════════════════════════════════════════════
@@ -1781,6 +1905,7 @@
     G.bg.draw(ctx, q);
     if (this.state === 'idle') { this.drawAttract(ctx); FX.drawFront(ctx); return; }
     if (!this.player) return;
+    if (this.scene) this.drawSceneDim(ctx);
     ctx.save();
     ctx.translate(G.FX + FX.shakeX, FX.shakeY);
     FX.drawBack(ctx);
@@ -1819,6 +1944,7 @@
       ctx.fillStyle = 'rgba(61,224,255,.18)';
       ctx.fillRect(G.FX - 1, 0, 1, H); ctx.fillRect(G.FX + G.FW, 0, 1, H);
     }
+    if (this.scene) this.drawScene(ctx);
   };
 
   game.drawAttract = function (ctx) {
