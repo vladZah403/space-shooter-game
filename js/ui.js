@@ -117,6 +117,8 @@
     SS.on('revived', () => { ui.hide('#scr-revive'); });
 
     $('#verTxt').textContent = 'v' + SS.VERSION + (SS.DEV ? ' • DEV' : '');
+    // значок на логотипах — из той же версии (в index.html цифра только на время загрузки)
+    document.querySelectorAll('.logo .ver, .boot-logo .l3').forEach((el) => { el.textContent = SS.VERSION.split('.').slice(0, 2).join('.'); });
     ui.measure();
   };
 
