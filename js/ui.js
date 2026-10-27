@@ -940,8 +940,9 @@
         : '<button class="btn sm up2-buy ' + (poor ? 'poor' : 'gold') + '" ' + attr + (poor ? ' disabled' : '') + '><span class="pr">' + ic('coin', 'coin-ico') + U.fmt(cost) + '</span><small>' + (poor ? 'не хватает' : 'улучшить') + '</small></button>') + '</div>';
   }
   function weaponLevels(wid) { const o = {}; for (const up of D.WEAPONS[wid].ups) o[up.id] = M.weaponLevel(wid, up.id); return o; }
-  // примерный урон в секунду с учётом прокачки оружия и корабля (без улучшений забега).
-  // Бонусы урона складываются (как в game.computeStats); особенности оружия — в среднем по бою
+  // примерный урон в секунду ПО ОДНОЙ ЦЕЛИ с учётом прокачки оружия и корабля (без улучшений забега) —
+  // так оружие честно сравнивается; урон по площади видно по шкале «Площадь». Бонусы урона складываются
+  // (как в game.computeStats); особенности оружия — в среднем по бою. Сверено со стендом урона
   function weaponPower(wid) {
     const w = D.WEAPONS[wid], b = w.base, lv = weaponLevels(wid);
     const dm = 1 + (lv.dmg || 0) * 0.12 + M.generalLevel('power') * 0.07, rate = 1 + M.generalLevel('rate') * 0.05;
@@ -949,12 +950,12 @@
     // магазин: выстрелов в секунду с учётом перезарядки
     const perSec = b.mag ? (b.mag + (wid === 'rocket' ? lv.salvo || 0 : 0)) / ((b.mag + (wid === 'rocket' ? lv.salvo || 0 : 0) - 1) * cd + b.reload / up) : 1 / cd;
     let dps = 0;
-    if (wid === 'laser') dps = b.dmg * dm / cd * (1 + b.focus * b.focusMax / 2);
+    if (wid === 'laser') dps = b.dmg * dm / cd * (1 + b.focus * b.focusMax * 0.9);
     else if (wid === 'arc') dps = b.dmg * dm / cd * (b.min + b.max) / 2;
     else if (wid === 'shotgun') dps = b.dmg * dm * (b.pellets + (lv.pellets || 0)) * 0.65 * perSec;
-    else if (wid === 'rocket') dps = (b.dmg + b.aoe * 0.5) * dm * perSec;
+    else if (wid === 'rocket') dps = b.dmg * dm * perSec;
     else if (wid === 'plasma') dps = (b.dmg + b.aoe) * dm / cd * (b.min + b.max) / 2;
-    else if (wid === 'lightning') { let k = 0, f = 1; for (let i = 0; i <= b.chain + (lv.chain || 0); i++) { k += f; f *= b.falloff; } dps = b.dmg * dm * k / cd; }
+    else if (wid === 'lightning') dps = b.dmg * dm / cd;
     else if (wid === 'darkmatter') dps = (b.dmg * (b.life / b.tick) * 0.6 + b.burst) * dm / Math.max(cd, b.life);
     return Math.round(dps * rate);
   }
@@ -971,7 +972,7 @@
     h += '<div class="ad-desc">' + w.desc + '</div>';
     h += '<div class="ad-stats">' + [['Урон', r.dmg], ['Скорострельность', r.speed], ['Площадь', r.area], ['Дальность', r.range]]
       .map((x) => '<span>' + x[0] + '</span><div class="segs">' + segs(x[1] || 0, 5) + '</div>').join('') + '</div>';
-    h += '<div class="ad-power"><span>Урон в секунду<br>с вашей прокачкой</span><b>≈ ' + U.fmt(weaponPower(wid)) + '</b></div>';
+    h += '<div class="ad-power"><span>Урон в секунду по цели<br>с вашей прокачкой</span><b>≈ ' + U.fmt(weaponPower(wid)) + '</b></div>';
     if (owned) {
       const total = w.ups.reduce((a, up) => a + up.max, 0), got = w.ups.reduce((a, up) => a + M.weaponLevel(wid, up.id), 0);
       h += '<div class="ad-sec">ПРОКАЧКА<small>' + got + ' из ' + total + '</small></div>';
