@@ -924,7 +924,7 @@
     if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini || Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0);
     // бонусы
     const luck = this.st.luck * (e.mini ? 100 : 1);
-    const chance = (0.028 + (e.def.coins || 1) * 0.006) * luck * (this.diffId === 'zen' ? 1.5 : 1);
+    const chance = (0.028 + (e.def.coins || 1) * 0.006) * luck * (this.diffId === 'zen' ? 1.5 : 1) * (this.diff.drops || 1);
     if (Math.random() < chance || e.mini) this.dropPowerup(e.x, e.y);
     if (e.mini) this.dropPowerup(e.x + 20 * S, e.y);
     // навыки и улучшения

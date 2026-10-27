@@ -84,6 +84,8 @@
       ty: 0, baseX: 0, amp: 0, dir: 0, face: 1, spinAng: undefined,
     };
     if (def.mini) setHitbox(e, sprite);
+    // «Сложно» и «Бог войны»: элита со щитом и на 15% быстрее
+    if (elite && diff.eliteShield && !def.prop) { e.shield += hp * 0.35; e.shieldMax += hp * 0.35; e.spd *= 1.15; }
     e.lastX = e.x;
     e.baseX = e.x;
     // поведение можно задать при появлении (строи из spawnGroup): o.ai
@@ -1364,7 +1366,8 @@
     }
     // фазы
     const ratio = b.hp / b.maxHp;
-    const newPhase = ratio <= 0.33 ? 3 : ratio <= 0.66 ? 2 : 1;
+    // «Кошмар» и «Бог войны»: 4-я фаза «ярость» на последних 15% прочности — все атаки чаще
+    const newPhase = ratio <= 0.15 && game.diff.bossRage ? 4 : ratio <= 0.33 ? 3 : ratio <= 0.66 ? 2 : 1;
     if (newPhase > b.phase) {
       b.phase = newPhase;
       FX.ring(b.x, b.y, b.r, b.r * 3, b.bdef.color, 0.6, 6);
@@ -1373,9 +1376,10 @@
       A.play('bossRoar');
       ring(b.x, b.y, b.num === 1 ? 10 : 16, 160, 'orb', Math.random());
       SS.emit('bossPhase', b);
+      if (b.phase === 4) { SS.emit('toast', { ico: '😡', title: 'ЯРОСТЬ', text: b.bdef.name + ' в ярости — атаки чаще!', info: true, dur: 2200 }); FX.vignette('#ff2a48', 1.6, 0.6, true); }
     }
     // 3.0: во 2-й фазе — дополнительная атака из новых паттернов, в 3-й чаще (свой набор у каждого босса)
-    if (b.phase >= 2 && !b.entering && timer(b, 'xpat', bcd(b, b.phase >= 3 ? 5.5 : 7.5), 3)) bossPattern(b);
+    if (b.phase >= 2 && !b.entering && timer(b, 'xpat', bcd(b, b.phase >= 4 ? 4 : b.phase >= 3 ? 5.5 : 7.5), 3)) bossPattern(b);
     // движение
     if (b.dive) {
       const d = b.dive;
@@ -1408,10 +1412,10 @@
     if (b.frozen > 0) b.frozen -= dt;
     if (game.player.alive) BOSS[b.bdef.id](b);
     // искры повреждённого босса
-    if (b.phase >= 2 && Math.random() < dt * (b.phase === 3 ? 8 : 3)) {
+    if (b.phase >= 2 && Math.random() < dt * (b.phase >= 3 ? 8 : 3)) {
       const x = b.x + U.rand(-0.35, 0.35) * b.w, y = b.y + U.rand(-0.3, 0.3) * b.h;
       FX.sparks(x, y, '#ffcf6b', 3, 160);
-      if (b.phase === 3) FX.smoke(x, y, 1, 14 * S);
+      if (b.phase >= 3) FX.smoke(x, y, 1, 14 * S);
     }
   }
 
