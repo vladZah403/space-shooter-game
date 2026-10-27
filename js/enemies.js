@@ -62,7 +62,7 @@
     const def = D.ENEMIES[type];
     if (!def) return null;
     const S = G.S, wn = game.wave ? game.wave.n : 1, diff = game.diff;
-    const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004);
+    const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004 + (game.wave && game.wave.danger ? D.DANGER.elite : 0));
     // в дальних секторах флот противника обновляется — новые облики кораблей
     const sprite = o.sprite || (def.alt && wn > 10 && Math.random() < 0.6 ? def.alt : def.sprite);
     const scale = (elite ? 1.12 : 1) * (o.scale || 1);
@@ -1005,7 +1005,7 @@
   // ════════════════════════════════════════════════════════════
   E.spawnBoss = function (n, tries) {
     const num = Math.max(1, Math.round(n / 5));
-    const bdef = D.BOSSES[(num - 1) % D.BOSSES.length];
+    const bdef = game.bossDef(num);
     const cycle = Math.floor((num - 1) / D.BOSSES.length);
     const S = G.S;
     // свой спрайт босса лежит в позднем атласе: на очень медленной сети он может ещё качаться — тогда ждём

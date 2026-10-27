@@ -85,6 +85,13 @@
       mods: {}, repairT: 0, emergT: 0,
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
+    // рогалик: порядок секторов и боссов свой в каждом забеге; первыми всегда Орбита Земли и Страж
+    const rnd = ch ? U.seeded(U.hashStr('order:' + ch.date)) : Math.random;
+    const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+    const range = (a, b) => Array.from({ length: b - a }, (_, i) => a + i);
+    this.run.sectorOrder = [0].concat(shuffle(range(1, D.SECTORS.length)));
+    // боссы мешаются внутри своей ступени сложности: ранние (до 4-го), средние, поздние; Оверлорд — финальный
+    this.run.bossOrder = [0].concat(shuffle(range(1, 4)), shuffle(range(4, 9)), shuffle(range(9, 12)), [12]);
     if (ch && ch.mods.includes('glass')) this.run.perks.glass = 1;
     // испытание дня: свои генераторы для состава волн и выбора улучшений — одинаковые у всех в этот день
     if (ch) { this.run.waveRng = U.seeded(U.hashStr('waves:' + ch.date)); this.run.perkRng = U.seeded(U.hashStr('perks:' + ch.date)); }
@@ -158,6 +165,10 @@
   game.skill = function (id) { return !!M.s.skills[id]; };
 
   game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
+  // сектор и босс по номеру в забеге (с учётом перемешанного порядка)
+  game.sectorIdx = function (k) { const o = this.run && this.run.sectorOrder; return o ? o[k % o.length] : k % D.SECTORS.length; };
+  game.sectorDef = function (k) { return D.SECTORS[this.sectorIdx(k)]; };
+  game.bossDef = function (num) { const o = this.run && this.run.bossOrder, i = (num - 1) % D.BOSSES.length; return D.BOSSES[o ? o[i] : i]; };
   game.computeStats = function () {
     const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skill(id);
     const ship = D.SHIPS[s.ship.model].stats;
@@ -947,7 +958,7 @@
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
     this.addScore(pts);
     // монеты и кристаллы
-    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1);
+    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? D.DANGER.coins : 1);
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
@@ -1765,12 +1776,14 @@
     // после прыжка (jumpScene) сектор уже сменён
     if (sector !== this.run.sector) {
       this.run.sector = sector;
-      G.bg.setSector(sector);
+      G.bg.setSector(this.sectorIdx(sector));
       G.bg.warp = 1;
     }
     // баннер сектора — только если его карточку не показали в прыжке
     const newSector = n > 1 && (n - 1) % 5 === 0 && this.run.cardSector !== sector;
-    SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector });
+    // Развилка: опасный путь — больше врагов и элиты, монеты ×2
+    if (this.run.nextDanger) { this.run.nextDanger = false; this.wave.danger = true; this.wave.budget *= D.DANGER.count; }
+    SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: this.sectorDef(sector).name, newSector, danger: this.wave.danger });
     SS.events.roll(this.wave);
     if (this.run.challenge) M.challengeWave(this.run.challenge, n);
     if (isBoss && this.state === 'play') this.bossScene(n);
@@ -1778,7 +1791,7 @@
       // игрок как раз погибает — без кат-сцены, как раньше
       this.wave.intro = 3.2;
       this.after(2.6, () => SS.enemies.spawnBoss(n));
-      SS.emit('bossWarning', D.BOSSES[(n / 5 - 1) % D.BOSSES.length]);
+      SS.emit('bossWarning', this.bossDef(n / 5));
       FX.vignette('#ff2a48', 2.4, 0.75, true);
       A.play('warning');
     }
@@ -1826,9 +1839,69 @@
     // собираем оставшиеся монеты и кристаллы
     for (const it of this.pickups) if (it.kind !== 'pu') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
-    // после босса — прыжок в следующий сектор
+    // после босса — станция и прыжок в следующий сектор; после обычной волны иногда событие
     if (w.boss) this.after(0.8, () => { if (this.wave === w) this.offerModules('station'); });
-    else this.after(1.2, () => { if (this.wave === w) this.nextWave(); });
+    else this.after(1.2, () => { if (this.wave === w && !this.waveEvent(w)) this.nextWave(); });
+  };
+
+  // ── События между волнами (3.0): Развилка и Торговец. true — событие показано, волна начнётся после выбора ──
+  game.waveEvent = function (w) {
+    const run = this.run, E = D.WAVE_EVENTS;
+    if (this.state !== 'play' || !this.player.alive || w.n < E.from || w.n - (run.lastWaveEvent || 0) < 2) return false;
+    const r = withRng(run.waveRng, () => Math.random());
+    if (r > E.chance) return false;
+    // перед боссом развилки нет — только торговец
+    const kind = (w.n + 1) % 5 === 0 || r > E.chance * E.forkShare ? 'merchant' : 'fork';
+    run.lastWaveEvent = w.n;
+    const offer = withRng(run.waveRng, () => (kind === 'fork' ? this.forkOffer() : this.merchantOffer()));
+    this.state = 'perk';
+    this.offerKind = 'event';
+    this.offer = offer;
+    this.pointer.id = null;
+    A.play('skill', { rate: 1.2 });
+    SS.emit('eventOffer', offer);
+    return true;
+  };
+  game.forkOffer = function () {
+    const d = D.DANGER;
+    return { title: 'РАЗВИЛКА', sub: 'Куда ведём следующую волну?', cards: [
+      { id: 'safe', ico: '🛰️', name: 'ОБЫЧНЫЙ ПУТЬ', desc: 'Следующая волна как обычно', rar: 'common' },
+      { id: 'danger', ico: '☠️', name: 'ОПАСНЫЙ ПУТЬ', desc: 'Врагов +' + Math.round((d.count - 1) * 100) + '%, элита чаще — но монеты ×' + d.coins, rar: 'epic' },
+    ] };
+  };
+  game.merchantOffer = function () {
+    const n = this.wave.n, p = this.player, cards = [];
+    const mods = this.moduleChoices();
+    if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) / 10) * 10 });
+    const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
+    const pk = perks.length ? U.pick(perks) : null;
+    if (pk) cards.push({ id: 'perk:' + pk.id, ico: pk.ico, name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) / 10) * 10 });
+    const epic = D.PERKS.filter((x) => x.rar === 'epic' && this.perk(x.id) < x.max && x.id !== 'glass' && x.id !== 'maxhp' && (!pk || x.id !== pk.id));
+    const ep = epic.length && p.lives >= 2 ? U.pick(epic) : null;
+    if (ep) cards.push({ id: 'deal:' + ep.id, ico: '🩸', name: 'СДЕЛКА: ' + ep.name, desc: '−1 жизнь, взамен: ' + ep.desc, rar: 'legendary' });
+    cards.push({ id: 'pass', ico: '👋', name: 'ПРОЙТИ МИМО', desc: 'Сберечь монеты', rar: 'common' });
+    return { title: 'ТОРГОВЕЦ', sub: 'Цены в монетах — монеты уходят из кошелька', cards };
+  };
+  game.pickOffer = function (id) {
+    if (this.state !== 'perk' || this.offerKind !== 'event') return false;
+    const offer = this.offer, card = offer.cards.find((c) => c.id === id);
+    if (!card) return false;
+    if (card.price && !M.spend(card.price)) { A.play('error'); return false; }
+    const [k, v] = id.split(':');
+    if (k === 'danger') this.run.nextDanger = true;
+    if (k === 'mod') { this.offerKind = 'module-buy'; this.state = 'perk'; this.chooseModule(v); }
+    if (k === 'perk') { this.grantPerk(v, true); A.play('perk'); }
+    if (k === 'deal') {
+      const p = this.player;
+      p.lives = Math.max(1, p.lives - 1); this.grantPerk(v, true);
+      FX.flash('#ff3d5a', 0.35); A.play('playerHit', { vol: 0.6 }); SS.emit('playerHit');
+    }
+    if (card.price) this.hudDirty = true;
+    this.offer = null; this.offerKind = null;
+    this.state = 'play';
+    this.player.inv = Math.max(this.player.inv, 0.8);
+    this.after(0.4, () => this.nextWave());
+    return true;
   };
 
   // уничтожение босса (из enemies.js)
@@ -1863,7 +1936,7 @@
 
   // выход босса: полная сцена — при первой встрече, дальше короткая
   game.bossScene = function (n) {
-    const def = D.BOSSES[(n / 5 - 1) % D.BOSSES.length];
+    const def = this.bossDef(n / 5);
     const seen = M.s.bossSeen || (M.s.bossSeen = []);
     const full = !seen.includes(def.id);
     if (full) { seen.push(def.id); SS.store.soon(); }
@@ -1876,7 +1949,7 @@
   // прыжок после босса: звёзды из заставки, вспышка, новый фон и карточка сектора
   game.jumpScene = function () {
     if (this.state !== 'play') { this.nextWave(); return; }
-    const sector = Math.floor(this.wave.n / 5), sec = D.SECTORS[sector % D.SECTORS.length];
+    const sector = Math.floor(this.wave.n / 5), sec = this.sectorDef(sector);
     this.startScene({ kind: 'jump', sector, sec, color: sec.neb[0], flashT: 1.45, cardT: 1.75, end: 3.4, warp: 0, flashed: false, stars: SS.intro.warpStars(150) });
     A.play('skill', { rate: 0.6 });
   };
@@ -1930,7 +2003,7 @@
     const sc = this.scene;
     sc.flashed = true;
     this.run.sector = sc.sector;
-    G.bg.setSector(sc.sector, true);
+    G.bg.setSector(this.sectorIdx(sc.sector), true);
     G.bg.warp = 0.7;
     for (const e of this.enemies) if (!e.boss) e.alive = false;
     FX.flash('#dcecff', 0.7);

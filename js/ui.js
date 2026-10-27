@@ -123,6 +123,7 @@
     SS.on('bossDefeated', (d) => ui.banner('<div class="b1">БОСС ПОВЕРЖЕН</div><div class="b2">' + d.def.name + '</div><div class="b3">+' + U.fmt(d.pts) + '</div>', 'gold', 2600));
     SS.on('perkOffer', (ch) => ui.showPerks(ch));
     SS.on('moduleOffer', (ch, kind) => ui.showModules(ch, kind));
+    SS.on('eventOffer', (offer) => ui.showEvent(offer));
     SS.on('reviveOffer', (cost) => ui.showRevive(cost));
     SS.on('runEnd', (sum) => { if (sum) ui.showGameOver(sum); });
     SS.on('paused', (on) => { if (on) ui.showPause(); else ui.hide('#scr-pause'); });
@@ -619,6 +620,7 @@
   ui.waveBanner = function (w) {
     if (w.boss) return;
     if (w.newSector || w.n === 1) ui.banner('<div class="b2">СЕКТОР ' + (w.sector + 1) + '</div><div class="b1">' + U.escape(w.sectorName) + '</div><div class="b3">Волна ' + w.n + '</div>', '', 2600);
+    else if (w.danger) ui.banner('<div class="b2" style="color:#ff5c7a">☠️ ОПАСНЫЙ ПУТЬ · МОНЕТЫ ×' + D.DANGER.coins + '</div><div class="b1">ВОЛНА ' + w.n + '</div>', '', 2200);
     else ui.banner('<div class="b1">ВОЛНА ' + w.n + '</div>', '', 1800);
   };
   ui.bossWarn = function (def) {
@@ -734,6 +736,31 @@
       });
       box.appendChild(b);
     });
+    ui.show('#scr-perk');
+    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
+  };
+
+  // события между волнами: Развилка, Торговец (карточки с ценой; не хватает монет — карточка гаснет)
+  ui.showEvent = function (offer) {
+    const box = $('#perkCards');
+    $('#perkTitle').textContent = offer.title;
+    $('#perkSub').textContent = offer.sub;
+    $('#btnPerkReroll').hidden = true;
+    box.innerHTML = '';
+    for (const c of offer.cards) {
+      const rar = D.RARITY[c.rar], poor = c.price && store.s.coins < c.price && !SS.DEV;
+      const b = document.createElement('button');
+      b.className = 'perk-card wait' + (poor ? ' poor' : '');
+      b.style.setProperty('--pc', rar.color);
+      b.innerHTML = '<div class="perk-ico">' + c.ico + '</div><div class="perk-info"><div class="perk-name">' + c.name + '</div><div class="perk-desc">' + c.desc + '</div></div>' +
+        '<div class="perk-rar">' + (c.price ? ic('coin', 'coin-ico') + ' ' + U.fmt(c.price) + (poor ? ' · мало' : '') : rar.name) + '</div>';
+      b.addEventListener('click', () => {
+        if (b.classList.contains('wait')) return;
+        if (poor) { A.play('error'); T.haptic('error'); return; }
+        if (game.pickOffer(c.id)) { ui.hide('#scr-perk'); T.haptic('success'); updateWallets(); }
+      });
+      box.appendChild(b);
+    }
     ui.show('#scr-perk');
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
   };

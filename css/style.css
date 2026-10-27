@@ -212,6 +212,8 @@ svg{width:1em;height:1em;flex-shrink:0}
 .lb-chip{padding:6px 10px;border-radius:10px;font-family:var(--font-h);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
 .lb-chip.sel{color:var(--dc);border-color:var(--dc);background:rgba(255,255,255,.08)}
 .diff-row.locked{opacity:.5;filter:grayscale(.6)}
+.perk-card.poor{opacity:.45;filter:grayscale(.5)}
+.perk-card .perk-rar .coin-ico{width:12px;height:12px;vertical-align:-2px}
 .diff-row.locked .diff-meta svg{width:12px;height:12px;vertical-align:-1px}
 .grid-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .item-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:14px;background:var(--panel);border:1px solid var(--line);text-align:center;transition:transform .12s}
@@ -500,7 +502,7 @@ body.cinema .banner{visibility:hidden}
 .perk-card.wait{pointer-events:none}
 .perk-ico{width:56px;height:56px;border-radius:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:30px;background:color-mix(in srgb,var(--pc) 16%,rgba(0,0,0,.35));border:1px solid color-mix(in srgb,var(--pc) 45%,transparent)}
 .perk-info{flex:1;min-width:0}
-.perk-name{font-family:var(--font-h);font-weight:900;font-size:14px;letter-spacing:1px;color:var(--pc)}
+.perk-name{font-family:var(--font-h);font-weight:900;font-size:14px;letter-spacing:1px;color:var(--pc);padding-right:58px}
 .perk-desc{font-size:14px;color:#cfd8f5;line-height:1.25;margin-top:3px}
 .perk-lv{display:flex;gap:4px;margin-top:6px}
 .perk-lv i{width:14px;height:4px;border-radius:2px;background:rgba(255,255,255,.12)}

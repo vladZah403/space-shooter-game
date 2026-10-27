@@ -27,7 +27,7 @@
     roll(w) {
       this.cur = null;
       const run = game.run, ch = run.challenge;
-      const sec = D.SECTORS[run.sector % D.SECTORS.length];
+      const sec = game.sectorDef(run.sector);
       // k: 0..3 — номер волны в секторе; бой с боссом проходит без механики
       this.mech = sec.mech && !w.boss ? { id: sec.mech, wave: w, k: (w.n - 1) % 5, cd: 0.6 } : null;
       if (w.boss) return;
