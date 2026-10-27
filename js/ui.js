@@ -1027,6 +1027,8 @@
       '<div class="ad-name">' + w.name + (slot >= 0 ? '<span class="tag">В БОЮ • ' + (slot + 1) + '</span>' : '') + '</div>' +
       '<div class="ad-tags">' + (w.tags || []).map((t) => '<span>' + t + '</span>').join('') + '</div></div></div>';
     h += '<div class="ad-desc">' + w.desc + '</div>';
+    // живая демонстрация: как оружие стреляет (js/demo.js)
+    h += '<canvas class="ad-demo" id="weaponDemo"></canvas>';
     h += '<div class="ad-stats">' + [['Урон', r.dmg], ['Скорострельность', r.speed], ['Площадь', r.area], ['Дальность', r.range]]
       .map((x) => '<span>' + x[0] + '</span><div class="segs">' + segs(x[1] || 0, 5) + '</div>').join('') + '</div>';
     h += '<div class="ad-power"><span>Урон в секунду по цели<br>с вашей прокачкой</span><b>≈ ' + U.fmt(weaponPower(wid)) + '</b></div>';
@@ -1060,6 +1062,7 @@
     h += '<div class="ad" style="--wc:' + w.color + '">' + weaponDetail(wid) + '</div>';
     list.innerHTML = h;
     $$('canvas[data-wi]', list).forEach((c) => c.getContext('2d').drawImage(G.weaponIcon(c.dataset.wi, c.width), 0, 0));
+    requestAnimationFrame(() => SS.demo.start($('#weaponDemo'), wid));
     list.onclick = (e) => {
       const b = e.target.closest('button');
       if (!b || b.disabled) return;

@@ -750,6 +750,7 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .ad-head{display:flex;gap:12px;align-items:center}
 .ad-ico{width:66px;height:66px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:color-mix(in srgb,var(--wc) 14%,rgba(0,0,0,.3));border:1px solid color-mix(in srgb,var(--wc) 40%,transparent)}
 .ad-ico canvas{width:52px;height:52px}
+.ad-demo{display:block;width:100%;height:170px;margin:10px 0 4px;border-radius:14px;border:1px solid color-mix(in srgb,var(--wc) 35%,transparent);background:#060a1f}
 .ad-name{font-family:var(--font-h);font-weight:900;font-size:17px;letter-spacing:2px;color:var(--wc);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ad-name .tag{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:7px;background:rgba(61,255,162,.14);color:var(--green)}
 .ad-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
