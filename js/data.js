@@ -21,15 +21,15 @@
     // рекорды сравниваются внутри своей сложности. power — рекомендуемая «Боевая мощь», unlock — на какой
     // сложности нужно дойти до волны D.DIFF_UNLOCK_WAVE, чтобы открыть эту.
     // eliteShield — элита со щитом и быстрее, bossRage — у боссов 4-я фаза «ярость», drops — шанс бонусов.
-    // hp × count растёт как рекомендуемая мощь (Сложно ×3, Кошмар ×7, Бог ×15 к «Норме»): при рекомендуемой мощи
+    // hp × count растёт как рекомендуемая мощь (Сложно ×2,5, Кошмар ×4,5, Бог ×7 к «Норме»): при рекомендуемой мощи
     // враги умирают так же долго, как у новичка на «Норме». waveOffset — состав волн (типы, число врагов,
     // темп огня, новые атаки) как на столько-то волн позже: на высоких сложностях с первых волн есть угроза
     zen:       { name: 'ЗЕН',       color: '#3dffd0', lead: 0,    count: 0.65, hp: 0.6,  spd: 0.8,  fire: 0.45, bspd: 0.75, elite: 0,    coins: 0.5,  score: 1, xp: 1, power: 0,    desc: 'Мало врагов и пуль — спокойный полёт' },
     easy:      { name: 'ЛЕГКО',     color: '#3dffa2', lead: 0.3,  count: 0.8,  hp: 0.8,  spd: 0.9,  fire: 0.7,  bspd: 0.85, elite: 0,    coins: 0.75, score: 1, xp: 1, power: 0,    desc: 'Враги слабее и реже стреляют' },
     normal:    { name: 'НОРМА',     color: '#3de0ff', lead: 0.6,  count: 1,    hp: 1,    spd: 1,    fire: 1,    bspd: 1,    elite: 0.03, coins: 1,    score: 1, xp: 1, power: 100,  desc: 'Задуманный баланс' },
-    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, waveOffset: 3,  count: 1.25, hp: 2.4,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1, xp: 1, power: 300,  unlock: 'normal',    eliteShield: true,    desc: 'Больше врагов, элита со щитами и ускорением' },
-    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, waveOffset: 6,  count: 1.5,  hp: 4.6,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 1, xp: 1, power: 700,  unlock: 'hard',      bossRage: true,      desc: 'Плотный огонь, у боссов дополнительная фаза ярости' },
-    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, waveOffset: 10, count: 1.8, hp: 8.3, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 1, xp: 1, power: 1500, unlock: 'nightmare', eliteShield: true, bossRage: true, drops: 0.6, desc: 'Щиты у элиты, ярость боссов и меньше бонусов' },
+    hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, waveOffset: 3,  count: 1.25, hp: 2.0,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1, xp: 1, power: 250,  unlock: 'normal',    eliteShield: true,    desc: 'Больше врагов, элита со щитами и ускорением' },
+    nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, waveOffset: 6,  count: 1.5,  hp: 3.0,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 1, xp: 1, power: 450,  unlock: 'hard',      bossRage: true,      desc: 'Плотный огонь, у боссов дополнительная фаза ярости' },
+    god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, waveOffset: 10, count: 1.8, hp: 3.9, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 1, xp: 1, power: 700, unlock: 'nightmare', eliteShield: true, bossRage: true, drops: 0.6, desc: 'Щиты у элиты, ярость боссов и меньше бонусов' },
   };
   D.DIFF_UNLOCK_WAVE = 25;
   D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god'];
@@ -123,7 +123,28 @@
   };
   D.WEAPON_ORDER = ['laser', 'shotgun', 'rocket', 'arc', 'plasma', 'lightning', 'darkmatter'];
 
-  // ── Общие улучшения корабля (вкладка «Корабль» в арсенале) ──
+  // ── Модули корабля (3.0): прокачка корабля переехала в забег — выбор 1 из 3 в начале забега и на станции
+  //    после каждого босса. Это не «ещё +15%», как улучшения уровня, а заметные системы корабля ──
+  D.MODULES = [
+    { id: 'power',      ico: '💥', name: 'МОЩЬ ОРУДИЙ',            rar: 'rare',      max: 2, desc: '+20% урона всем оружием' },
+    { id: 'cooling',    ico: '❄️', name: 'ОХЛАЖДЕНИЕ',             rar: 'rare',      max: 2, desc: '+15% темп стрельбы' },
+    { id: 'plating',    ico: '❤️', name: 'БРОНЕПЛИТЫ',             rar: 'epic',      max: 2, desc: '+2 к максимуму жизней и +2 жизни сейчас' },
+    { id: 'shieldcore', ico: '🛡️', name: 'ЯДРО ЩИТА',              rar: 'epic',      max: 1, desc: 'Щит сейчас и восстановление каждые 20 с' },
+    { id: 'wings',      ico: '🛩️', name: 'БОРТОВЫЕ ПУШКИ',         rar: 'epic',      max: 1, desc: 'Две пушки по бортам стреляют вместе с оружием' },
+    { id: 'targeting',  ico: '🎯', name: 'ТАКТИЧЕСКИЙ КОМПЬЮТЕР',  rar: 'rare',      max: 1, desc: '+12% шанс крита, крит наносит ×2,5' },
+    { id: 'hunter',     ico: '🏹', name: 'БРОНЕБОЙНЫЕ СНАРЯДЫ',    rar: 'rare',      max: 1, desc: '+35% урона по боссам, мини-боссам и элите' },
+    { id: 'salvage',    ico: '💰', name: 'УТИЛИЗАТОР',             rar: 'rare',      max: 1, desc: '+40% монет, радиус сбора ×1,5' },
+    { id: 'scanner',    ico: '💠', name: 'КРИСТАЛЬНЫЙ СКАНЕР',     rar: 'rare',      max: 1, desc: '+35% опыта забега — улучшения чаще' },
+    { id: 'bombbay',    ico: '💣', name: 'БОМБОВЫЙ ОТСЕК',         rar: 'rare',      max: 1, desc: '+2 бомбы сейчас, урон бомб +60%' },
+    { id: 'gyro',       ico: '🌀', name: 'ГИРОСКОП',               rar: 'rare',      max: 1, desc: '+15% скорость корабля и +10% уклонение' },
+    { id: 'chrono',     ico: '⏱️', name: 'ХРОНО-МОДУЛЬ',           rar: 'rare',      max: 1, desc: 'Навыки и бомба перезаряжаются на 30% быстрее' },
+    { id: 'repair',     ico: '🔧', name: 'РЕМОНТНЫЙ ДРОН',         rar: 'epic',      max: 1, desc: '+1 жизнь каждые 60 с' },
+    { id: 'emergency',  ico: '🚨', name: 'АВАРИЙНЫЙ ПРОТОКОЛ',     rar: 'legendary', max: 1, desc: 'На последней жизни щит восстанавливается каждые 12 с' },
+  ];
+  D.MODULE_CHOICES = 3;
+
+  // ── Прокачка корабля до 3.0 (вкладка «Корабль» в арсенале). Больше не продаётся: по этим ценам
+  //    при первом запуске 3.0 вложенные монеты возвращаются (store.patchNotes) ──
   D.GENERAL = [
     { id: 'power',   name: 'Мощь орудий',      ico: '💥', max: 10, step: 0.07, unit: '% урона',       costs: [100, 160, 240, 350, 500, 700, 950, 1300, 1750, 2300] },
     { id: 'rate',    name: 'Охлаждение',       ico: '⚡', max: 8,  step: 0.05, unit: '% темпа',       costs: [120, 200, 300, 450, 650, 900, 1250, 1700] },
@@ -251,6 +272,7 @@
     common: { name: 'ОБЫЧНОЕ', color: '#9fb4ff', w: 10 },
     rare:   { name: 'РЕДКОЕ',  color: '#3dd2ff', w: 5.5 },
     epic:   { name: 'ЭПИЧЕСКОЕ', color: '#c48bff', w: 2.4 },
+    legendary: { name: 'ЛЕГЕНДАРНОЕ', color: '#ffc83d', w: 1 },
   };
   D.PERKS = [
     { id: 'dmg',       ico: '🔥', name: 'МОЩЬ',            rar: 'common', max: 6,  desc: '+15% урона всем оружием' },

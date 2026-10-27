@@ -219,8 +219,16 @@
     if (!s.notes || !s.notes.length) return;
     const notes = s.notes.splice(0);
     SS.store.save();
-    const refund = notes.find((n) => n.type === 'refund');
-    if (notes.find((n) => n.type === 'v2')) {
+    const refund = notes.find((n) => n.type === 'refund'), v30 = notes.find((n) => n.type === 'v30');
+    if (v30) {
+      SS.ui.dialog({
+        ico: 'star', title: 'ОБНОВЛЕНИЕ 3.0',
+        text: 'Забег стал рогаликом: прокачка корабля теперь внутри забега — выбирайте модули корабля на старте и на станции после каждого босса.' +
+          (v30.coins ? '\n\nМонеты за прежнюю прокачку корабля возвращены: +' + U.fmt(v30.coins) : '') +
+          '\n\nСекторы со своими механиками, кат-сцены боссов, новое оружие «Серп», умные враги, «Боевая мощь» и честные сложности.',
+        ok: 'В БОЙ!', noCancel: true,
+      });
+    } else if (notes.find((n) => n.type === 'v2')) {
       SS.ui.dialog({
         ico: 'star', title: 'SPACE SHOOTER 2.0',
         text: 'Новая графика, 13 боссов со своими атаками, 13 кораблей, 30 видов врагов и 5 мини-боссов, улучшения в каждом забеге, ежедневные задания и многое другое!' +

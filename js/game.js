@@ -82,6 +82,7 @@
       waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
       lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '', energy: 1, arc: 0, focus: { uid: 0, n: 0, t: 0 },
+      mods: {}, repairT: 0, emergT: 0,
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
     if (ch && ch.mods.includes('glass')) this.run.perks.glass = 1;
@@ -95,10 +96,10 @@
       tilt: 0, vxs: 0, alive: true,
       weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, mag: {}, side: 1,
     };
-    p.maxLives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
+    p.maxLives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0);
     p.lives = p.maxLives;
-    p.shield = M.generalLevel('shield') >= 1;
-    p.bombs = 1 + M.generalLevel('bombs') + (D.SHIPS[s.ship.model].stats.bombs || 0);
+    p.shield = false;
+    p.bombs = 1 + (D.SHIPS[s.ship.model].stats.bombs || 0);
     p.wingCd = 0.2;
     if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
     if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
@@ -112,6 +113,8 @@
     this.hudDirty = true;
     this.nextWave();
     SS.emit('runStart');
+    // стартовый модуль корабля — первый выбор забега
+    this.after(0.7, () => this.offerModules('start'));
   };
 
   game.clearWorld = function () {
@@ -154,33 +157,36 @@
   game.perk = function (id) { return (this.run && this.run.perks[id]) || 0; };
   game.skill = function (id) { return !!M.s.skills[id]; };
 
+  game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
   game.computeStats = function () {
-    const s = M.s, gl = (id) => M.generalLevel(id), pk = (id) => this.perk(id), sk = (id) => this.skill(id);
+    const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skill(id);
     const ship = D.SHIPS[s.ship.model].stats;
     const pres = M.prestigeBonus();
     const S = G.S;
-    let shieldRegen = gl('shield') >= 3 ? 25 : gl('shield') >= 2 ? 40 : 0;
+    let shieldRegen = md('shieldcore') ? 20 : 0;
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
     if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + gl('power') * 0.07 + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
-      rate: (1 + gl('rate') * 0.05) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
-      crit: 0.03 + gl('crit') * 0.04 + pk('crit') * 0.08 + (ship.crit || 0),
-      critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5,
+      dmg: 1 + md('power') * 0.2 + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
+      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
+      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0),
+      critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5,
       pierce: pk('pierce'),
       multi: pk('multi') + (ship.multi || 0),
-      wings: ship.wings || 0,
-      magnet: sk('sk_magnet') ? 9999 : 120 * S * (1 + gl('magnet') * 0.2) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
+      wings: ship.wings || md('wings'),
+      magnet: sk('sk_magnet') ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + gl('greed') * 0.06) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
-      luck: (1 + gl('luck') * 0.12) * (1 + pk('luck') * 0.4),
-      speed: (1 + (ship.speed || 0)) * (1 + gl('engine') * 0.04) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
-      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0)),
-      cdMul: 1 - pk('cooldown') * 0.15,
-      bomb: 1 + gl('bombdmg') * 0.25 + (ship.bombdmg || 0),
-      bossDmg: 1 + pk('titan') * 0.25,
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
+      luck: 1 + pk('luck') * 0.4,
+      speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
+      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1),
+      cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1),
+      bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0),
+      bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35,
+      eliteDmg: 1 + md('hunter') * 0.35,
+      xp: 1 + md('scanner') * 0.35,
       shieldRegen,
       cryo: pk('cryo') * 0.12,
       nova: pk('nova'),
@@ -360,6 +366,14 @@
       if (run.shieldRegenT >= st.shieldRegen) { run.shieldRegenT = 0; p.shield = true; this.shieldFx(); A.play('powerup', { vol: 0.5 }); this.hudDirty = true; }
     }
     // регенерация (навык)
+    if (this.mod('repair') && p.alive && p.lives < p.maxLives) {
+      run.repairT += dt;
+      if (run.repairT >= 60) { run.repairT = 0; this.heal(1, '🔧 РЕМОНТ'); }
+    }
+    if (this.mod('emergency') && p.alive && p.lives === 1 && !p.shield) {
+      run.emergT += dt;
+      if (run.emergT >= 12) { run.emergT = 0; p.shield = true; this.shieldFx(); this.hudDirty = true; }
+    } else run.emergT = 0;
     if (this.skill('sk_regen') && p.alive && p.lives < p.maxLives) {
       run.regenT += dt;
       if (run.regenT >= (p.lives === 1 ? 20 : 45)) { run.regenT = 0; this.heal(1, '💚 РЕГЕНЕРАЦИЯ'); }
@@ -844,6 +858,7 @@
       }
     }
     if (e.boss || e.mini) dmg *= this.st.bossDmg;
+    else if (e.elite) dmg *= this.st.eliteDmg;
     if (e.vuln > 0) dmg *= 1.5;
     if (this.skill('sk_executioner') && e.hp < e.maxHp * 0.25) dmg *= 2;
     if (e.frozen > 0) dmg *= 1.15;
@@ -1551,7 +1566,7 @@
       A.play('coin');
       SS.emit('coinPicked');
     } else if (it.kind === 'xp') {
-      run.xp += it.val;
+      run.xp += it.val * this.st.xp;
       A.play('xp');
       while (run.xp >= D.perkXpNeed(run.level)) { run.xp -= D.perkXpNeed(run.level); run.level++; run.pendingPerks++; }
     } else if (it.kind === 'en') {
@@ -1658,6 +1673,44 @@
     A.play('levelup');
     SS.tg.haptic('success');
     SS.emit('perkOffer', withRng(this.run.perkRng, () => this.perkChoices()));
+  };
+  // ── модули корабля: старт забега и станция после босса (kind: 'start' | 'station') ──
+  game.moduleChoices = function () {
+    const pool = D.MODULES.filter((m) => this.mod(m.id) < m.max && !(m.id === 'plating' && this.perk('glass')));
+    const n = D.MODULE_CHOICES, picks = [];
+    while (picks.length < n && pool.length) {
+      const m = U.pickWeighted(pool, (x) => D.RARITY[x.rar].w);
+      picks.push(m);
+      pool.splice(pool.indexOf(m), 1);
+    }
+    return picks;
+  };
+  game.offerModules = function (kind) {
+    const choices = withRng(this.run.perkRng, () => this.moduleChoices());
+    if (this.state !== 'play' || !this.player.alive || !choices.length) { if (kind === 'station') this.jumpScene(); return; }
+    this.state = 'perk';
+    this.offerKind = kind;
+    this.pointer.id = null;
+    A.play('levelup', { rate: 0.8 });
+    SS.tg.haptic('success');
+    SS.emit('moduleOffer', choices, kind);
+  };
+  game.chooseModule = function (id) {
+    if (this.state !== 'perk') return;
+    const p = this.player, run = this.run, kind = this.offerKind;
+    run.mods[id] = (run.mods[id] || 0) + 1;
+    if (id === 'plating') { p.maxLives += 2; p.lives += 2; }
+    if (id === 'shieldcore' && !p.shield) { p.shield = true; this.shieldFx(); }
+    if (id === 'bombbay') p.bombs = Math.min(9, p.bombs + 2);
+    this.refreshStats();
+    A.play('perk');
+    FX.glowPuff(p.x, p.y, '#ffc83d', 120 * G.S, 0.5);
+    FX.ring(p.x, p.y, p.w * 0.4, p.w * 1.7, '#ffc83d', 0.5, 4);
+    p.inv = Math.max(p.inv, 0.8);
+    this.offerKind = null;
+    this.state = 'play';
+    this.hudDirty = true;
+    if (kind === 'station') this.after(0.4, () => this.jumpScene());
   };
   game.rerollCost = function () { return 40 + this.run.rerolls * 40; };
   game.rerollPerks = function () {
@@ -1774,7 +1827,7 @@
     for (const it of this.pickups) if (it.kind !== 'pu') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
     // после босса — прыжок в следующий сектор
-    if (w.boss) this.after(0.8, () => { if (this.wave === w) this.jumpScene(); });
+    if (w.boss) this.after(0.8, () => { if (this.wave === w) this.offerModules('station'); });
     else this.after(1.2, () => { if (this.wave === w) this.nextWave(); });
   };
 

@@ -122,6 +122,7 @@
     SS.on('cinema', (on) => document.body.classList.toggle('cinema', on));
     SS.on('bossDefeated', (d) => ui.banner('<div class="b1">БОСС ПОВЕРЖЕН</div><div class="b2">' + d.def.name + '</div><div class="b3">+' + U.fmt(d.pts) + '</div>', 'gold', 2600));
     SS.on('perkOffer', (ch) => ui.showPerks(ch));
+    SS.on('moduleOffer', (ch, kind) => ui.showModules(ch, kind));
     SS.on('reviveOffer', (cost) => ui.showRevive(cost));
     SS.on('runEnd', (sum) => { if (sum) ui.showGameOver(sum); });
     SS.on('paused', (on) => { if (on) ui.showPause(); else ui.hide('#scr-pause'); });
@@ -276,7 +277,6 @@
       if (!s.weapons.owned.includes(wid)) { if (c >= w.price) return true; continue; }
       for (const up of w.ups) { const l = M.weaponLevel(wid, up.id); if (l < up.max && c >= up.costs[l]) return true; }
     }
-    for (const g of D.GENERAL) { const l = M.generalLevel(g.id); if (l < g.max && c >= g.costs[l]) return true; }
     return false;
   }
   function hasNewHangar() {
@@ -331,7 +331,7 @@
     const s = store.s;
     ui._diffSel = D.DIFFS[s.settings.diff] && M.diffUnlocked(s.settings.diff) ? s.settings.diff : 'normal';
     const power = M.power(), rec = recommendedDiff(power);
-    const lives = D.BASE_LIVES + M.generalLevel('hull') + (D.SHIPS[s.ship.model].stats.lives || 0);
+    const lives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0);
     $('#diffLives').innerHTML = ic('heart') + 'Жизней: <b>' + lives + '</b> • ⚡ Боевая мощь: <b>' + U.fmt(power) + '</b>';
     // испытание дня — первой строкой
     const ch = M.challenge(), cs = M.challengeState();
@@ -683,7 +683,9 @@
 
   ui.showPerks = function (choices, reroll) {
     const box = $('#perkCards');
-    $('#perkLvl').textContent = game.run.level;
+    $('#perkTitle').textContent = 'УРОВЕНЬ ' + game.run.level;
+    $('#perkSub').textContent = 'Выберите улучшение';
+    $('#btnPerkReroll').hidden = false;
     box.innerHTML = '';
     choices.forEach((pk) => {
       const lv = game.perk(pk.id), rar = D.RARITY[pk.rar];
@@ -709,6 +711,31 @@
     ui.show('#scr-perk');
     // защита от случайного нажатия пальцем, который вёл корабль
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), reroll ? 120 : 480);
+  };
+
+  // модули корабля: та же раскладка карточек, но без перебора и со своим заголовком
+  ui.showModules = function (choices, kind) {
+    const box = $('#perkCards');
+    $('#perkTitle').textContent = kind === 'start' ? 'СТАРТОВЫЙ МОДУЛЬ' : 'СТАНЦИЯ';
+    $('#perkSub').textContent = 'Модуль корабля — до конца забега';
+    $('#btnPerkReroll').hidden = true;
+    box.innerHTML = '';
+    choices.forEach((m) => {
+      const rar = D.RARITY[m.rar], lv = game.mod(m.id);
+      const b = document.createElement('button');
+      b.className = 'perk-card module wait';
+      b.style.setProperty('--pc', rar.color);
+      b.innerHTML = '<div class="perk-ico">' + m.ico + '</div><div class="perk-info"><div class="perk-name">' + m.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + m.desc + '</div></div><div class="perk-rar">' + rar.name + '</div>';
+      b.addEventListener('click', () => {
+        if (b.classList.contains('wait')) return;
+        ui.hide('#scr-perk');
+        game.chooseModule(m.id);
+        T.haptic('success');
+      });
+      box.appendChild(b);
+    });
+    ui.show('#scr-perk');
+    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
   };
 
   ui.showRevive = function (cost) {
@@ -936,7 +963,7 @@
   ui.renderArsenal = function (tab) {
     updateWallets();
     const list = $('#arsenalList');
-    if (tab === 'weapons') renderWeapons(list); else renderGeneral(list);
+    renderWeapons(list);
   };
 
   function segs(v, n) { return Array.from({ length: n }, (_, i) => '<i class="' + (i < v ? 'on' : '') + '"></i>').join(''); }
@@ -1026,18 +1053,6 @@
         if (M.buyWeaponUp(id, b.dataset.up)) { A.play('buy'); T.haptic('light'); } else A.play('error');
         ui.renderArsenal('weapons');
       }
-    };
-  }
-  function renderGeneral(list) {
-    let h = '<div class="ars-hint">Прокачка корабля действует на всё оружие и на все корабли.</div><div class="gen-card">';
-    h += D.GENERAL.map((g) => upRow(g, M.generalLevel(g.id), 'data-g="' + g.id + '"')).join('');
-    h += '</div>';
-    list.innerHTML = h;
-    list.onclick = (e) => {
-      const b = e.target.closest('button[data-g]');
-      if (!b || b.disabled) return;
-      if (M.buyGeneral(b.dataset.g)) { A.play('buy'); T.haptic('light'); } else A.play('error');
-      ui.renderArsenal('general');
     };
   }
 

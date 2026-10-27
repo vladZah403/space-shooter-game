@@ -188,9 +188,8 @@
 <section id="scr-arsenal" class="screen sub">
   <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>АРСЕНАЛ</h2><div class="wallet sm"><svg><use href="#i-coin"/></svg><span class="js-coins">0</span></div></div>
   <div class="sub-body">
-    <div class="tabs" id="arsenalTabs">
+    <div class="tabs" id="arsenalTabs" hidden>
       <button class="tab active" data-tab="weapons">ОРУЖИЕ</button>
-      <button class="tab" data-tab="general">КОРАБЛЬ</button>
     </div>
     <div id="arsenalList"></div>
   </div>
@@ -309,8 +308,8 @@
 <!-- ═══ ВЫБОР УЛУЧШЕНИЯ ═══ -->
 <section id="scr-perk" class="screen overlay">
   <div class="perk-wrap">
-    <div class="perk-title">УРОВЕНЬ <span id="perkLvl">2</span></div>
-    <div class="perk-sub">Выберите улучшение</div>
+    <div class="perk-title" id="perkTitle">УРОВЕНЬ 2</div>
+    <div class="perk-sub" id="perkSub">Выберите улучшение</div>
     <div class="perk-cards" id="perkCards"></div>
     <button class="btn ghost" id="btnPerkReroll"><svg><use href="#i-retry"/></svg>ДРУГИЕ <span id="perkRerollCost"></span></button>
   </div>

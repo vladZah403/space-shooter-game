@@ -30,7 +30,7 @@
       seenIntro: false,
       bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
-      patch: 25,
+      patch: 30,
     };
   }
 
@@ -117,7 +117,15 @@
       } else if (data && data.patch >= 24 && !(data.patch >= 25) && data.stats && data.stats.games > 0) {
         if (!this.s.notes.some((n) => n.type === 'v25')) this.s.notes.push({ type: 'v25' });
       }
-      this.s.patch = 25;
+      // 3.0: прокачка корабля переехала в забег — монеты за неё возвращаем
+      if (data && !(data.patch >= 30)) {
+        let refund = 0;
+        for (const g of D.GENERAL) { const l = Math.min((this.s.general && this.s.general[g.id]) || 0, g.costs.length); for (let i = 0; i < l; i++) refund += g.costs[i]; }
+        this.s.general = {};
+        if (refund > 0) this.s.coins += refund;
+        if (data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v30')) this.s.notes.push({ type: 'v30', coins: refund });
+      }
+      this.s.patch = 30;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
@@ -287,19 +295,6 @@
       const i = lo.indexOf(wid);
       if (i >= 0) { if (lo.length > 1) lo.splice(i, 1); else return false; }
       else { if (!this.s.weapons.owned.includes(wid)) return false; if (lo.length >= 3) lo.shift(); lo.push(wid); }
-      store.save();
-      return true;
-    },
-
-    // ── общие улучшения ──
-    generalLevel(id) { return this.s.general[id] || 0; },
-    buyGeneral(id) {
-      const g = D.GENERAL.find((x) => x.id === id);
-      const lvl = this.generalLevel(id);
-      if (!g || lvl >= g.max) return false;
-      if (!this.spend(g.costs[lvl])) return false;
-      this.s.general[id] = lvl + 1;
-      if (lvl + 1 >= g.max) this.unlock('max_one_upgrade');
       store.save();
       return true;
     },
@@ -503,8 +498,8 @@
     weaponDps(wid, full) {
       const w = D.WEAPONS[wid], b = w.base, lv = (wid2) => this.weaponLevel(wid, wid2);
       const ship = D.SHIPS[this.s.ship.model].stats, pres = this.prestigeBonus();
-      const dm = 1 + lv('dmg') * 0.12 + this.generalLevel('power') * 0.07 + (full ? (ship.dmg || 0) + pres.dmg - 1 : 0);
-      const rate = (1 + this.generalLevel('rate') * 0.05) * (full ? 1 + (ship.rate || 0) : 1);
+      const dm = 1 + lv('dmg') * 0.12 + (full ? (ship.dmg || 0) + pres.dmg - 1 : 0);
+      const rate = full ? 1 + (ship.rate || 0) : 1;
       const up = 1 + lv('rate') * 0.08, cd = b.cd / up;
       const mag = b.mag ? b.mag + (wid === 'rocket' ? lv('salvo') : 0) : 0;
       const perSec = mag ? mag / ((mag - 1) * cd + b.reload / up) : 1 / cd;
@@ -518,12 +513,12 @@
       else if (wid === 'darkmatter') dps = (b.dmg * (b.life / b.tick) * 0.6 + b.burst) * dm / Math.max(cd, b.life);
       return dps * rate;
     },
-    // ── Боевая мощь (3.0): урон лучшего оружия × живучесть × навыки. Новичок ≈ 120, всё на максимуме ≈ 2500 ──
+    // ── Боевая мощь (3.0): урон лучшего оружия × живучесть × навыки. Новичок ≈ 120, всё на максимуме ≈ 850 ──
     power() {
       const s = this.s, ship = D.SHIPS[s.ship.model].stats;
       let dps = 0;
       for (const wid of s.weapons.owned) if (D.WEAPONS[wid]) dps = Math.max(dps, this.weaponDps(wid, true));
-      const lives = D.BASE_LIVES + this.generalLevel('hull') + (ship.lives || 0) + this.generalLevel('shield') * 0.5;
+      const lives = D.BASE_LIVES + (ship.lives || 0);
       const skills = Object.keys(s.skills).filter((k) => s.skills[k]).length;
       return Math.round(dps * Math.sqrt(lives / D.BASE_LIVES) * (1 + skills * 0.03) * 1.4);
     },
