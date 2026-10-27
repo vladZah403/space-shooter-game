@@ -132,8 +132,8 @@
 <section id="scr-menu" class="screen">
   <div class="menu-wrap">
     <header class="menu-head">
-      <div class="profile" id="menuProfile">
-        <div class="avatar"><svg><use href="#i-user"/></svg></div>
+      <div class="profile" id="menuProfile" data-go="pilot" role="button">
+        <div class="avatar"><svg><use href="#i-user"/></svg><span class="pilot-badge" id="menuPilotBadge"></span></div>
         <div class="profile-info">
           <div class="profile-name" id="menuName">Пилот</div>
           <div class="profile-lvl"><span id="menuShipLvl">Корабль 1</span><div class="xp-mini"><i id="menuXpFill"></i></div></div>
@@ -202,6 +202,17 @@
 </section>
 
 <!-- ═══ НАВЫКИ ═══ -->
+<!-- ═══ ПИЛОТ (3.0) ═══ -->
+<section id="scr-pilot" class="screen sub">
+  <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>ПИЛОТ</h2><div></div></div>
+  <div class="sub-body">
+    <div class="pilot-hero" id="pilotHero"></div>
+    <div class="ars-hint">Пилот летит с вами в каждом забеге. Новые пилоты открываются с уровнем корабля.</div>
+    <div class="pilot-grid" id="pilotGrid"></div>
+    <button class="btn ghost pilot-skills" data-go="skills"><svg><use href="#i-atom"/></svg>НАВЫКИ ПИЛОТА</button>
+  </div>
+</section>
+
 <section id="scr-skills" class="screen sub">
   <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>НАВЫКИ</h2><div class="wallet sm sp"><svg><use href="#i-atom"/></svg><span id="skillPts">0</span></div></div>
   <div class="sub-body">

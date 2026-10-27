@@ -175,7 +175,7 @@
   // ════════════════════════════════════════════════════════════
   // ЭКРАНЫ
   // ════════════════════════════════════════════════════════════
-  const SUBS = { hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
+  const SUBS = { pilot: '#scr-pilot', hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
 
   // холст закрыт экраном меню (непрозрачный), окном с размытием или итогами — main.js его тогда не перерисовывает
   function syncCover() { ui.covered = !!document.querySelector('.screen.show.sub, .screen.show.overlay, #scr-gameover.show'); }
@@ -206,6 +206,7 @@
     ui.cur = name;
     ui.show(sel);
     T.back(() => ui.back());
+    if (name === 'pilot') ui.renderPilot();
     if (name === 'hangar') ui.renderHangar(activeTab('#hangarTabs') || 'models');
     if (name === 'arsenal') ui.renderArsenal(activeTab('#arsenalTabs') || 'weapons');
     if (name === 'skills') ui.renderSkills(activeTab('#skillTabs') || 'passive');
@@ -242,7 +243,9 @@
     $('#menuName').textContent = user.name;
     const av = $('#menuProfile .avatar');
     if (user.photo && !av.querySelector('img')) { const img = new Image(); img.alt = ''; img.onload = () => { av.innerHTML = ''; av.appendChild(img); }; img.src = user.photo; }
-    $('#menuShipLvl').textContent = 'Корабль ' + s.shipLvl + (s.prestige ? ' • ✦' + s.prestige : '');
+    const pil = D.PILOTS[s.pilot] || D.PILOTS.kai;
+    $('#menuShipLvl').textContent = pil.name + ' • Корабль ' + s.shipLvl + (s.prestige ? ' • ✦' + s.prestige : '');
+    $('#menuPilotBadge').textContent = pil.ico;
     $('#menuXpFill').style.width = Math.min(100, s.shipXP / D.shipXpNeed(s.shipLvl) * 100) + '%';
     $('#menuBest').textContent = U.fmt(s.stats.bestScore);
     $('#menuBestWave').textContent = s.stats.bestWave;
@@ -1082,6 +1085,28 @@
       }
     };
   }
+
+  // ════════════════════════════════════════════════════════════
+  // ПИЛОТ (3.0)
+  // ════════════════════════════════════════════════════════════
+  ui.renderPilot = function () {
+    const s = store.s, cur = D.PILOTS[s.pilot] || D.PILOTS.kai;
+    $('#pilotHero').innerHTML = '<div class="ph-ava" style="--pc:' + cur.color + '">' + cur.ico + '</div><div class="ph-info"><div class="ph-title">' + cur.title + '</div>' +
+      '<div class="ph-name" style="color:' + cur.color + '">' + cur.name + '</div><div class="ph-desc">' + cur.desc + '</div></div>';
+    $('#pilotGrid').innerHTML = D.PILOT_ORDER.map((id) => {
+      const p = D.PILOTS[id], open = M.pilotUnlocked(id), sel = s.pilot === id;
+      return '<button class="pilot-card' + (sel ? ' sel' : '') + (open ? '' : ' locked') + '" data-pilot="' + id + '" style="--pc:' + p.color + '">' +
+        '<div class="pc-ava">' + p.ico + '</div><b>' + p.name + '</b><small>' + (open ? p.title : ic('lock') + ' Корабль ' + p.lvl) + '</small>' + (sel ? '<span class="pc-sel">' + ic('check') + '</span>' : '') + '</button>';
+    }).join('');
+    $('#pilotGrid').onclick = (e) => {
+      const b = e.target.closest('[data-pilot]');
+      if (!b) return;
+      const id = b.dataset.pilot, p = D.PILOTS[id];
+      if (!M.pilotUnlocked(id)) { A.play('error'); ui.toast({ ico: '🔒', title: 'ЕЩЁ РАНО', text: p.name + ' откроется на ' + p.lvl + ' уровне корабля', info: true }); return; }
+      M.setPilot(id); A.play('click'); T.haptic('select');
+      ui.renderPilot(); ui.renderMenu();
+    };
+  };
 
   // ════════════════════════════════════════════════════════════
   // НАВЫКИ

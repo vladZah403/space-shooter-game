@@ -82,7 +82,7 @@
       waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
       lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '', energy: 1, arc: 0, focus: { uid: 0, n: 0, t: 0 },
-      mods: {}, repairT: 0, emergT: 0,
+      mods: {}, repairT: 0, emergT: 0, pilot: D.PILOTS[s.pilot] && M.pilotUnlocked(s.pilot) ? s.pilot : 'kai',
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
     // рогалик: порядок секторов и боссов свой в каждом забеге; первыми всегда Орбита Земли и Страж
@@ -103,10 +103,11 @@
       tilt: 0, vxs: 0, alive: true,
       weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, mag: {}, side: 1,
     };
-    p.maxLives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0);
+    const pil = this.run.pilot;
+    p.maxLives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0) + (pil === 'bork' ? 1 : 0);
     p.lives = p.maxLives;
     p.shield = false;
-    p.bombs = 1 + (D.SHIPS[s.ship.model].stats.bombs || 0);
+    p.bombs = 1 + (D.SHIPS[s.ship.model].stats.bombs || 0) + (pil === 'rex' ? 2 : 0);
     p.wingCd = 0.2;
     if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
     if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
@@ -171,6 +172,7 @@
   game.bossDef = function (num) { const o = this.run && this.run.bossOrder, i = (num - 1) % D.BOSSES.length; return D.BOSSES[o ? o[i] : i]; };
   game.computeStats = function () {
     const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skill(id);
+    const pl = (id) => !!(this.run && this.run.pilot === id);
     const ship = D.SHIPS[s.ship.model].stats;
     const pres = M.prestigeBonus();
     const S = G.S;
@@ -180,24 +182,26 @@
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + md('power') * 0.2 + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
+      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
       rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
-      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0),
+      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0),
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5,
       pierce: pk('pierce'),
       multi: pk('multi') + (ship.multi || 0),
       wings: ship.wings || md('wings'),
       magnet: sk('sk_magnet') ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
       luck: 1 + pk('luck') * 0.4,
       speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
-      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1),
+      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
       cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1),
-      bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0),
+      bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0) + (pl('rex') ? 0.5 : 0),
+      bombCd: pl('rex') ? 0.5 : 1,
+      invMul: pl('nox') ? 2 : 1,
       bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35,
       eliteDmg: 1 + md('hunter') * 0.35,
-      xp: 1 + md('scanner') * 0.35,
+      xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1),
       shieldRegen,
       cryo: pk('cryo') * 0.12,
       nova: pk('nova'),
@@ -1008,7 +1012,7 @@
     }
     if (p.shield) {
       p.shield = false;
-      p.inv = 1.0;
+      p.inv = 1.0 * this.st.invMul;
       run.shieldRegenT = 0;
       FX.ring(p.x, p.y, p.w * 0.6, p.w * 1.4, '#7fe7ff', 0.4, 4);
       FX.sprite('fx_sh_break', p.x, p.y, { w0: p.w * 1.3, w1: p.w * 2.3, dur: 0.45, hold: 0.3, rot: U.rand(-0.4, 0.4) });
@@ -1023,7 +1027,7 @@
     run.lastHit = cause || 'Вражеский огонь';
     run.waveDamage++;
     run.bossDamaged = true;
-    p.inv = 1.8;
+    p.inv = 1.8 * this.st.invMul;
     this.clearBulletsAround(p.x, p.y, 130 * G.S);
     FX.explode(p.x, p.y, 1.2, '#ff5c7a');
     FX.vignette('#ff2a48', 0.6, 0.85);
@@ -1151,7 +1155,7 @@
     if (p.bombs <= 0) { A.play('error'); return; }
     if (p.bombCd > 0) return;
     p.bombs--;
-    p.bombCd = 1.2 * this.st.cdMul;
+    p.bombCd = 1.2 * this.st.cdMul * this.st.bombCd;
     p.inv = Math.max(p.inv, 1.2);
     const S = G.S;
     FX.ring(p.x, p.y, 10, Math.max(G.FW, G.H) * 1.1, '#ffb36b', 0.7, 10);
@@ -1688,7 +1692,7 @@
   // ── модули корабля: старт забега и станция после босса (kind: 'start' | 'station') ──
   game.moduleChoices = function () {
     const pool = D.MODULES.filter((m) => this.mod(m.id) < m.max && !(m.id === 'plating' && this.perk('glass')));
-    const n = D.MODULE_CHOICES, picks = [];
+    const n = D.MODULE_CHOICES + (this.run.pilot === 'lira' ? 1 : 0), picks = [];
     while (picks.length < n && pool.length) {
       const m = U.pickWeighted(pool, (x) => D.RARITY[x.rar].w);
       picks.push(m);
@@ -1699,6 +1703,8 @@
   game.offerModules = function (kind) {
     const choices = withRng(this.run.perkRng, () => this.moduleChoices());
     if (this.state !== 'play' || !this.player.alive || !choices.length) { if (kind === 'station') this.jumpScene(); return; }
+    // Борк чинит корабль на каждой станции
+    if (kind === 'station' && this.run.pilot === 'bork' && this.player.lives < this.player.maxLives) this.heal(1, '🔧 БОРК ЧИНИТ');
     this.state = 'perk';
     this.offerKind = kind;
     this.pointer.id = null;

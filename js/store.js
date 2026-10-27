@@ -28,6 +28,7 @@
         dmgNums: true, shake: true, fps: false, diff: 'normal', intro: true },
       lb: [],
       seenIntro: false,
+      pilot: 'kai',
       bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
       patch: 30,
@@ -295,6 +296,15 @@
       const i = lo.indexOf(wid);
       if (i >= 0) { if (lo.length > 1) lo.splice(i, 1); else return false; }
       else { if (!this.s.weapons.owned.includes(wid)) return false; if (lo.length >= 3) lo.shift(); lo.push(wid); }
+      store.save();
+      return true;
+    },
+
+    // ── пилоты (3.0) ──
+    pilotUnlocked(id) { const p = D.PILOTS[id]; return !!p && (SS.DEV || this.s.shipLvl >= p.lvl); },
+    setPilot(id) {
+      if (!this.pilotUnlocked(id)) return false;
+      this.s.pilot = id;
       store.save();
       return true;
     },
