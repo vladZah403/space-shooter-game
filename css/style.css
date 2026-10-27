@@ -208,6 +208,9 @@ svg{width:1em;height:1em;flex-shrink:0}
 .ship-stage-stats{position:absolute;left:14px;bottom:10px;right:14px;display:flex;flex-wrap:wrap;gap:6px}
 .stat-chip{font-size:12px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(6,18,36,.86);color:var(--cyan);border:1px solid rgba(61,224,255,.25)}
 .stat-chip.power{color:var(--gold);border-color:rgba(255,200,61,.4)}
+.lb-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.lb-chip{padding:6px 10px;border-radius:10px;font-family:var(--font-h);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.lb-chip.sel{color:var(--dc);border-color:var(--dc);background:rgba(255,255,255,.08)}
 .diff-row.locked{opacity:.5;filter:grayscale(.6)}
 .diff-row.locked .diff-meta svg{width:12px;height:12px;vertical-align:-1px}
 .grid-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}

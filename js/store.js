@@ -545,7 +545,7 @@
 
     // ── испытание дня: правила одинаковы у всех в этот день (зерно — только дата) ──
     challenge() {
-      const today = U.today(), rnd = U.seeded(U.hashStr('challenge:' + today));
+      const today = U.todayUTC(), rnd = U.seeded(U.hashStr('challenge:' + today));
       const pool = D.CHALLENGE_MODS.map((m) => m.id), mods = [];
       while (mods.length < 2) {
         const id = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
@@ -556,27 +556,32 @@
       const ws = D.WEAPON_ORDER.filter((w) => w !== 'laser');
       return { date: today, mods, weapon: ws[Math.floor(rnd() * ws.length)] };
     },
+    // tiers — сколько ступеней наград уже получено сегодня (done — старое поле: первая ступень)
     challengeState() {
-      const d = this.s.daily, today = U.today();
-      if (!d.ch || d.ch.date !== today) d.ch = { date: today, best: 0, wave: 0, done: false };
+      const d = this.s.daily, today = U.todayUTC();
+      if (!d.ch || d.ch.date !== today) d.ch = { date: today, best: 0, wave: 0, done: false, tiers: 0 };
+      if (d.ch.tiers === undefined) d.ch.tiers = d.ch.done ? 1 : 0;
       return d.ch;
     },
     modText(id, ch) {
       const m = D.CHALLENGE_MODS.find((x) => x.id === id);
       return m ? m.desc.replace('{w}', D.WEAPONS[ch.weapon].name) : id;
     },
-    // дошли до нужной волны — награда раз в день
-    challengeDone(ch) {
+    // волна испытания: дошли до ступени — её награда (каждая ступень раз в день)
+    challengeWave(ch, wave) {
       const c = this.challengeState();
-      if (c.done || ch.date !== c.date) return false;
-      c.done = true;
-      this.s.stats.challenges = (this.s.stats.challenges || 0) + 1;
-      this.addCoins(D.CHALLENGE_REWARD, false);
-      this.unlock('challenge1');
-      this.checkAchievements();
-      SS.emit('toast', { ico: '🎲', title: 'ИСПЫТАНИЕ ДНЯ ПРОЙДЕНО', text: '+' + D.CHALLENGE_REWARD + ' монет', dur: 3200 });
-      store.save();
-      return true;
+      if (ch.date !== c.date) return false;
+      let got = false;
+      while (c.tiers < D.CHALLENGE_TIERS.length && wave >= D.CHALLENGE_TIERS[c.tiers].wave) {
+        const t = D.CHALLENGE_TIERS[c.tiers++];
+        c.done = true;
+        if (c.tiers === 1) { this.s.stats.challenges = (this.s.stats.challenges || 0) + 1; this.unlock('challenge1'); }
+        this.addCoins(t.coins, false);
+        SS.emit('toast', { ico: '🎲', title: 'ИСПЫТАНИЕ: СТУПЕНЬ ' + c.tiers + ' / ' + D.CHALLENGE_TIERS.length, text: 'Волна ' + t.wave + ' — +' + t.coins + ' монет', dur: 3200 });
+        got = true;
+      }
+      if (got) { this.checkAchievements(); store.save(); }
+      return got;
     },
 
     // ── награда за вход ──
@@ -639,9 +644,11 @@
       if (run.time >= 600) this.unlock('survive_10min');
       if (run.challenge) { const c = this.challengeState(); c.best = Math.max(c.best, run.score); c.wave = Math.max(c.wave, run.wave); }
 
+      // 3.0: рекорды по сложностям — по 10 лучших забегов на каждой (очки разных сложностей не сравниваются)
       s.lb.push({ score: run.score, wave: run.wave, diff: run.diff, date: Date.now() });
       s.lb.sort((a, b) => b.score - a.score);
-      s.lb = s.lb.slice(0, 20);
+      const per = {};
+      s.lb = s.lb.filter((r) => (per[r.diff] = (per[r.diff] || 0) + 1) <= 10);
 
       // опыт корабля: за врагов, волны и боссов
       // опыт за врагов и очки нормирован на число врагов и множитель очков, затем умножен на опыт сложности

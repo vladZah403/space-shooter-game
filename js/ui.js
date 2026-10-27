@@ -60,6 +60,12 @@
     tabs('#arsenalTabs', (t) => ui.renderArsenal(t));
     tabs('#skillTabs', (t) => ui.renderSkills(t));
     tabs('#lbTabs', (t) => ui.renderLeaders(t));
+    $('#lbList').addEventListener('click', (e) => {
+      const c = e.target.closest('[data-lbd]');
+      if (!c) return;
+      ui._lbDiff = c.dataset.lbd; A.play('click');
+      ui.renderLeaders('local');
+    });
 
     // HUD
     $('#btnPause').addEventListener('click', () => { game.pause(); });
@@ -310,7 +316,7 @@
       const ch = M.challenge();
       $('#btnDiffGo span').textContent = 'В БОЙ • ИСПЫТАНИЕ';
       $('#diffDesc2').innerHTML = '<b style="color:#ff5cf0">Испытание дня</b>: сложность «Норма», ' + ch.mods.map((m) => U.escape(M.modText(m, ch))).join('; ') +
-        '. Дойдите до волны ' + D.CHALLENGE_WAVE + ' — награда раз в день.';
+        '. Волны и улучшения у всех одинаковые. Награды за волны ' + D.CHALLENGE_TIERS.map((t) => t.wave).join(' / ') + ': ' + D.CHALLENGE_TIERS.map((t) => t.coins).join(' / ') + ' монет, раз в день.';
       return;
     }
     const d = D.DIFFS[ui._diffSel] || D.DIFFS.normal, power = M.power();
@@ -332,7 +338,8 @@
     const chRow = '<button class="diff-row daily' + (ui._diffSel === 'daily' ? ' sel' : '') + '" data-diff="daily" style="--dc:#ff5cf0">' +
       '<div class="dr-main"><div class="diff-name">ИСПЫТАНИЕ ДНЯ' + (cs.wave ? '<span class="diff-best">сегодня: волна ' + cs.wave + '</span>' : '') + '</div>' +
       '<div class="diff-meta">' + ch.mods.map((m) => '<span>' + U.escape(D.CHALLENGE_MODS.find((x) => x.id === m).name) + '</span>').join('') + '</div></div>' +
-      '<div class="diff-rew">' + (cs.done ? '✓<small>получено</small>' : ic('coin') + ' ' + D.CHALLENGE_REWARD + '<small>за волну ' + D.CHALLENGE_WAVE + '</small>') + '</div></button>';
+      '<div class="diff-rew">' + (cs.tiers >= D.CHALLENGE_TIERS.length ? '✓<small>всё получено</small>'
+        : ic('coin') + ' ' + D.CHALLENGE_TIERS[cs.tiers].coins + '<small>за волну ' + D.CHALLENGE_TIERS[cs.tiers].wave + ' • ' + cs.tiers + '/' + D.CHALLENGE_TIERS.length + '</small>') + '</div></button>';
     $('#diffList').innerHTML = chRow + D.DIFF_ORDER.map((id) => {
       const d = D.DIFFS[id], best = s.stats.diff[id] || { wave: 0 }, open = M.diffUnlocked(id);
       const meta = open ? [['Враги', d.count], ['Броня', d.hp], ['Огонь', d.fire]]
@@ -399,7 +406,7 @@
 
   ui.startRun = function (diffId, opts) {
     // повтор забега сохраняет правила испытания, но только в тот же день
-    if (opts && opts.challenge && opts.challenge.date !== U.today()) opts = { challenge: M.challenge() };
+    if (opts && opts.challenge && opts.challenge.date !== U.todayUTC()) opts = { challenge: M.challenge() };
     ui._runOpts = opts || null;
     ['#scr-menu', '#scr-gameover', '#scr-pause', '#scr-perk', '#scr-revive'].forEach(ui.hide);
     Object.values(SUBS).forEach(ui.hide);
@@ -1126,8 +1133,12 @@
       ['Лучшее комбо', '×' + st.maxCombo], ['Время в бою', U.fmtTime(st.playTime)], ['Монет заработано', U.fmt(st.coinsEarned)], ['Улучшений выбрано', U.fmt(st.perks)],
     ].map((x) => '<div class="stat-cell"><small>' + x[0] + '</small><b>' + x[1] + '</b></div>').join('');
     if (tab === 'local') {
-      list.innerHTML = s.lb.length ? s.lb.map((r, i) => '<div class="lb-row"><div class="lb-rank r' + (i + 1) + '">' + (i + 1) + '</div><div><div class="lb-name">' + U.fmt(r.score) + ' очков</div><div class="lb-sub">' + D.DIFFS[r.diff].name + ' • волна ' + r.wave + ' • ' + new Date(r.date).toLocaleDateString('ru-RU') + '</div></div><div class="lb-score">В' + r.wave + '</div></div>').join('')
-        : '<div class="lb-empty">Сыграйте первую игру — здесь появятся ваши лучшие забеги</div>';
+      // свой рейтинг на каждой сложности
+      const sel = D.DIFFS[ui._lbDiff] ? ui._lbDiff : D.DIFFS[s.settings.diff] ? s.settings.diff : 'normal';
+      const chips = '<div class="lb-chips">' + D.DIFF_ORDER.map((id) => '<button class="lb-chip' + (id === sel ? ' sel' : '') + '" data-lbd="' + id + '" style="--dc:' + D.DIFFS[id].color + '">' + (D.DIFFS[id].short || D.DIFFS[id].name) + '</button>').join('') + '</div>';
+      const rows = s.lb.filter((r) => r.diff === sel);
+      list.innerHTML = chips + (rows.length ? rows.map((r, i) => '<div class="lb-row"><div class="lb-rank r' + (i + 1) + '">' + (i + 1) + '</div><div><div class="lb-name">' + U.fmt(r.score) + ' очков</div><div class="lb-sub">Волна ' + r.wave + ' • ' + new Date(r.date).toLocaleDateString('ru-RU') + '</div></div><div class="lb-score">В' + r.wave + '</div></div>').join('')
+        : '<div class="lb-empty">На сложности «' + D.DIFFS[sel].name + '» ещё нет забегов</div>');
       return;
     }
     list.innerHTML = '<div class="lb-empty">Загрузка…</div>';

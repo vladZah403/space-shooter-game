@@ -42,6 +42,14 @@
 
   // отложенное действие по игровому времени (на паузе не идёт, при новом забеге сбрасывается)
   game.after = function (sec, fn) { this.timers.push({ t: sec, fn }); };
+  // общий сид испытания дня: на время вызова Math.random подменяется детерминированным генератором —
+  // у всех игроков в этот день одинаковый состав волн и выбор улучшений (rng = null — обычная случайность)
+  function withRng(rng, fn) {
+    if (!rng) return fn();
+    const mr = Math.random;
+    Math.random = rng;
+    try { return fn(); } finally { Math.random = mr; }
+  }
   game.runTimers = function (dt) {
     if (!this.timers.length) return;
     const due = [];
@@ -77,6 +85,8 @@
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
     };
     if (ch && ch.mods.includes('glass')) this.run.perks.glass = 1;
+    // испытание дня: свои генераторы для состава волн и выбора улучшений — одинаковые у всех в этот день
+    if (ch) { this.run.waveRng = U.seeded(U.hashStr('waves:' + ch.date)); this.run.perkRng = U.seeded(U.hashStr('perks:' + ch.date)); }
     this.st = this.computeStats();
     const st = this.st;
     const p = this.player = {
@@ -92,7 +102,7 @@
     p.wingCd = 0.2;
     if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
     if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
-    if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = this.perkChoices().find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
+    if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = withRng(this.run.perkRng, () => this.perkChoices()).find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
     this.buffs = {};
     this.wave = null;
     this.t = 0; this.timeScale = 1; this.slowT = 0;
@@ -1638,7 +1648,7 @@
     this.pointer.id = null;
     A.play('levelup');
     SS.tg.haptic('success');
-    SS.emit('perkOffer', this.perkChoices());
+    SS.emit('perkOffer', withRng(this.run.perkRng, () => this.perkChoices()));
   };
   game.rerollCost = function () { return 40 + this.run.rerolls * 40; };
   game.rerollPerks = function () {
@@ -1646,7 +1656,7 @@
     if (!M.spend(this.rerollCost())) { A.play('error'); return null; }
     this.run.rerolls++;
     A.play('click');
-    return this.perkChoices();
+    return withRng(this.run.perkRng, () => this.perkChoices());
   };
   // действие перка; free — подарен правилами (не считается выбором и не идёт в задания)
   game.grantPerk = function (id, free) {
@@ -1699,7 +1709,7 @@
     const newSector = n > 1 && (n - 1) % 5 === 0 && this.run.cardSector !== sector;
     SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: D.SECTORS[sector % D.SECTORS.length].name, newSector });
     SS.events.roll(this.wave);
-    if (this.run.challenge && n === D.CHALLENGE_WAVE) M.challengeDone(this.run.challenge);
+    if (this.run.challenge) M.challengeWave(this.run.challenge, n);
     if (isBoss && this.state === 'play') this.bossScene(n);
     else if (isBoss) {
       // игрок как раз погибает — без кат-сцены, как раньше
@@ -1726,13 +1736,13 @@
     if (!w.done) {
       w.spawnT -= dt;
       const cap = Math.min(26 * Math.max(1, this.diff.count), (7 + w.n * 0.7) * this.diff.count);
-      if (w.spawnT <= 0 && alive < cap) {
+      if (w.spawnT <= 0 && alive < cap) withRng(this.run.waveRng, () => {
         const cost = SS.enemies.spawnGroup(w.n, w.budget - w.spent);
         w.spent += cost;
         w.spawnT = Math.max(0.42, 1.3 - w.n * 0.035) * U.rand(0.75, 1.25) / Math.pow(this.diff.count, 0.4);
         if (!w.miniDone && w.spent > w.budget * 0.4) { w.miniDone = true; SS.enemies.spawnMini(w.n); }
         if (w.spent >= w.budget) w.done = true;
-      }
+      });
     } else if (alive === 0) {
       w.clearT += dt;
       if (w.clearT > 0.9) this.waveCleared();

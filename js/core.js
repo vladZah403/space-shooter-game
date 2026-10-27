@@ -92,6 +92,8 @@ SS.VERSION = '2.7.1';
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     },
+    // дата по UTC — одна и та же у всех игроков в мире (испытание дня)
+    todayUTC() { return new Date().toISOString().slice(0, 10); },
     daysBetween(a, b) {
       const pa = a.split('-').map(Number), pb = b.split('-').map(Number);
       const da = Date.UTC(pa[0], pa[1] - 1, pa[2]), db = Date.UTC(pb[0], pb[1] - 1, pb[2]);
