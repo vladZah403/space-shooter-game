@@ -60,6 +60,7 @@
     tabs('#arsenalTabs', (t) => ui.renderArsenal(t));
     tabs('#skillTabs', (t) => ui.renderSkills(t));
     tabs('#lbTabs', (t) => ui.renderLeaders(t));
+    ui.bindSkillReset();
     $('#lbList').addEventListener('click', (e) => {
       const c = e.target.closest('[data-lbd]');
       if (!c) return;
@@ -1165,6 +1166,14 @@
     }
   };
 
+  ui.bindSkillReset = function () {
+    $('#btnSkillReset').addEventListener('click', () => {
+      if (!Object.keys(store.s.skills).length) { A.play('error'); return; }
+      ui.dialog({ ico: 'retry', title: 'СНЯТЬ ВСЕ НАВЫКИ?', text: 'Все очки навыков вернутся — можно собрать пилота заново.', ok: 'СНЯТЬ', onOk: () => {
+        M.resetSkills(); A.play('back'); ui.renderSkills(activeTab('#skillTabs') || 'passive');
+      } });
+    });
+  };
   function skillDialog(id) {
     const sk = D.SKILLS[id], st = M.skillState(id);
     const tab = activeTab('#skillTabs');

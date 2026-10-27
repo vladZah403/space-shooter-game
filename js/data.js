@@ -344,6 +344,9 @@
     sk_doublecoins: { type: 'passive', branch: 'special',  tier: 1, ico: '💎', name: 'АЛЧНОСТЬ',     cost: 2, desc: 'Монеты ×2, но скорость корабля −15%' },
     sk_sniper:      { type: 'passive', branch: 'special',  tier: 2, ico: '🎯', name: 'СНАЙПЕР',      cost: 3, req: 'sk_ghost',     desc: '+50% урона, −20% темп стрельбы' },
     sk_overload:    { type: 'passive', branch: 'special',  tier: 2, ico: '💡', name: 'ПЕРЕГРУЗКА',   cost: 3, req: 'sk_detonator', desc: 'После активного навыка — темп стрельбы ×2 на 4 с' },
+    // 3.0: навыки для рогалика — станция, торговец, развилка
+    sk_scavenger:   { type: 'passive', branch: 'special',  tier: 1, ico: '🧰', name: 'МАРОДЁР',      cost: 2, desc: 'На станции на 1 модуль больше, у Торговца всё на 30% дешевле' },
+    sk_daredevil:   { type: 'passive', branch: 'special',  tier: 2, ico: '☠️', name: 'СОРВИГОЛОВА',  cost: 3, req: 'sk_scavenger', desc: 'На опасном пути Развилки монеты ×3 и урон +25%' },
 
     sk_nova:      { type: 'active', tier: 1, ico: '🌟', name: 'НОВА',        cost: 3, cd: 20, desc: 'Ударная волна уничтожает обычных врагов и пули, боссам −10% прочности' },
     sk_barrier:   { type: 'active', tier: 1, ico: '🔵', name: 'БАРЬЕР',      cost: 3, cd: 24, dur: 5, desc: 'Полная неуязвимость на 5 секунд' },

@@ -367,6 +367,8 @@
       this.checkAchievements();
       return true;
     },
+    // снять все навыки — бесплатно: навыки это выбор стиля, а не вложение
+    resetSkills() { const n = Object.keys(this.s.skills).length; this.s.skills = {}; store.save(); return n; },
     // снимает навык и все зависящие от него
     forgetSkill(id) {
       if (!this.s.skills[id]) return [];

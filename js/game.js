@@ -410,6 +410,7 @@
   game.dmgMul = function (wid) {
     let d = this.st.dmg + (wid ? wl(wid, 'dmg') * 0.12 : 0);
     if (this.buffs.power > 0) d *= 1.6;
+    if (this.wave && this.wave.danger && this.skill('sk_daredevil')) d *= 1.25;
     if (this.skill('sk_berserker')) {
       const p = this.player;
       const lost = p.maxLives > 1 ? (p.maxLives - p.lives) / (p.maxLives - 1) : 0;
@@ -962,7 +963,7 @@
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
     this.addScore(pts);
     // монеты и кристаллы
-    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? D.DANGER.coins : 1);
+    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? (this.skill('sk_daredevil') ? 3 : D.DANGER.coins) : 1);
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
@@ -1692,7 +1693,7 @@
   // ── модули корабля: старт забега и станция после босса (kind: 'start' | 'station') ──
   game.moduleChoices = function () {
     const pool = D.MODULES.filter((m) => this.mod(m.id) < m.max && !(m.id === 'plating' && this.perk('glass')));
-    const n = D.MODULE_CHOICES + (this.run.pilot === 'lira' ? 1 : 0), picks = [];
+    const n = D.MODULE_CHOICES + (this.run.pilot === 'lira' ? 1 : 0) + (this.skill('sk_scavenger') ? 1 : 0), picks = [];
     while (picks.length < n && pool.length) {
       const m = U.pickWeighted(pool, (x) => D.RARITY[x.rar].w);
       picks.push(m);
@@ -1876,12 +1877,12 @@
     ] };
   };
   game.merchantOffer = function () {
-    const n = this.wave.n, p = this.player, cards = [];
+    const n = this.wave.n, p = this.player, cards = [], cut = this.skill('sk_scavenger') ? 0.7 : 1;
     const mods = this.moduleChoices();
-    if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) / 10) * 10 });
+    if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
     const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
     const pk = perks.length ? U.pick(perks) : null;
-    if (pk) cards.push({ id: 'perk:' + pk.id, ico: pk.ico, name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) / 10) * 10 });
+    if (pk) cards.push({ id: 'perk:' + pk.id, ico: pk.ico, name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) * cut / 10) * 10 });
     const epic = D.PERKS.filter((x) => x.rar === 'epic' && this.perk(x.id) < x.max && x.id !== 'glass' && x.id !== 'maxhp' && (!pk || x.id !== pk.id));
     const ep = epic.length && p.lives >= 2 ? U.pick(epic) : null;
     if (ep) cards.push({ id: 'deal:' + ep.id, ico: '🩸', name: 'СДЕЛКА: ' + ep.name, desc: '−1 жизнь, взамен: ' + ep.desc, rar: 'legendary' });
