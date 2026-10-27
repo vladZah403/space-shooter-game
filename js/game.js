@@ -1692,12 +1692,15 @@
     this.state = 'cutscene';
     for (const b of this.ebullets) b.dead = true;
     for (const b of this.bullets) b.dead = true;
+    // астероиды сектора не лезут в кадр: тают за полсекунды (updateScene), без добычи
+    for (const e of this.enemies) if (e.alive && e.def.prop) { e.hittable = false; e.fading = true; }
     A.muffle(true);
     SS.emit('cinema', true);
   };
 
   game.updateScene = function (dt) {
     const sc = this.scene;
+    for (const e of this.enemies) if (e.fading && e.alive) { e.alpha -= dt * 2.5; if (e.alpha <= 0) e.alive = false; }
     // сцена закончилась — полосы ещё уезжают
     if (sc.out >= 0) { sc.out += dt; if (sc.out > 0.45) this.scene = null; return; }
     sc.t += dt;
