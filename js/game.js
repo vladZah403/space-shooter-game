@@ -151,7 +151,9 @@
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
     if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
-      dmg: (1 + gl('power') * 0.07) * (1 + (ship.dmg || 0)) * pres.dmg * (1 + pk('dmg') * 0.15) * (sk('sk_sniper') ? 1.5 : 1) * (pk('glass') ? 1.5 : 1) * (pk('ricochet') ? 0.8 : 1) * (this.run && this.run.noDrops ? 1.3 : 1),
+      // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
+      // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
+      dmg: 1 + gl('power') * 0.07 + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
       rate: (1 + gl('rate') * 0.05) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
       crit: 0.03 + gl('crit') * 0.04 + pk('crit') * 0.08 + (ship.crit || 0),
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5,
@@ -353,8 +355,10 @@
     if (this.run.overload > 0) r *= 2;
     return r;
   };
-  game.dmgMul = function () {
-    let d = this.st.dmg;
+  // wid — оружие: его прокачка урона входит в общую сумму бонусов. Временные состояния
+  // (бонус «Усиление», берсерк) остаются множителями — они ситуативны, как криты
+  game.dmgMul = function (wid) {
+    let d = this.st.dmg + (wid ? wl(wid, 'dmg') * 0.12 : 0);
     if (this.buffs.power > 0) d *= 1.6;
     if (this.skill('sk_berserker')) {
       const p = this.player;
@@ -403,7 +407,7 @@
   game.fire = function (wid) {
     const p = this.player, S = G.S, st = this.st;
     const def = D.WEAPONS[wid], base = def.base;
-    const dmgMul = this.dmgMul() * (1 + wl(wid, 'dmg') * 0.12);
+    const dmgMul = this.dmgMul(wid);
     const multi = st.multi + (this.buffs.multi > 0 ? 2 : 0);
     // дополнительные снаряды бьют слабее основного: ×1.6 за первый, ×2.8 за три
     const mk = (1 + multi * 0.6) / (1 + multi);
