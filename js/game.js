@@ -180,18 +180,21 @@
   // ════════════════════════════════════════════════════════════
   // ВВОД
   // ════════════════════════════════════════════════════════════
-  // в кат-сцене корабль можно вести, но не стрелять
-  game.canSteer = function () { return this.state === 'play' || this.state === 'cutscene'; };
+  // забег идёт (бой или кат-сцена): для паузы и клавиш в main.js. В кат-сцене корабль ведёт сцена
+  game.inRun = function () { return this.state === 'play' || this.state === 'cutscene'; };
   game.onPointerDown = function (e) {
     const pt = this.pointer;
-    if (!this.canSteer()) return;
+    // в любой кат-сцене касание запоминаем — короткий тап её пропускает (onPointerUp)
+    if (this.state !== 'play' && this.state !== 'cutscene') return;
     if (pt.id !== null && pt.id !== e.pointerId) return;
     pt.id = e.pointerId; pt.x = e.clientX; pt.y = e.clientY;
     pt.downT = performance.now(); pt.downX = e.clientX; pt.downY = e.clientY; pt.moved = 0;
   };
   game.onPointerMove = function (e) {
     const pt = this.pointer;
-    if (pt.id !== e.pointerId || !this.canSteer()) return;
+    if (pt.id !== e.pointerId) return;
+    // палец следим и без управления, чтобы после сцены корабль не прыгнул на накопленный сдвиг
+    if (this.state !== 'play') { pt.moved += Math.abs(e.clientX - pt.x) + Math.abs(e.clientY - pt.y); pt.x = e.clientX; pt.y = e.clientY; return; }
     const sens = M.s.settings.sens || 1.25;
     const dx = (e.clientX - pt.x) * sens, dy = (e.clientY - pt.y) * sens;
     pt.x = e.clientX; pt.y = e.clientY;
@@ -264,7 +267,7 @@
     const edt = dt * slow;
 
     // ── управление с клавиатуры ──
-    if (p.alive && this.canSteer()) {
+    if (p.alive && this.state === 'play') {
       let kx = 0, ky = 0;
       const k = this.keys;
       if (k.ArrowLeft || k.KeyA) kx--; if (k.ArrowRight || k.KeyD) kx++;
@@ -391,7 +394,7 @@
     b.dmg = o.dmg; b.r = o.r; b.kind = o.kind; b.sprite = o.sprite || null; b.cv = o.cv || null; b.w = o.w;
     b.pierce = o.pierce || 0; b.hit.length = 0; b.life = o.life || 2.4; b.age = 0;
     b.homing = o.homing || 0; b.aoe = o.aoe || 0; b.aoeR = o.aoeR || 0; b.acc = o.acc || 0; b.maxSpd = o.maxSpd || 0;
-    b.bounced = false; b.tick = 0; b.tickT = o.tickT || 0; b.pull = o.pull || 0; b.burst = o.burst || 0; b.burstR = o.burstR || 0;
+    b.bounced = false; b.fade = 0; b.tick = 0; b.tickT = o.tickT || 0; b.pull = o.pull || 0; b.burst = o.burst || 0; b.burstR = o.burstR || 0;
     b.rot = 0; b.wid = o.wid || ''; b.dead = false; b.target = null;
     game.bullets.push(b);
     return b;
@@ -547,7 +550,8 @@
       const tx = p.x + d.side * p.w * 0.95, ty = p.y + p.w * 0.25 + Math.sin(this.t * 3 + i) * 6 * S;
       d.x = U.damp(d.x, tx, 9, dt); d.y = U.damp(d.y, ty, 9, dt);
       d.cd -= dt * this.rateMul();
-      if (d.cd <= 0 && p.alive) {
+      // в кат-сценах дроны молчат, как и сам корабль
+      if (d.cd <= 0 && p.alive && this.state === 'play') {
         d.cd = 0.38;
         let tgt = null, bd = 420 * S;
         for (const e of this.enemies) { if (!e.alive || !e.hittable || e.y > d.y) continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
@@ -603,8 +607,15 @@
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (ric && !b.bounced && (b.kind === 'laser' || b.kind === 'pellet' || b.kind === 'drone')) {
-        if (b.x < 0 || b.x > FW) { b.vx = -b.vx; b.x = U.clamp(b.x, 0, FW); b.bounced = true; }
-        else if (b.y < 0) { b.vy = -b.vy * 0.85; b.y = 0; b.bounced = true; b.life = Math.min(b.life, 0.9); }
+        if (b.x < 0 || b.x > FW) { b.vx = -b.vx; b.x = U.clamp(b.x, 0, FW); b.bounced = true; FX.hit(b.x, b.y, '#7fe7ff'); }
+        else if (b.y < 0) {
+          // от верха — под случайным углом, медленнее и недалеко: обратные снаряды тают в верхней
+          // части поля и не долетают до корабля (раньше летели строго вниз через весь экран)
+          const sp = Math.hypot(b.vx, b.vy) * 0.7, a = Math.atan2(-b.vy, b.vx) + U.rand(-0.45, 0.45);
+          b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp; b.y = 0; b.bounced = true;
+          b.life = b.fade = Math.min(b.life, 0.45);
+          if (Math.random() < 0.5) FX.hit(b.x, 2, '#7fe7ff');
+        }
       }
       if (b.life <= 0 || b.y < -60 || b.y > H + 60 || b.x < -60 || b.x > FW + 60) {
         if (b.kind === 'rocket' && b.life <= 0) this.rocketBlast(b, null);
@@ -690,9 +701,9 @@
         else { b.dead = true; break; }
       }
     }
-    // таран: враг врезался в корабль
+    // таран: враг врезался в корабль (в кат-сценах корабль ведёт сцена — тарана нет)
     const p = this.player;
-    if (p.alive) {
+    if (p.alive && this.state === 'play') {
       for (const e of enemies) {
         if (!e.alive || !e.hittable || e.boss && e.entering) continue;
         const rr = e.r * 0.8 + p.r * 1.6;
@@ -1650,7 +1661,7 @@
   // ════════════════════════════════════════════════════════════
   // КАТ-СЦЕНЫ: выход босса и прыжок в следующий сектор
   //  Затемнение и полосы кино поверх боя, карточка с крупным именем.
-  //  Корабль можно вести, но он неуязвим и не стреляет; касание — пропуск.
+  //  Корабль ведёт сцена: игрок им не управляет, он неуязвим и не стреляет; касание — пропуск.
   //  scene.card = { cap, name, sub, at, y } — карточка, появившаяся в момент at
   // ════════════════════════════════════════════════════════════
   const ease3 = (q) => 1 - Math.pow(1 - U.clamp(q, 0, 1), 3);
@@ -1675,10 +1686,12 @@
     A.play('skill', { rate: 0.6 });
   };
 
+  // срежиссированный момент: снаряды в полёте гаснут, корабль ведёт сцена (updateScene)
   game.startScene = function (sc) {
     this.scene = Object.assign(sc, { t: 0, out: -1, card: null });
     this.state = 'cutscene';
     for (const b of this.ebullets) b.dead = true;
+    for (const b of this.bullets) b.dead = true;
     A.muffle(true);
     SS.emit('cinema', true);
   };
@@ -1688,6 +1701,11 @@
     // сцена закончилась — полосы ещё уезжают
     if (sc.out >= 0) { sc.out += dt; if (sc.out > 0.45) this.scene = null; return; }
     sc.t += dt;
+    // корабль выходит в центр; в прыжке на разгоне подаётся вперёд, после вспышки возвращается
+    const p = this.player, ox = p.x;
+    p.x = U.damp(p.x, G.FW / 2, 2.6, dt);
+    p.y = U.damp(p.y, G.H * (sc.kind === 'jump' ? 0.72 - 0.1 * sc.warp : 0.76), 2.6, dt);
+    p.vxs += p.x - ox;
     if (sc.kind === 'boss') {
       if (!sc.spawned && sc.t >= sc.spawnT) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
       if (!sc.card && sc.t >= sc.cardT) this.bossCard();
@@ -2105,10 +2123,12 @@
         ctx.strokeStyle = '#c9a0ff'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, b.rot * 0.3, b.rot * 0.3 + U.TAU * 0.75); ctx.stroke();
         ctx.globalAlpha = 1;
-      } else if (b.cv) {
-        G.drawCanvas(ctx, b.cv, b.x, b.y, b.w, b.kind === 'plasma' ? b.age * 4 : 0);
-      } else if (b.sprite) {
-        G.draw(ctx, b.sprite, b.x, b.y, b.w, ang);
+      } else if (b.cv || b.sprite) {
+        // отскочившие от верха снаряды тают
+        if (b.fade) ctx.globalAlpha = U.clamp(b.life / b.fade, 0, 1) * 0.85;
+        if (b.cv) G.drawCanvas(ctx, b.cv, b.x, b.y, b.w, b.kind === 'plasma' ? b.age * 4 : 0);
+        else G.draw(ctx, b.sprite, b.x, b.y, b.w, ang);
+        ctx.globalAlpha = 1;
       }
     }
     ctx.globalCompositeOperation = 'source-over';
