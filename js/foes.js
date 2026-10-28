@@ -372,18 +372,23 @@
     for (const a of F.links) {
       if (!a.alive || !a.mate || !a.mate.alive) continue;
       const m = a.mate, dx = m.x - a.x, dy = m.y - a.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-      ctx.globalAlpha = 0.4 + 0.15 * Math.sin(t * 18);
+      ctx.globalAlpha = 0.3 + 0.12 * Math.sin(t * 18);
       ctx.strokeStyle = '#ff2d4d'; ctx.lineWidth = 8 * S;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(m.x, m.y); ctx.stroke();
-      // ядро луча вьётся синусоидой, как на рисунке
-      ctx.globalAlpha = 0.95; ctx.strokeStyle = '#ff8a9a'; ctx.lineWidth = 2.2 * S;
-      ctx.beginPath();
-      for (let i = 0; i <= 24; i++) {
-        const k = i / 24, o = Math.sin(k * 22 - t * 14) * 3 * S * Math.sin(k * Math.PI);
-        const x = a.x + dx * k + nx * o, y = a.y + dy * k + ny * o;
-        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      // ядро луча вьётся синусоидой, как на рисунке; красное — обычным смешиванием, иначе на синем небе выходит розовым
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      for (const [col, lw] of [['#ff2d4d', 2.6], ['#ffc2ca', 1]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw * S;
+        ctx.beginPath();
+        for (let i = 0; i <= 24; i++) {
+          const k = i / 24, o = Math.sin(k * 22 - t * 14) * 3 * S * Math.sin(k * Math.PI);
+          const x = a.x + dx * k + nx * o, y = a.y + dy * k + ny * o;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
     }
     for (const hb of F.heals) {
       const k = 1 - hb.t / 0.45;
