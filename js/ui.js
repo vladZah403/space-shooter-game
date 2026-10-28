@@ -701,9 +701,11 @@
     A.play('click');
   }
 
+  // длинный заголовок («Стартовый модуль») мельче — иначе на узком экране он ломается на две строки
+  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); }
   ui.showPerks = function (choices, reroll) {
     const box = $('#perkCards');
-    $('#perkTitle').textContent = 'УРОВЕНЬ ' + game.run.level;
+    setPerkTitle('УРОВЕНЬ ' + game.run.level);
     $('#perkSub').textContent = 'Выберите улучшение';
     $('#btnPerkReroll').hidden = false;
     box.innerHTML = '';
@@ -736,7 +738,7 @@
   // модули корабля: та же раскладка карточек, но без перебора и со своим заголовком
   ui.showModules = function (choices, kind) {
     const box = $('#perkCards');
-    $('#perkTitle').textContent = kind === 'start' ? 'СТАРТОВЫЙ МОДУЛЬ' : 'СТАНЦИЯ';
+    setPerkTitle(kind === 'start' ? 'СТАРТОВЫЙ МОДУЛЬ' : 'СТАНЦИЯ');
     $('#perkSub').textContent = 'Модуль корабля — до конца забега';
     $('#btnPerkReroll').hidden = true;
     box.innerHTML = '';
@@ -761,7 +763,7 @@
   // события между волнами: Развилка, Торговец (карточки с ценой; не хватает монет — карточка гаснет)
   ui.showEvent = function (offer) {
     const box = $('#perkCards');
-    $('#perkTitle').textContent = offer.title;
+    setPerkTitle(offer.title);
     $('#perkSub').textContent = offer.sub;
     $('#btnPerkReroll').hidden = true;
     box.innerHTML = '';
