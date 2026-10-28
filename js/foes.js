@@ -5,6 +5,7 @@
 //  Связка — серп, Проектор — плазма, Невидимка и Ионный — молния,
 //  Мимик привыкает к оружию, которым его бьют.
 //  Поддержка: Медик лечит соседей, Вор крадёт добычу, Мортира бьёт навесом.
+//  Обстановка (лист 13): яйца Улья, грузовики Конвоя, санитарный корабль.
 //  Поведение регистрируется в enemies.js (E.AI, E.INIT, E.NEW_FIRE).
 // ════════════════════════════════════════════════════════════════
 'use strict';
@@ -25,6 +26,7 @@
     shells: [],   // снаряды Мортиры: { x0, y0, tx, ty, t, dur, R }
     heals: [],    // лучи Медика (только картинка): { e, o, t }
     domes: [], gravs: [], links: [],   // Проекторы, Гравитоны и Связки на этом кадре
+    med: null,    // санитарный корабль: { t, x, y, dropped }
     init() {
       G = SS.gfx; FX = SS.fx; A = SS.audio; M = SS.meta; game = SS.game;
       const E = SS.enemies;
@@ -33,18 +35,21 @@
       Object.assign(E.INIT, INIT);
       E.NEW_FIRE.lob = lob;
     },
-    reset() { this.shells.length = 0; this.heals.length = 0; this.domes.length = 0; this.gravs.length = 0; this.links.length = 0; },
+    reset() { this.shells.length = 0; this.heals.length = 0; this.domes.length = 0; this.gravs.length = 0; this.links.length = 0; this.med = null; },
   };
   SS.foes = F;
 
   // подсказка при первой встрече
-  F.seen = function (e) {
+  F.seen = function (e) { hint(e.type, e.def.ico, e.def.name, e.def.hint); };
+  function hint(key, ico, name, text) {
     const seen = M.s.foeSeen || (M.s.foeSeen = []);
-    if (seen.includes(e.type)) return;
-    seen.push(e.type);
+    if (seen.includes(key)) return;
+    seen.push(key);
     SS.store.soon();
-    SS.emit('toast', { ico: e.def.ico || '⚠️', title: e.def.name.toUpperCase(), text: e.def.hint, info: true, dur: 3200 });
-  };
+    SS.emit('toast', { ico: ico || '⚠️', title: name.toUpperCase(), text, info: true, dur: 3200 });
+  }
+  // спрайт из позднего атласа ещё может качаться — тогда эту вещь пропускаем
+  F.ready = function (name) { const f = G.frame(name); return !!f && (!f[5] || !!G.img2); };
 
   // надпись над врагом не чаще раза в полсекунды
   function nope(e, text, color) {
@@ -163,6 +168,35 @@
     return 6; // две Связки по 3 в бюджете волны
   };
 
+  // Улей: яйцо на стене у левого или правого края
+  F.spawnEgg = function () {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    return SS.enemies.spawn('hive_egg', { y: U.rand(0.16, 0.6) * G.H, noElite: true, side });
+  };
+
+  // санитарный корабль: если корабль ранен, иногда в начале волны пролетает сверху вниз и сбрасывает аптечку
+  F.onWave = function (w) {
+    const run = game.run, p = game.player;
+    if (w.boss || w.n < 4 || run.noDrops || p.lives >= p.maxLives || w.n - (run.lastMed || -99) < 4 || Math.random() > 0.3) return;
+    run.lastMed = w.n;
+    F.med = { t: -U.rand(4, 8), x: U.rand(0.25, 0.75) * G.FW, y: -70 * G.S, dropped: false };
+  };
+  function updateMed(dt) {
+    const m = F.med, S = G.S;
+    m.t += dt;
+    if (m.t < 0) return;
+    if (!F.ready('p_medship') || game.state !== 'play' && !m.dropped) { if (m.t > 0) F.med = null; return; }
+    if (m.t < dt * 1.5) hint('medship', '🚑', 'Санитарный корабль', 'Свои! Сбрасывает аптечку, когда вы ранены');
+    m.y += 150 * S * dt;
+    if (!m.dropped && m.y >= G.H * 0.3) {
+      m.dropped = true;
+      game.dropPowerup(m.x, m.y + 20 * S, 'heal');
+      FX.text(m.x, m.y + 40 * S, 'АПТЕЧКА!', '#ff6b6b', 14, 1.0, -40);
+      A.play('powerup', { rate: 1.2, vol: 0.6 });
+    }
+    if (m.y > G.H + 90 * S) F.med = null;
+  }
+
   // ════════════════════════════════════════════════════════════
   // ГИБЕЛЬ
   // ════════════════════════════════════════════════════════════
@@ -174,10 +208,17 @@
         if (l.kind === 'coin') coins += l.val * 2;
         else if (l.kind === 'pu') game.dropPowerup(e.x, e.y, l.pu);
         else if (l.kind === 'en') game.dropEnergy(e.x, e.y, 1);
+        else if (l.kind === 'crate') game.dropCrate(e.x, e.y, l.val);
       }
       if (coins) game.dropCoins(e.x, e.y, coins);
       FX.text(e.x, e.y - e.r, 'ДОБЫЧА ВОЗВРАЩЕНА', '#ffc83d', 13, 1.0, -50);
       e.loot.length = 0;
+    }
+    // грузовик Конвоя роняет ящики
+    if (e.type === 'cargo') {
+      const n = 2 + (game.threatWave() >= 15 ? 1 : 0);
+      for (let i = 0; i < n; i++) game.dropCrate(e.x + (i - (n - 1) / 2) * 26 * G.S, e.y);
+      FX.text(e.x, e.y - e.r, 'ЯЩИКИ!', '#ffc83d', 15, 1.0, -50);
     }
     // напарник Связки в ярости — стреляет вдвое чаще
     if (e.mate && e.mate.alive) {
@@ -191,6 +232,15 @@
   // ПОВЕДЕНИЕ
   // ════════════════════════════════════════════════════════════
   const INIT = {
+    // яйцо прилеплено к стене у края экрана: у правого края рисуется зеркально (horiz + vx < 0)
+    egg(e, o) {
+      e.side = o.side || -1;
+      e.horiz = true; e.vx = e.side > 0 ? -1e-6 : 1e-6;
+      e.x = e.side < 0 ? e.w * 0.5 : G.FW - e.w * 0.5;
+      e.grow = U.rand(5.5, 7) / Math.pow(h.fireRate(), 0.3);
+      e.stage = 1; e.alpha = 0;
+    },
+    cargo(e) { e.ty = U.rand(0.16, 0.3) * G.H; e.stay = U.rand(11, 13); },
     thief(e) { e.ty = U.rand(0.12, 0.28) * G.H; e.loot = []; e.idle = 0; e.prey = null; e.vy = 0; },
     link(e, o) { e.pair = o.pair || null; e.side = o.side || 1; },
   };
@@ -214,7 +264,49 @@
     A.play('coin', { rate: 0.7, vol: 0.6 });
   }
 
+  function eggSprite(e, n) {
+    e.sprite = 'hive_egg' + n;
+    e.h = e.w * G.aspect(e.sprite);
+    e.cv = null;
+  }
+
   const AI = {
+    // яйцо Улья: зреет, трескается и выпускает личинок, которые ползут к кораблю
+    egg(e, dt) {
+      const S = G.S;
+      e.t += dt;
+      const st = e.t < e.grow * 0.55 ? 1 : e.t < e.grow ? 2 : 3;
+      if (st !== e.stage) {
+        e.stage = st;
+        eggSprite(e, st);
+        if (st === 2) { FX.sparks(e.x, e.y, '#a6ff3d', 8, 140); A.play('mine', { rate: 0.6, vol: 0.4 }); }
+        if (st === 3) {
+          e.hittable = false; e.leaving = true;
+          h.brood(e.x - e.side * e.w * 0.1, e.y, 2 + (game.threatWave() >= 20 ? 1 : 0), true, 16);
+          FX.explode(e.x, e.y, 0.7, '#a6ff3d');
+          A.play('teleport', { rate: 0.6, vol: 0.5 });
+        }
+      }
+      // скорлупа после вылупления тает
+      if (st === 3) { if (e.t > e.grow + 0.8) { e.alpha -= dt * 1.2; if (e.alpha <= 0) e.alive = false; } }
+      else e.alpha = Math.min(1, e.alpha + dt * 2);
+    },
+    // грузовик Конвоя: встаёт наверху, ходит из стороны в сторону и через ~12 с уходит с грузом
+    cargo(e, dt) {
+      const S = G.S;
+      if (e.st === 0) {
+        if (h.arrive(e, dt, 1.2)) { e.st = 1; e.vx = U.sign(Math.random() - 0.5) * e.spd * 0.6; }
+      } else if (e.st === 1) {
+        e.t += dt;
+        h.strafe(e, dt, 0.6);
+        e.y = e.ty + Math.sin(e.age * 0.9) * 6 * S;
+        if (e.t > e.stay) { e.st = 2; e.leaving = true; nope(e, 'УШЁЛ С ГРУЗОМ', '#ffc83d'); A.play('rail', { vol: 0.3, rate: 0.8 }); }
+      } else {
+        e.vy = Math.max((e.vy || 0) - 500 * S * dt, -e.spd * 5);
+        e.y += e.vy * dt;
+        if (e.y < -e.h) e.alive = false;
+      }
+    },
     thief(e, dt) {
       const S = G.S;
       if (e.st === 0) {
@@ -344,6 +436,7 @@
       }
     }
     for (let i = F.heals.length - 1; i >= 0; i--) { F.heals[i].t += dt; if (F.heals[i].t > 0.45) F.heals.splice(i, 1); }
+    if (F.med) updateMed(dt);
   };
 
   // ════════════════════════════════════════════════════════════
@@ -390,6 +483,24 @@
       }
       ctx.globalCompositeOperation = 'lighter';
     }
+    // санитарный корабль — свой: под врагами, с зелёным ореолом
+    const m = F.med;
+    if (m && m.t >= 0) {
+      const w = 46 * S;
+      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(t * 6);
+      ctx.drawImage(G.soft('#5cff9d', 64), m.x - w, m.y - w, w * 2, w * 2);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      G.draw(ctx, 'p_medship', m.x, m.y, w, Math.PI);
+      ctx.globalCompositeOperation = 'lighter';
+    }
+    // яйцо Улья светится, когда вот-вот вылупится
+    for (const e of game.enemies) {
+      if (!e.alive || e.type !== 'hive_egg' || e.stage !== 2) continue;
+      const gs = e.w * (1.5 + 0.2 * Math.sin(t * 12));
+      ctx.globalAlpha = 0.3 + 0.25 * Math.abs(Math.sin(t * 8));
+      ctx.drawImage(G.soft('#a6ff3d', 64), e.x - gs / 2, e.y - gs / 2, gs, gs);
+    }
     for (const hb of F.heals) {
       const k = 1 - hb.t / 0.45;
       ctx.globalAlpha = 0.8 * k; ctx.strokeStyle = '#5cff9d'; ctx.lineWidth = 3 * S * k + 1;
@@ -426,6 +537,15 @@
       ctx.drawImage(G.soft('#6b7bff', 64), e.x - gs / 2, e.y - e.h * 0.35 - gs / 2, gs, gs);
     }
     ctx.globalCompositeOperation = 'source-over';
+    // грузовик Конвоя: сколько ещё ждёт, прежде чем уйти с грузом
+    for (const e of game.enemies) {
+      if (!e.alive || e.type !== 'cargo' || e.st !== 1) continue;
+      const k = Math.max(0, 1 - e.t / e.stay), bw = e.w * 0.7, x = e.x - bw / 2, y = e.y + e.h * 0.55;
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 1, y - 1, bw + 2, 4 * S + 2);
+      ctx.fillStyle = k < 0.3 ? '#ff5c4d' : '#ffc83d'; ctx.fillRect(x, y, bw * k, 4 * S);
+    }
+    ctx.globalAlpha = 1;
     // значок: буква оружия в его цвете, перечёркнутая
     let font = false;
     for (const e of game.enemies) {

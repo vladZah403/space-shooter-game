@@ -920,7 +920,7 @@
       if (this.player.weapons.includes('lightning')) {
         const step = e.maxHp * D.WEAPONS.lightning.base.bossStep;
         e.enAcc = (e.enAcc || 0) + dmg;
-        while (e.enAcc >= step) { e.enAcc -= step; this.dropEnergy(e.x + U.rand(-0.3, 0.3) * e.w, e.y + e.h * 0.3, 1); }
+        while (e.enAcc >= step) { e.enAcc -= step; this.dropEnergy(e.x + U.rand(-0.3, 0.3) * e.w, e.y + e.h * 0.3, 1, 'boss'); }
       }
     }
     if (o.cryo && this.st.cryo > 0 && !e.boss && Math.random() < this.st.cryo) e.frozen = 2;
@@ -984,7 +984,8 @@
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
     // энергоблоки для молнии — только если она в слотах
-    if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini || Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0);
+    // Ионный поглощает молнию — и отдаёт её двойным блоком
+    if (this.player.weapons.includes('lightning') && !e.def.prop) this.dropEnergy(e.x, e.y, e.mini || e.type === 'ion' || Math.random() < D.WEAPONS.lightning.base.drop ? 1 : 0, e.type === 'ion' ? 'big' : undefined);
     // бонусы
     const luck = this.st.luck * (e.mini ? 100 : 1);
     const chance = (0.028 + (e.def.coins || 1) * 0.006) * luck * (this.diffId === 'zen' ? 1.5 : 1) * (this.diff.drops || 1);
@@ -1546,13 +1547,22 @@
     }
   };
   // не больше, чем не хватает до полной энергии с учётом уже лежащих блоков, и не больше maxOnScreen на экране
-  game.dropEnergy = function (x, y, n) {
+  // kind: 'boss' — синий блок с босса, 'big' — зелёный двойной (из Ионного)
+  const EN_SPR = { std: 'en_orange', boss: 'en_blue', big: 'en_green' };
+  const EN_COL = { std: '#ffb03d', boss: '#5cc8ff', big: '#5cff7a' };
+  game.dropEnergy = function (x, y, n, kind) {
     const lb = D.WEAPONS.lightning.base;
     let lying = 0;
     for (const it of this.pickups) if (!it.dead && it.kind === 'en') lying++;
     const need = Math.ceil((1 - this.run.energy) / lb.block - 0.01) - lying;
     n = Math.min(n, need, lb.maxOnScreen - lying);
-    for (let i = 0; i < n; i++) { const it = pick('en', x, y, 1); it.vx *= 0.5; }
+    for (let i = 0; i < n; i++) { const it = pick('en', x, y, kind === 'big' ? 2 : 1); it.vx *= 0.5; it.en = kind || 'std'; }
+  };
+  // ящик Конвоя (3.1): цена растёт с волной
+  game.dropCrate = function (x, y, val) {
+    const it = pick('crate', x, y, val || Math.round((12 + this.wave.n * 2) * this.st.coins));
+    it.vx *= 0.3; it.vy = -50 * G.S;
+    return it;
   };
   game.dropPowerup = function (x, y, type) {
     if (!type && this.run.noDrops) return null;
@@ -1575,21 +1585,23 @@
       if (it.dead) continue;
       it.age += dt; it.spin += dt * 6;
       const dx = p.x - it.x, dy = p.y - it.y, d = Math.hypot(dx, dy);
-      const mr = it.kind === 'pu' ? st.magnet * 0.6 : st.magnet;
+      // бонус и ящик Конвоя (3.1) сами к кораблю не летят — их нужно подобрать
+      const big = it.kind === 'pu' || it.kind === 'crate';
+      const mr = big ? st.magnet * 0.6 : st.magnet;
       // монеты и кристаллы сами летят к кораблю через 2.5 с — на телефоне их легко упустить;
       // энергоблоки молнии нужно собрать самому (или магнитом)
-      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr)) || (it.kind !== 'pu' && it.kind !== 'en' && it.age > 2.5))) {
+      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr)) || (!big && it.kind !== 'en' && it.age > 2.5))) {
         it.pull = true;
         const sp = (380 + it.age * 120) * S;
         it.vx = U.damp(it.vx, dx / (d || 1) * sp, 9, dt);
         it.vy = U.damp(it.vy, dy / (d || 1) * sp, 9, dt);
       } else {
         it.vx *= Math.exp(-2.6 * dt);
-        it.vy = U.damp(it.vy, (it.kind === 'pu' ? 55 : 70) * S, 1.8, dt);
+        it.vy = U.damp(it.vy, (big ? 55 : 70) * S, 1.8, dt);
       }
       it.x += it.vx * dt; it.y += it.vy * dt;
-      if (p.alive && d < p.pickR + (it.kind === 'pu' ? 10 * S : 0)) { this.collect(it); continue; }
-      if (it.y > H + 30 || it.age > (it.kind === 'pu' ? 14 : 10)) it.dead = true;
+      if (p.alive && d < p.pickR + (big ? 10 * S : 0)) { this.collect(it); continue; }
+      if (it.y > H + 30 || it.age > (big ? 14 : 10)) it.dead = true;
     }
   };
 
@@ -1607,8 +1619,18 @@
       A.play('xp');
       while (run.xp >= D.perkXpNeed(run.level)) { run.xp -= D.perkXpNeed(run.level); run.level++; run.pendingPerks++; }
     } else if (it.kind === 'en') {
-      run.energy = Math.min(1, run.energy + D.WEAPONS.lightning.base.block);
+      run.energy = Math.min(1, run.energy + D.WEAPONS.lightning.base.block * (it.val || 1));
       A.play('zap', { vol: 0.35, rate: 2 });
+    } else if (it.kind === 'crate') {
+      // ящик Конвоя: монеты и случайный бонус
+      run.coins += it.val; M.addCoins(it.val); M.trackMission('coins', it.val);
+      FX.text(p.x, p.y - p.w * 0.7, 'ЯЩИК  +' + it.val, '#ffc83d', 15, 1.0, -60);
+      FX.ring(p.x, p.y, p.w * 0.4, p.w * 1.4, '#ffc83d', 0.4, 3);
+      A.play('coin', { rate: 0.8 }); A.play('powerup', { vol: 0.6 });
+      const keys = Object.keys(D.POWERUPS).filter((k) => !(k === 'heal' && p.lives >= p.maxLives) && !(k === 'shield' && p.shield));
+      this.applyPowerup(U.pickWeighted(keys, (k) => D.POWERUPS[k].weight));
+      run.pickups++;
+      SS.emit('coinPicked');
     } else {
       this.applyPowerup(it.pu);
       run.pickups++;
@@ -1738,6 +1760,7 @@
     if (this.state !== 'perk') return;
     const p = this.player, run = this.run, kind = this.offerKind;
     run.mods[id] = (run.mods[id] || 0) + 1;
+    run.parts = this.shipParts(run.mods);
     if (id === 'plating') { p.maxLives += 2; p.lives += 2; }
     if (id === 'shieldcore' && !p.shield) { p.shield = true; this.shieldFx(); }
     if (id === 'bombbay') p.bombs = Math.min(9, p.bombs + 2);
@@ -1813,6 +1836,7 @@
     if (this.run.nextDanger) { this.run.nextDanger = false; this.wave.danger = true; this.wave.budget *= D.DANGER.count; }
     SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: this.sectorDef(sector).name, newSector, danger: this.wave.danger });
     SS.events.roll(this.wave);
+    SS.foes.onWave(this.wave);
     if (this.run.challenge) M.challengeWave(this.run.challenge, n);
     if (isBoss && this.state === 'play') this.bossScene(n);
     else if (isBoss) {
@@ -1865,7 +1889,7 @@
     if (w.n >= 10 && this.perk('glass')) M.unlock('glass10');
     SS.events.finish();
     // собираем оставшиеся монеты и кристаллы
-    for (const it of this.pickups) if (it.kind !== 'pu') it.pull = true;
+    for (const it of this.pickups) if (it.kind !== 'pu' && it.kind !== 'crate') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
     // после босса — станция и прыжок в следующий сектор; после обычной волны иногда событие
     if (w.boss) this.after(0.8, () => { if (this.wave === w) this.offerModules('station'); });
@@ -1908,7 +1932,7 @@
     const ep = epic.length && p.lives >= 2 ? U.pick(epic) : null;
     if (ep) cards.push({ id: 'deal:' + ep.id, ico: '🩸', name: 'СДЕЛКА: ' + ep.name, desc: '−1 жизнь, взамен: ' + ep.desc, rar: 'legendary' });
     cards.push({ id: 'pass', ico: '👋', name: 'ПРОЙТИ МИМО', desc: 'Сберечь монеты', rar: 'common' });
-    return { title: 'ТОРГОВЕЦ', sub: 'Цены в монетах — монеты уходят из кошелька', cards };
+    return { title: 'ТОРГОВЕЦ', art: 'p_merchant', sub: 'Цены в монетах — монеты уходят из кошелька', cards };
   };
   game.pickOffer = function (id) {
     if (this.state !== 'perk' || this.offerKind !== 'event') return false;
@@ -2240,7 +2264,44 @@
   }
 
   // корабль с пламенем: (x, y) — центр, w — ширина
-  game.drawShip = function (ctx, model, skin, trail, x, y, w, tilt, t, boost) {
+  // 3.1: модули забега видны на корабле — детали с листа «Кастомизация» (sp_*).
+  // Деталь: [спрайт, x, y (доли ширины/высоты корабля), ширина (доля ширины корабля), слой: 0 — под корпусом, 1 — поверх].
+  // Парные стоят зеркально; правая копия без своего спрайта «_r» отражается
+  game.shipParts = function (mods) {
+    const out = [], m = (id) => mods[id] || 0;
+    const pair = (l, r, x, y, w, layer) => { out.push([l, -x, y, w, layer], [r, x, y, w, layer]); };
+    // крылья и двигатели — одни на корабль, по старшему модулю
+    const wing = m('plating') >= 2 ? 'armor' : m('gyro') ? 'speed' : m('salvage') ? 'heavy' : m('repair') ? 'light' : '';
+    if (wing) pair('sp_wing_' + wing + '_l', 'sp_wing_' + wing + '_r', 0.42, 0.22, 0.36, 0);
+    const eng = m('cooling') ? 'sp_eng_ion' : m('chrono') ? 'sp_eng_burn' : '';
+    if (eng) pair(eng, eng, 0.2, 0.46, 0.18, 0);
+    if (m('hunter')) out.push(['sp_gun_plasma', 0, -0.44, 0.12, 0]);
+    if (m('wings')) pair('sp_gun_blaster', 'sp_gun_blaster', 0.36, 0, 0.13, 1);
+    if (m('power')) pair('sp_gun_laser', 'sp_gun_laser', 0.24, -0.12, m('power') >= 2 ? 0.13 : 0.11, 1);
+    if (m('bombbay')) pair('sp_gun_rocket', 'sp_gun_rocket', 0.3, 0.18, 0.08, 1);
+    if (m('plating')) out.push(['sp_arm_nose', 0, -0.27, 0.18, 1]);
+    if (m('plating') >= 2) pair('sp_arm_plate', 'sp_arm_plate', 0.16, 0.06, 0.13, 1);
+    if (m('targeting') || m('scanner')) out.push(['sp_arm_sensor', 0, -0.06, 0.13, 1]);
+    if (m('shieldcore')) out.push(['sp_arm_core', 0, 0.14, 0.16, 1]);
+    if (m('emergency')) out.push(['sp_arm_shield', 0, 0.33, 0.14, 1]);
+    return out;
+  };
+  function drawParts(ctx, parts, layer, w, h) {
+    for (const p of parts) {
+      if (p[4] !== layer) continue;
+      const f = G.frame(p[0]), img = f && G.src(f);
+      if (!img) continue;
+      const pw = w * p[3], ph = pw * f[3] / f[2];
+      ctx.save();
+      ctx.translate(p[1] * w, p[2] * h);
+      if (p[1] > 0 && !p[0].endsWith('_r')) ctx.scale(-1, 1);
+      ctx.drawImage(img, f[0], f[1], f[2], f[3], -pw / 2, -ph / 2, pw, ph);
+      ctx.restore();
+    }
+  }
+
+  // parts — детали модулей (game.shipParts), только в забеге
+  game.drawShip = function (ctx, model, skin, trail, x, y, w, tilt, t, boost, parts) {
     const L = drawLook(model, skin, trail), f = L.f;
     if (!f) return;
     const h = w * f[3] / f[2];
@@ -2280,9 +2341,11 @@
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    if (parts) drawParts(ctx, parts, 0, w, h);
     const cv = L.cv;
     if (cv) ctx.drawImage(cv, -w / 2, -h / 2, w, h);
     else { const im = G.src(f); if (im) ctx.drawImage(im, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h); }
+    if (parts) drawParts(ctx, parts, 1, w, h);
     ctx.restore();
   };
 
@@ -2356,7 +2419,17 @@
     const S = G.S, coin = G.proc('coin'), xp = G.proc('xp'), xpBig = G.proc('xpBig');
     for (const it of this.pickups) {
       if (it.dead) continue;
-      if (it.kind === 'coin') {
+      if (it.kind === 'crate') {
+        const s = 40 * S * (1 + Math.sin(it.age * 5) * 0.05);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.45 + Math.sin(it.age * 6) * 0.15;
+        ctx.drawImage(G.glow('#ffc83d', 64), it.x - s, it.y - s, s * 2, s * 2);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = it.age > 11 ? 0.5 + 0.5 * Math.sin(it.age * 20) : 1;
+        if (G.frame('p_crate') && G.src(G.frame('p_crate'))) G.draw(ctx, 'p_crate', it.x, it.y, s, Math.sin(it.age * 2) * 0.12);
+        else ctx.drawImage(G.proc('coin'), it.x - s / 3, it.y - s / 3, s / 1.5, s / 1.5);
+        ctx.globalAlpha = 1;
+      } else if (it.kind === 'coin') {
         const s = (it.val >= 25 ? 22 : it.val >= 5 ? 17 : 13) * S;
         const sx = Math.abs(Math.cos(it.spin)) * 0.8 + 0.2;
         ctx.drawImage(coin, it.x - s * sx / 2, it.y - s / 2, s * sx, s);
@@ -2369,14 +2442,16 @@
         ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(big ? xpBig : xp, it.x - s / 2, it.y - s / 2, s, s);
       } else if (it.kind === 'en') {
-        // энергоблок: пульсирует, перед исчезновением мигает
-        const s = 20 * S * (1 + Math.sin(it.age * 7) * 0.08), en = G.proc('energy');
+        // энергоблок: пульсирует, перед исчезновением мигает. 3.1: спрайт по цвету — обычный оранжевый,
+        // с босса синий, двойной (из Ионного) зелёный; без атласа — нарисованный кодом
+        const s = 20 * S * (1 + Math.sin(it.age * 7) * 0.08), spr = EN_SPR[it.en] || EN_SPR.std, col = EN_COL[it.en] || EN_COL.std;
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.5;
-        ctx.drawImage(G.glow('#fff36b', 64), it.x - s * 1.1, it.y - s * 1.1, s * 2.2, s * 2.2);
+        ctx.drawImage(G.glow(col, 64), it.x - s * 1.1, it.y - s * 1.1, s * 2.2, s * 2.2);
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = it.age > 8 ? 0.5 + 0.5 * Math.sin(it.age * 20) : 1;
-        ctx.drawImage(en, it.x - s * 0.39, it.y - s / 2, s * 0.78, s);
+        if (G.frame(spr)) G.draw(ctx, spr, it.x, it.y, s * (it.val > 1 ? 1.45 : 1.25));
+        else ctx.drawImage(G.proc('energy'), it.x - s * 0.39, it.y - s / 2, s * 0.78, s);
       } else {
         const def = D.POWERUPS[it.pu];
         const s = 34 * S * (1 + Math.sin(it.age * 5) * 0.05);
@@ -2512,7 +2587,7 @@
     ctx.globalAlpha = blink ? 0.35 : 1;
     // в прыжке между секторами двигатели на форсаже
     const boost = (this.buffs.rapid > 0 || run.skillFx.sk_overclock > 0 ? 1.3 : 1) + (this.scene && this.scene.kind === 'jump' ? this.scene.warp * 1.5 : 0);
-    this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, p.x, p.y, p.w, p.tilt, this.t, boost);
+    this.drawShip(ctx, s.ship.model, s.ship.skin, s.ship.trail, p.x, p.y, p.w, p.tilt, this.t, boost, run.parts);
     ctx.globalAlpha = 1;
     // ресурс текущего оружия — вертикальная шкала слева от корабля
     const res = this.state === 'play' && p.alive ? this.weaponRes(p.weapon) : null;

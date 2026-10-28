@@ -269,6 +269,14 @@
     mimic:       { name: 'Мимик',          sprite: 'e_mimic',     w: 52, hp: 160, spd: 60,  score: 700, coins: 6, xp: 4, ai: 'hover',     wave: 19, weight: 4, adapt: true,
       ico: '🧬', hint: 'Привыкает к оружию, которым его бьют, — меняйте оружие',
       fire: { kind: 'aimed3', cd: 2.4, bullet: 'bolt', spd: 230 } },
+    // ── 3.1: обстановка секторов и событий (foes.js, events.js) ──
+    // яйцо на стене улья: через несколько секунд трескается и выпускает личинок — разбейте раньше
+    hive_egg:    { name: 'Яйцо улья',      sprite: 'hive_egg1',   w: 58, hp: 55,  spd: 0,   score: 150, coins: 1, xp: 2, ai: 'egg',       wave: 99, weight: 0, prop: true, rot: 0 },
+    // лавовый астероид «Красного гиганта»: разбитый, брызжет огнём во все стороны
+    lava_rock:   { name: 'Лавовый астероид', sprite: 'astl_1',    w: 46, hp: 40,  spd: 90,  score: 60,  coins: 1, xp: 1, ai: 'drift',     wave: 99, weight: 0, prop: true,
+      death: { n: 6, bullet: 'junk', spd: 150 } },
+    // грузовик события «Конвой»: сбитый, роняет ящики с добычей; не сбили — улетел
+    cargo:       { name: 'Грузовик',       sprite: 'e_cargo',     w: 74, hp: 240, spd: 45,  score: 900, coins: 4, xp: 4, ai: 'cargo',     wave: 99, weight: 0 },
     // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
     gunship:     { name: 'Ганшип',          sprite: 'gunship',       w: 104, hp: 850,  spd: 45, score: 3000, coins: 30, xp: 14, ai: 'gunship',    wave: 8,  weight: 0, mini: true },
     destroyer:   { name: 'Эсминец',         sprite: 'e_destroyer',   w: 88,  hp: 1200, spd: 40, score: 4000, coins: 40, xp: 18, ai: 'destroyer',  wave: 13, weight: 0, mini: true },
@@ -541,12 +549,14 @@
       mech: 'asteroids', desc: 'Астероиды закрывают от пуль, в обломках монеты', noEvents: ['meteors', 'debris'] },
     { name: 'ТУМАННОСТЬ ОРИОНА',  sky: ['#06020c', '#260a33'], neb: ['#ff3dd2', '#8a3dff', '#3d5cff'], star: '#ffd9fb', planet: 300 },
     { name: 'ЛЕДЯНЫЕ ЛУНЫ',       sky: ['#010810', '#06283a'], neb: ['#3dfff0', '#7fb8ff', '#2a6bff'], star: '#e0fdff', planet: 190 },
-    { name: 'КРАСНЫЙ ГИГАНТ',     sky: ['#0a0204', '#2e070d'], neb: ['#ff2d4d', '#ff8a3d', '#8a1a3d'], star: '#ffd6d6', planet: 5 },
+    { name: 'КРАСНЫЙ ГИГАНТ',     sky: ['#0a0204', '#2e070d'], neb: ['#ff2d4d', '#ff8a3d', '#8a1a3d'], star: '#ffd6d6', planet: 5,
+      mech: 'lava', desc: 'Лавовые астероиды брызжут огнём — сбивайте издалека', noEvents: ['meteors'] },
     { name: 'ИЗУМРУДНЫЕ ПОЛЯ',    sky: ['#010805', '#06301f'], neb: ['#2dff8a', '#3dd2ff', '#1a8a5c'], star: '#dcffe9', planet: 145 },
     { name: 'ГОРИЗОНТ СОБЫТИЙ',   sky: ['#030108', '#16082e'], neb: ['#7a3dff', '#ff3d8b', '#2a1a8a'], star: '#e8dcff', planet: 265 },
     { name: 'СЕРДЦЕ ГАЛАКТИКИ',   sky: ['#080501', '#2e1a05'], neb: ['#ffc83d', '#ff6b3d', '#ff3d8b'], star: '#fff3d6', planet: 45 },
     { name: 'КРИСТАЛЬНЫЙ ПОЯС',   sky: ['#020809', '#082a2e'], neb: ['#3dffd2', '#3d9bff', '#b0fff0'], star: '#dcfffb', planet: 170 },
-    { name: 'УЛЕЙ',               sky: ['#050801', '#1c2a06'], neb: ['#a6ff3d', '#3dff7a', '#6b8a1a'], star: '#efffd6', planet: 95 },
+    { name: 'УЛЕЙ',               sky: ['#050801', '#1c2a06'], neb: ['#a6ff3d', '#3dff7a', '#6b8a1a'], star: '#efffd6', planet: 95,
+      mech: 'hive', desc: 'На стенах зреют яйца — разбейте, пока не вылупились' },
     { name: 'ПУСТОШЬ ХАОСА',      sky: ['#0a0502', '#2e1405'], neb: ['#ff7a2a', '#c0461a', '#ffb03d'], star: '#ffe9d6', planet: 20 },
     { name: 'ЦИТАДЕЛЬ ИНКВИЗИЦИИ', sky: ['#08070a', '#2a2410'], neb: ['#ffe08a', '#ff3d3d', '#fff3d6'], star: '#fff8e6', planet: 50 },
     { name: 'ТРОН ОВЕРЛОРДА',     sky: ['#050108', '#1f0626'], neb: ['#b03dff', '#ff3d6b', '#3d1a8a'], star: '#f0dcff', planet: 285 },
@@ -558,6 +568,7 @@
     { id: 'meteors', name: 'МЕТЕОРИТНЫЙ ДОЖДЬ', ico: '☄️', color: '#ff8a3d', desc: 'Следите за линиями — по ним летят метеоры' },
     { id: 'solar',   name: 'СОЛНЕЧНАЯ ВСПЫШКА', ico: '☀️', color: '#ffc83d', desc: 'Вспышки сжигают вражеские снаряды и ранят врагов' },
     { id: 'debris',  name: 'КОСМИЧЕСКИЙ МУСОР', ico: '🌑', color: '#d8c3a5', desc: 'Сбивайте обломки — в них монеты' },
+    { id: 'convoy',  name: 'КОНВОЙ',            ico: '📦', color: '#ffc83d', desc: 'Сбейте грузовики, пока не ушли, — в них ящики с добычей' },
   ];
   D.EVENT_WAVE = 6;       // с какой волны бывают события
   D.EVENT_CHANCE = 0.3;   // шанс события на обычной волне

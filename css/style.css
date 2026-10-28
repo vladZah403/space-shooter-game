@@ -518,6 +518,8 @@ body.cinema .banner{visibility:hidden}
 .perk-title.long{font-size:19px;letter-spacing:2.5px}
 .perk-sub{color:var(--muted);font-size:15px;margin-bottom:8px}
 .perk-cards{width:100%;display:flex;flex-direction:column;gap:10px}
+.perk-art{height:92px;width:auto;margin-bottom:2px;filter:drop-shadow(0 0 14px rgba(255,176,61,.45));animation:popIn .35s both}
+@media (max-height:640px){.perk-art{height:64px}}
 .perk-card{position:relative;display:flex;align-items:center;gap:14px;padding:14px;border-radius:18px;text-align:left;
   background:linear-gradient(135deg,rgba(26,38,86,.95),rgba(12,18,44,.95));border:1.5px solid color-mix(in srgb,var(--pc) 55%,transparent);
   box-shadow:0 0 22px color-mix(in srgb,var(--pc) 22%,transparent);animation:perkIn .35s cubic-bezier(.2,.9,.3,1.25) both;transition:transform .12s}

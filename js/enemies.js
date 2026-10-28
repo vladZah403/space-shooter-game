@@ -19,6 +19,7 @@
     gunship: '#ff4d4d', destroyer: '#ff8a3d', cruiser_h: '#ff4d6d', battleship: '#ff6a3d', frigate: '#ffb03d',
     thief: '#ffc83d', medic: '#5cff9d', link: '#ff3d5a', mortar: '#ff8a3d', mirror: '#7ff6ff', projector: '#4cb8ff',
     icebreaker: '#bff4ff', stealth: '#6b7bff', graviton: '#b06bff', mimic: '#ffb03d',
+    hive_egg: '#a6ff3d', lava_rock: '#ff6a2a', cargo: '#ff4d4d',
   };
 
   // стоимость врага в «бюджете» волны
@@ -26,7 +27,8 @@
     bomber: 4, sniper: 3, shielder: 4.5, techno: 3.5, hunter: 3.5, armored: 8, heavyfighter: 4.5, bombardier: 5, redoubt: 5.5,
     cruiser: 9, bug: 0.5, ram: 2.5, swarm: 4, crystal: 3, minelayer: 4, platform: 5.5, ghost: 3.5, orbit: 4.5, parasite: 4.5,
     ion: 5, crab: 7, biomech: 7, lancer: 4, debris: 0, asteroid: 0, gunship: 0, destroyer: 0, cruiser_h: 0, battleship: 0, frigate: 0,
-    thief: 2, medic: 3.5, link: 3, mortar: 5, mirror: 3.5, projector: 4, icebreaker: 7, stealth: 4, graviton: 5, mimic: 5.5 };
+    thief: 2, medic: 3.5, link: 3, mortar: 5, mirror: 3.5, projector: 4, icebreaker: 7, stealth: 4, graviton: 5, mimic: 5.5,
+    hive_egg: 0, lava_rock: 0, cargo: 0 };
 
   // эллиптические хитбоксы для крупных кораблей (доли ширины/высоты спрайта)
   const HITBOX = {
@@ -931,7 +933,7 @@
 
   // поведение и стрельба доступны врагам 3.1 (foes.js)
   E.AI = AI; E.INIT = INIT;
-  E.h = { arrive, strafe, leave, dodge, tickFire, doFire, canShoot, fireRate, minY };
+  E.h = { arrive, strafe, leave, dodge, tickFire, doFire, canShoot, fireRate, minY, brood };
 
   // ════════════════════════════════════════════════════════════
   // ОБНОВЛЕНИЕ

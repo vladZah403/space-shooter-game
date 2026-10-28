@@ -5,6 +5,7 @@
 //  Событие объявляется после баннера волны и длится до её зачистки.
 //  3.0: механики секторов — то же, но постоянно на волнах 1–4 сектора (бой с боссом без них)
 //  и мягче; сила растёт от первой волны сектора к четвёртой.
+//  3.1: событие «Конвой», механики «Улья» (яйца) и «Красного гиганта» (лавовые астероиды).
 // ════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -189,6 +190,15 @@
       SS.enemies.spawn('debris', { sprite: 'fx_rock' + U.randi(1, 6), noElite: true, scale: U.rand(0.8, 1.35) });
     },
 
+    // ── КОНВОЙ (3.1): грузовики с ящиками, два-три за волну ──
+    spawn_convoy(c) {
+      c.cd = U.rand(6, 8);
+      c.convoys = c.convoys || 0;
+      if (c.wave.done || c.convoys >= (c.wave.n >= 20 ? 3 : 2) || !SS.foes.ready('e_cargo')) return;
+      c.convoys++;
+      SS.enemies.spawn('cargo', { noElite: true });
+    },
+
     // ── МЕХАНИКИ СЕКТОРОВ ──
     // в кат-сценах новое не появляется, уже летящее продолжает движение
     updateMech(dt) {
@@ -219,6 +229,27 @@
       const e = SS.enemies.spawn('asteroid', { sprite: U.pick(SPR[loot][size]), noElite: true, scale, hpMul: scale * scale });
       if (!e) return;
       if (loot === 'coin') e.coins = 4; else if (loot === 'xp') e.xp = 2;
+    },
+
+    // УЛЕЙ (3.1): на стенах у краёв экрана зреют яйца, не разбитые — выпускают личинок
+    mech_hive(m) {
+      const k = m.k;
+      m.cd = [5, 4.2, 3.6, 3][k] * U.rand(0.8, 1.2);
+      let n = 0;
+      for (const e of game.enemies) if (e.alive && e.type === 'hive_egg') n++;
+      if (n >= [2, 3, 3, 4][k] || !SS.foes.ready('hive_egg1')) return;
+      SS.foes.spawnEgg();
+    },
+
+    // КРАСНЫЙ ГИГАНТ (3.1): раскалённые астероиды, разбитые, брызжут огнём во все стороны
+    mech_lava(m) {
+      const k = m.k;
+      m.cd = [2.8, 2.3, 1.9, 1.6][k] * U.rand(0.8, 1.2);
+      let n = 0;
+      for (const e of game.enemies) if (e.alive && e.type === 'lava_rock') n++;
+      if (n >= [2, 3, 4, 5][k] || !SS.foes.ready('astl_1')) return;
+      const scale = U.rand(0.8, 1.2) + k * 0.06;
+      SS.enemies.spawn('lava_rock', { sprite: 'astl_' + U.randi(1, 5), noElite: true, scale, hpMul: scale * scale });
     },
 
     // ── отрисовка (координаты поля) ──

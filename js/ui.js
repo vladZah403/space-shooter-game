@@ -704,7 +704,18 @@
   }
 
   // длинный заголовок («Стартовый модуль») мельче — иначе на узком экране он ломается на две строки
-  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); }
+  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; }
+  // картинка над заголовком (3.1: корабль-лавка Торговца); если поздний атлас ещё не скачан — без неё
+  function setPerkArt(name) {
+    const cv = $('#perkArt'), G = SS.gfx, f = name && G.frame(name), img = f && G.src(f);
+    if (!img) return;
+    const h = 92 * 2, w = Math.round(h * f[2] / f[3]);
+    cv.width = w; cv.height = h;
+    const x = cv.getContext('2d');
+    x.clearRect(0, 0, w, h);
+    x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, w, h);
+    cv.hidden = false;
+  }
   ui.showPerks = function (choices, reroll) {
     const box = $('#perkCards');
     setPerkTitle('УРОВЕНЬ ' + game.run.level);
@@ -766,6 +777,7 @@
   ui.showEvent = function (offer) {
     const box = $('#perkCards');
     setPerkTitle(offer.title);
+    setPerkArt(offer.art);
     $('#perkSub').textContent = offer.sub;
     $('#btnPerkReroll').hidden = true;
     box.innerHTML = '';
