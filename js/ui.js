@@ -534,8 +534,10 @@
     // босс
     const boss = g.boss;
     const bossOn = !!(boss && boss.alive);
-    if (c.bossOn !== bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; if (bossOn) el.bossName.textContent = boss.bdef.name; }
+    if (c.bossOn !== bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; c.bossPh = 0; }
     if (bossOn) {
+      // 3.1: номер фазы рядом с именем (полоса поделена на три части)
+      if (c.bossPh !== boss.phase) { c.bossPh = boss.phase; el.bossName.textContent = boss.bdef.name + (boss.phase > 1 ? ' · ФАЗА ' + boss.phase : ''); }
       const k = Math.max(0, boss.hp / boss.maxHp);
       const kk = Math.round(k * 400) / 400;
       if (c.bossK !== kk) { c.bossK = kk; el.bossFill.style.transform = 'scaleX(' + kk + ')'; }

@@ -9,6 +9,7 @@
   add   — свечение за вычетом фона, рисуется в режиме 'lighter' (пули, взрывы)
   glow  — непрозрачное тело внутри яркого ореола (ракеты, мины): заливка проходит
           тёмные и насыщенно-светящиеся пиксели и останавливается о металл корпуса
+  hull  — тёмный корпус цвета фона (Невидимка): силуэт по едва заметному контуру, внутри — непрозрачно
 """
 import json
 import os
@@ -21,7 +22,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # листы спрайтов: 0 — основной, 1 — новые корабли игрока, 2 — новые враги, 3 — новые боссы,
 # 4 — классические боссы, 5 — боссы 2.1, 6 — враги 2.1, 7 — корабли 2.1, 8 — кастомизация (цветные корабли),
 # 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты), 10 — каталог эффектов (экраны, индикаторы, разрушения),
-# 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы)
+# 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы),
+# 12 — враги 3.1 (защиты от оружия и поддержка)
 SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet00_main.png',
     'sheet01_player_ships.png',
@@ -35,6 +37,7 @@ SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet09_vfx.png',
     'sheet10_vfx_catalogue.png',
     'sheet11_asteroids.png',
+    'sheet12_enemies_30.png',
 )]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -237,6 +240,18 @@ SPRITES = {
     'astr_l':   ((1110, 662, 1207, 754), 'solid', 11, {'max': 128}),
     'astr_xl1': ((1239, 657, 1326, 749), 'solid', 11, {'max': 128}),
     'astr_xl2': ((1363, 630, 1499, 759), 'solid', 11, {'max': 128}),
+
+    # ── лист 12: враги 3.1 (у Связки нарезан один корабль — луч между парой рисует игра) ──
+    'e_medic':     ((36, 76, 262, 336), 'glow', 12, {'max': 180}),
+    'e_projector': ((266, 90, 510, 336), 'glow', 12, {'max': 180}),
+    'e_link':      ((536, 160, 586, 280), 'solid', 12, {'max': 120}),
+    'e_thief':     ((778, 140, 906, 296), 'solid', 12, {'max': 150}),
+    'e_mimic':     ((950, 120, 1180, 300), 'solid', 12, {'max': 170}),
+    'e_mortar':    ((36, 540, 262, 812), 'solid', 12, {'max': 190}),
+    'e_mirror':    ((282, 570, 492, 812), 'solid', 12, {'max': 180}),
+    'e_stealth':   ((510, 575, 710, 808), 'hull', 12, {'max': 170}),
+    'e_graviton':  ((726, 570, 942, 808), 'glow', 12, {'max': 180, 'sat': 0.8}),
+    'e_icebreaker': ((950, 490, 1180, 826), 'solid', 12, {'max': 200}),
 }
 
 # поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
@@ -469,6 +484,34 @@ def extract_glow(x0, y0, x1, y1, dark=44, sat_t=0.5):
     return out
 
 
+def extract_hull(x0, y0, x1, y1, thr=20, close_r=6):
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+    bg = bg_estimate(x0, y0, x1, y1)
+    m = Image.new('L', (w, h), 0)
+    mp = m.load()
+    for y in range(h):
+        for x in range(w):
+            c = SPX[x0 + x, y0 + y]
+            if sum(abs(c[k] - bg[k]) for k in range(3)) > thr:
+                mp[x, y] = 255
+    k = 2 * close_r + 1
+    mp = m.filter(ImageFilter.MaxFilter(k)).filter(ImageFilter.MinFilter(k)).load()
+    blocked = bytearray(w * h)
+    for y in range(h):
+        for x in range(w):
+            if mp[x, y]:
+                blocked[y * w + x] = 1
+    outside = flood_outside(x0, y0, w, h, lambda c: True, blocked)
+    out = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    op = out.load()
+    for y in range(h):
+        for x in range(w):
+            if not outside[y * w + x]:
+                c = SPX[x0 + x, y0 + y]
+                op[x, y] = (c[0], c[1], c[2], 255)
+    return out
+
+
 def split_parts(img, n):
     """Делит кадр на n самых крупных связных кусков (обломки летят по отдельности)."""
     w, h = img.size
@@ -589,7 +632,9 @@ def main():
         if mode == 'solid':
             img = despeckle(extract_solid(*box, close_r=CLOSE.get(name, 0), holes=not name.startswith('pu_')))
         elif mode == 'glow':
-            img = despeckle(extract_glow(*box), 12)
+            img = despeckle(extract_glow(*box, sat_t=opt.get('sat', 0.5)), 12)
+        elif mode == 'hull':
+            img = despeckle(extract_hull(*box))
         else:
             img = extract_add(*box)
             # каталог эффектов (лист 10) свёрстан плотно — края ореолов гасим, кроме экранных рамок

@@ -416,6 +416,9 @@ body.cinema .banner{visibility:hidden}
 .hud-boss-bar{position:relative;height:9px;border-radius:5px;background:rgba(40,0,10,.65);border:1px solid rgba(255,77,109,.45);overflow:hidden}
 .hud-boss-bar i{position:absolute;left:0;top:0;bottom:0;width:100%;transform-origin:left;background:linear-gradient(90deg,#ff2d55,#ff7a45);box-shadow:0 0 10px rgba(255,61,90,.8);transition:transform .15s}
 .hud-boss-bar b{position:absolute;left:0;top:0;height:3px;width:100%;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,#7fd8ff,#e3f8ff)}
+.hud-boss-bar::before,.hud-boss-bar::after{content:'';position:absolute;top:0;bottom:0;width:2px;background:rgba(12,0,6,.9);z-index:1}
+.hud-boss-bar::before{left:33.33%}
+.hud-boss-bar::after{left:66.66%}
 .hud-buffs{position:absolute;left:calc(max(var(--sal), (100vw - var(--fw,100vw)) / 2) + 12px);top:calc(var(--sat) + 92px);display:flex;flex-direction:column;gap:5px}
 .hud-boss:not([hidden]) ~ .hud-buffs{top:calc(var(--sat) + 122px)}
 .buff{display:flex;align-items:center;gap:5px;height:24px;padding:0 8px 0 5px;border-radius:12px;background:rgba(8,12,30,.66);border:1px solid color-mix(in srgb,var(--bc,#fff) 45%,transparent);

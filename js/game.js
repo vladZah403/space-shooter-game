@@ -137,6 +137,7 @@
     this.ov = { rail: null, hole: null, beams: [], lasers: [] };
     SS.enemies.corpses.length = 0;
     SS.events.reset();
+    SS.foes.reset();
     FX.clear();
   };
 
@@ -332,6 +333,7 @@
     this.updateDrones(dt);
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
+    SS.foes.update(edt);
     this.updateEBullets(edt);
     this.collide();
     this.processBlasts();
@@ -602,7 +604,7 @@
       let best = null, bd = Infinity;
       const R = j === 0 ? firstRange : range;
       for (const e of this.enemies) {
-        if (!e.alive || !e.hittable || hit.includes(e)) continue;
+        if (!e.alive || !e.hittable || e.def.cloak || hit.includes(e)) continue;
         let d = Math.hypot(e.x - cx, e.y - cy);
         if (j === 0 && e.y > cy + 20) d *= 2.2; // предпочитаем цели впереди
         if (alt && j === 0 && cur === null && Math.random() < 0.5) d *= 1.4;
@@ -633,6 +635,8 @@
   // враг задет, если его центр у дуги (с учётом размера); каждого — один раз за волну
   game.waveHits = function (b) {
     const w = waveGeom(b);
+    // луч Связки гасит волну
+    if (SS.foes.cutsWave(b, w)) { b.dead = true; return; }
     for (const e of this.enemies) {
       if (!e.alive || !e.hittable || b.hit.includes(e.uid)) continue;
       const er = e.rx ? Math.max(e.rx, e.ry) * 0.8 : e.r;
@@ -666,7 +670,7 @@
       if (d.cd <= 0 && p.alive && this.state === 'play') {
         d.cd = 0.38;
         let tgt = null, bd = 420 * S;
-        for (const e of this.enemies) { if (!e.alive || !e.hittable || e.y > d.y) continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
+        for (const e of this.enemies) { if (!e.alive || !e.hittable || e.y > d.y || SS.foes.hidden(e)) continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
         const a = tgt ? Math.atan2(tgt.y - d.y, tgt.x - d.x) : -Math.PI / 2;
         shot({ x: d.x, y: d.y, vx: Math.cos(a) * 900 * S, vy: Math.sin(a) * 900 * S, dmg: 7 * this.dmgMul(), r: 4 * S, kind: 'drone', sprite: 'pb_bolt_s', w: 10 * S, wid: 'drone', life: 1.2 });
       }
@@ -684,6 +688,8 @@
       b.age += dt; b.life -= dt;
       b.px = b.x; b.py = b.y;
       if (b.kind === 'rocket') {
+        // Гравитон разворачивает ракету в игрока
+        if (SS.foes.bendRocket(b)) { b.dead = true; continue; }
         // самонаведение с ограниченной скоростью поворота
         if (!b.target || !b.target.alive) b.target = this.nearestEnemy(b.x, b.y, true);
         let sp = Math.hypot(b.vx, b.vy);
@@ -710,7 +716,7 @@
         }
         // притяжение (боссы не двигаются)
         for (const e of this.enemies) {
-          if (!e.alive || e.boss || e.mini) continue;
+          if (!e.alive || e.boss || e.mini || e.def.gravity) continue;
           const dx = b.x - e.x, dy = b.y - e.y, d = Math.hypot(dx, dy);
           if (d > 1 && d < b.r * 2.2) { const f = b.pull * (1 - d / (b.r * 2.2)) * dt; e.x += dx / d * f; e.y += dy / d * f; }
         }
@@ -718,6 +724,8 @@
         if (b.life <= 0) { this.darkBurst(b); b.dead = true; continue; }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
+      // купол Проектора: плазма лопается о его край
+      if (b.kind === 'plasma' && SS.foes.inDome(b.x, b.y, b.r)) { SS.foes.domeHit(b.x, b.y); this.plasmaBlast(b, null); b.dead = true; continue; }
       if (ric && !b.bounced && (b.kind === 'laser' || b.kind === 'pellet' || b.kind === 'drone')) {
         if (b.x < 0 || b.x > FW) { b.vx = -b.vx; b.x = U.clamp(b.x, 0, FW); b.bounced = true; FX.hit(b.x, b.y, '#7fe7ff'); }
         else if (b.y < 0) {
@@ -740,7 +748,7 @@
   game.nearestEnemy = function (x, y, preferAhead) {
     let best = null, bd = Infinity;
     for (const e of this.enemies) {
-      if (!e.alive || !e.hittable || e.y < -20) continue;
+      if (!e.alive || !e.hittable || e.y < -20 || SS.foes.hidden(e)) continue;
       let d = Math.hypot(e.x - x, e.y - y);
       if (preferAhead && e.y > y) d *= 1.8;
       if (e.boss) d *= 0.8;
@@ -812,6 +820,8 @@
         this.run.hits++;
         if (b.kind === 'rocket') { this.damageEnemy(e, b.dmg, { crit: true, src: 'rocket', heavy: true }); this.rocketBlast(b, e); b.dead = true; break; }
         if (b.kind === 'plasma') { this.damageEnemy(e, b.dmg * plasmaK(b), { crit: true, src: 'plasma', heavy: true }); this.plasmaBlast(b, e); b.dead = true; break; }
+        // Зеркало отражает лазер в игрока
+        if (e.def.reflect && e.def.reflect === b.wid) { SS.foes.reflect(b, e); b.dead = true; break; }
         // дробь в упор бьёт сильнее; лазер — «фокус» по одной цели
         let mul = 1, hitCol = b.kind === 'pellet' ? '#ffd23d' : '#7fe7ff';
         if (b.kind === 'pellet' && b.age < D.WEAPONS.shotgun.base.closeT) mul = D.WEAPONS.shotgun.base.closeMul;
@@ -854,7 +864,8 @@
   game.damageEnemy = function (e, dmg, o) {
     if (!e.alive || dmg <= 0) return 0;
     o = o || {};
-    if (e.boss && e.entering) return 0;
+    // босс неуязвим, пока входит и пока перестраивается между фазами
+    if (e.boss && (e.entering || e.trans > 0)) return 0;
     // энергобарьер Редута поглощает обычный урон; бомба, нова и рельса его снимают
     if (e.barrier > 0) {
       if (o.src === 'bomb' || o.src === 'nova' || o.src === 'rail') { e.barrier = 0; e.cyc = 2.6; }
@@ -864,6 +875,10 @@
         return 0;
       }
     }
+    // 3.1: защита от оружия, купол Проектора, привыкание Мимика (foes.js)
+    const rk = SS.foes.resist(e, o.src, dmg);
+    if (rk <= 0) return 0;
+    dmg *= rk;
     let crit = false;
     if (o.crit && Math.random() < this.st.crit) {
       dmg *= this.st.critMul; crit = true;
@@ -896,6 +911,7 @@
       } else if (Math.random() < 0.3) A.play('hitArmor');
       if (dmg <= 0.01) return 0;
     }
+    if (e.boss) { dmg = SS.enemies.bossCap(e, dmg); if (dmg <= 0) return 0; }
     e.hp -= dmg;
     e.flash = 0.07;
     if (e.boss) {
@@ -1043,7 +1059,8 @@
 
   // чем сбит игрок — показывается на экране итогов
   const SHOT_NAMES = { mine: 'мина', needle: 'прицельный выстрел', long: 'прицельный выстрел', fire: 'огненный шар', ink: 'чернильная бомба',
-    egg: 'кладка роя', shard: 'осколок кристалла', feather: 'перо Феникса', junk: 'обломок', eye: 'взгляд Оверлорда', plaser: 'фиолетовый лазер' };
+    egg: 'кладка роя', shard: 'осколок кристалла', feather: 'перо Феникса', junk: 'обломок', eye: 'взгляд Оверлорда', plaser: 'фиолетовый лазер',
+    rocket: 'своя ракета от Гравитона', mirror: 'лазер от Зеркала' };
   function hitCause(b, boss) {
     const what = SHOT_NAMES[b.type] || 'вражеский снаряд';
     return boss && boss.alive ? boss.bdef.name + ', ' + what : what[0].toUpperCase() + what.slice(1);
@@ -1376,6 +1393,10 @@
     junk:    { sprite: 'eb_fire',   w: 18, r: 7,   color: '#ff8a3d', tint: 20 },
     eye:     { sprite: 'eb_orb',    w: 17, r: 6,   color: '#ff3dd2', tint: 320 },
     plaser:  { sprite: 'eb_plaser', w: 9,  r: 4,   color: '#c86bff', rotate: true },
+    // ракета игрока, развёрнутая Гравитоном
+    rocket:  { sprite: 'fx_rocket', w: 13, r: 6,   color: '#ff8a3d', rotate: true },
+    // лазер игрока, отражённый Зеркалом
+    mirror:  { sprite: 'eb_plaser', w: 9,  r: 4,   color: '#7ff6ff', tint: 185, rotate: true },
   };
   game.EB = EB;
 
@@ -2276,7 +2297,9 @@
     ctx.translate(G.FX + FX.shakeX, FX.shakeY);
     FX.drawBack(ctx);
     this.drawPickups(ctx);
+    SS.foes.drawBack(ctx);
     SS.enemies.drawAll(ctx);
+    SS.foes.drawFront(ctx);
     this.drawBullets(ctx);
     this.drawPlayer(ctx);
     this.drawEBullets(ctx);

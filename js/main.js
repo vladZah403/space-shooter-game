@@ -171,6 +171,7 @@
       SS.store.load();
       SS.game.init();
       SS.enemies.init();
+      SS.foes.init();
       SS.fx.shakeOn = SS.store.s.settings.shake;
       main.applyQuality();
       prog(0.25, 'Синтез звука…');

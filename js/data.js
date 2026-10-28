@@ -228,7 +228,8 @@
       fire: { kind: 'twin', cd: 1.5, bullet: 'bolt', spd: 250 }, fire2: { kind: 'ring', cd: 3.6, count: 10, bullet: 'orb', spd: 140 } },
     parasite:    { name: 'Паразит',        sprite: 'e_parasite',  w: 56, hp: 110, spd: 55,  score: 540, coins: 5, xp: 4, ai: 'hover',     wave: 16, weight: 4, brood: 3, larva: true,
       fire: { kind: 'fan', cd: 2.6, count: 4, spread: 0.7, bullet: 'green', spd: 170 } },
-    ion:         { name: 'Ионный',         sprite: 'e_ion',       w: 52, hp: 120, spd: 75,  score: 600, coins: 5, xp: 4, ai: 'ion',       wave: 18, weight: 4 },
+    ion:         { name: 'Ионный',         sprite: 'e_ion',       w: 52, hp: 120, spd: 75,  score: 600, coins: 5, xp: 4, ai: 'ion',       wave: 18, weight: 4,
+      resist: { lightning: 0 }, guard: 'lightning', ico: '⚡', hint: 'Поглощает молнию — бейте другим оружием' },
     crab:        { name: 'Крабоход',       sprite: 'e_crab',      w: 66, hp: 280, spd: 55,  score: 820, coins: 7, xp: 5, ai: 'crab',      wave: 21, weight: 4,
       fire: { kind: 'pincer', cd: 1.8, bullet: 'bolt', spd: 240 } },
     lancer:      { name: 'Лансер',         sprite: 'interceptor', tint: 285, w: 52, hp: 95, spd: 80, score: 500, coins: 4, xp: 3, ai: 'hover', wave: 15, weight: 5,
@@ -240,6 +241,34 @@
     asteroid:    { name: 'Астероид',       sprite: 'ast_m1',      w: 48, hp: 34,  spd: 85,  score: 30,  coins: 0, xp: 0, ai: 'drift',     wave: 99, weight: 0, prop: true, cover: true },
     biomech:     { name: 'Био-мех',        sprite: 'e_biomech',   w: 86, hp: 230, spd: 58,  score: 900, coins: 8, xp: 5, ai: 'bomber',    wave: 23, weight: 3, horizontal: true, weave: 38,
       fire: { kind: 'fan', cd: 1.3, count: 5, spread: 0.9, bullet: 'green', spd: 160, down: true } },
+    // ── 3.1: защиты от оружия и поддержка (foes.js) ──
+    // resist — множитель урона по источнику (0 — неуязвим); guard — оружие на значке над врагом;
+    // ico и hint — подсказка при первой встрече
+    thief:       { name: 'Вор',            sprite: 'e_thief',     w: 40, hp: 38,  spd: 150, score: 300, coins: 2, xp: 2, ai: 'thief',     wave: 6,  weight: 4,
+      ico: '🦝', hint: 'Крадёт бонусы и монеты. Собьёте — вернёт всё, монеты вдвойне' },
+    medic:       { name: 'Медик',          sprite: 'e_medic',     w: 52, hp: 70,  spd: 60,  score: 450, coins: 4, xp: 3, ai: 'hover',     wave: 9,  weight: 4, heal: 0.18,
+      ico: '💚', hint: 'Лечит соседей — сбивайте его первым', fire: { kind: 'aimed', cd: 3.2, bullet: 'green', spd: 180 } },
+    link:        { name: 'Связка',         sprite: 'e_link',      w: 34, hp: 55,  spd: 60,  score: 320, coins: 3, xp: 2, ai: 'link',      wave: 10, weight: 4,
+      guard: 'arc', ico: '🔗', hint: 'Луч между кораблями обжигает и гасит волны Серпа', fire: { kind: 'aimed', cd: 3.0, bullet: 'bolt', spd: 220 } },
+    mortar:      { name: 'Мортира',        sprite: 'e_mortar',    w: 60, hp: 160, spd: 40,  score: 600, coins: 5, xp: 4, ai: 'tank',      wave: 11, weight: 4,
+      ico: '🎯', hint: 'Бьёт навесом — уходите из красных кругов', fire: { kind: 'lob', cd: 2.9 } },
+    mirror:      { name: 'Зеркало',        sprite: 'e_mirror',    w: 50, hp: 90,  spd: 70,  score: 460, coins: 4, xp: 3, ai: 'hover',     wave: 12, weight: 5,
+      resist: { laser: 0 }, reflect: 'laser', guard: 'laser', ico: '🪞', hint: 'Отражает лазер обратно — бейте другим оружием',
+      fire: { kind: 'fan', cd: 2.6, count: 3, spread: 0.5, bullet: 'shard', spd: 200 } },
+    projector:   { name: 'Проектор',       sprite: 'e_projector', w: 54, hp: 100, spd: 55,  score: 520, coins: 4, xp: 3, ai: 'hover',     wave: 13, weight: 4, dome: 80,
+      guard: 'plasma', ico: '🛡️', hint: 'Купол гасит плазму — выманите врагов из-под него', fire: { kind: 'sine', cd: 3.0, bullet: 'blue', spd: 190 } },
+    icebreaker:  { name: 'Ледокол',        sprite: 'e_icebreaker', w: 64, hp: 260, spd: 40, score: 820, coins: 7, xp: 5, ai: 'tank',      wave: 15, weight: 4,
+      resist: { shotgun: 0.2, plasma: 1.5, rocket: 1.5 }, guard: 'shotgun', ico: '🧊', hint: 'Дробь отскакивает ото льда, плазма и ракеты его колют',
+      fire: { kind: 'fan', cd: 3.0, count: 5, spread: 0.8, bullet: 'shard', spd: 170, down: true }, death: { n: 10, bullet: 'shard', spd: 160 } },
+    stealth:     { name: 'Невидимка',      sprite: 'e_stealth',   w: 48, hp: 75,  spd: 85,  score: 520, coins: 4, xp: 3, ai: 'hover',     wave: 16, weight: 4, cloak: true,
+      resist: { lightning: 0 }, guard: 'lightning', ico: '👻', hint: 'Молния и ракеты его не видят — цельтесь сами',
+      fire: { kind: 'burst', cd: 0, count: 3, bullet: 'needle', spd: 270 } },
+    graviton:    { name: 'Гравитон',       sprite: 'e_graviton',  w: 56, hp: 140, spd: 55,  score: 640, coins: 5, xp: 4, ai: 'hover',     wave: 17, weight: 4, gravity: true,
+      resist: { rocket: 0, dark: 0 }, guard: 'rocket', ico: '🌀', hint: 'Разворачивает ракеты в вас, тёмная материя его не берёт',
+      fire: { kind: 'ring', cd: 3.4, count: 10, bullet: 'violet', spd: 135 } },
+    mimic:       { name: 'Мимик',          sprite: 'e_mimic',     w: 52, hp: 160, spd: 60,  score: 700, coins: 6, xp: 4, ai: 'hover',     wave: 19, weight: 4, adapt: true,
+      ico: '🧬', hint: 'Привыкает к оружию, которым его бьют, — меняйте оружие',
+      fire: { kind: 'aimed3', cd: 2.4, bullet: 'bolt', spd: 230 } },
     // мини-боссы — по очереди на волнах 8, 13, 18, 23, 28…
     gunship:     { name: 'Ганшип',          sprite: 'gunship',       w: 104, hp: 850,  spd: 45, score: 3000, coins: 30, xp: 14, ai: 'gunship',    wave: 8,  weight: 0, mini: true },
     destroyer:   { name: 'Эсминец',         sprite: 'e_destroyer',   w: 88,  hp: 1200, spd: 40, score: 4000, coins: 40, xp: 18, ai: 'destroyer',  wave: 13, weight: 0, mini: true },
@@ -253,6 +282,9 @@
   // sprite — кадр атласа; rot — поворот (PI = носом вниз); hue — перекраска (null = оригинальные цвета)
   // wf/wmax — ширина: доля поля и предел в px; hp — множитель прочности
   // Боссы идут по кругу каждые 5 волн, после 13-го круг повторяется сильнее.
+  // 3.1: три фазы с перестройкой между ними — прочность ×1,7 (у первого босса ×1,6: он вводный, разгон ramp и так ниже)
+  D.BOSS_HP = 1.7;
+  D.BOSS_HP_FIRST = 1.6;
   D.BOSSES = [
     { id: 'guardian',    name: 'СТРАЖ',               sprite: 'boss',           hue: null,    color: '#ff3d5a', wf: 0.46, wmax: 176, hp: 1.0,  title: 'Хранитель первого рубежа' },
     { id: 'sniper',      name: 'СНАЙПЕР',             sprite: 'b_sniper',       rot: Math.PI, color: '#ff9f3d', wf: 0.36, wmax: 150, hp: 1.0,  title: 'Видит каждый ваш манёвр' },
