@@ -942,6 +942,13 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .modal{overflow-y:auto;scrollbar-width:none}
 .modal::-webkit-scrollbar{display:none}
 .perk-wrap{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px);overflow-y:auto;scrollbar-width:none}
+/* лавка на карте — 5 карточек под портретом торговца: плотнее, чтобы влезли без прокрутки */
+.perk-cards:has(> .perk-card:nth-child(5)){gap:7px}
+.perk-cards:has(> .perk-card:nth-child(5)) .perk-card{padding:9px 12px;gap:12px}
+.perk-cards:has(> .perk-card:nth-child(5)) .perk-ico{width:46px;height:46px;border-radius:13px;font-size:25px}
+.perk-cards:has(> .perk-card:nth-child(5)) .perk-ico .px-ico{width:38px}
+/* «ЛЕГЕНДАРНОЕ» и «● 320 · мало» шире обычной цены — название не должно под них заезжать */
+.perk-cards:has(> .perk-card:nth-child(5)) .perk-name,.perk-card.poor .perk-name{padding-right:84px}
 
 /* ═══════════════════════════════════════════════════════════════
    4.1 — сундуки и коллекция реликвий

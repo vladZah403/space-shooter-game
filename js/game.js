@@ -705,14 +705,17 @@
   // ── дроны-напарники (улучшение забега) ──
   game.syncDrones = function () {
     const n = this.perk('drone') + (this.relic('r_buddy') ? 1 : 0);
-    while (this.drones.length < n) this.drones.push({ x: this.player.x, y: this.player.y, cd: 0.3 * this.drones.length, side: this.drones.length ? 1 : -1 });
+    while (this.drones.length < n) this.drones.push({ x: this.player.x, y: this.player.y, cd: 0.3 * this.drones.length });
     this.drones.length = n;
   };
   game.updateDrones = function (dt) {
     const p = this.player, S = G.S;
+    // у каждого дрона своё место: слева, справа, дальше слева-сзади, дальше справа-сзади.
+    // Место слева занимает дрон из Ангара (кроме Стража — он кружит), его пропускаем
+    const skip = SS.comp.d && SS.comp.d.id !== 'guard' ? 1 : 0;
     for (let i = 0; i < this.drones.length; i++) {
-      const d = this.drones[i];
-      const tx = p.x + d.side * p.w * 0.95, ty = p.y + p.w * 0.25 + Math.sin(this.t * 3 + i) * 6 * S;
+      const d = this.drones[i], j = i + skip, side = j % 2 ? 1 : -1, row = j >> 1;
+      const tx = p.x + side * p.w * (0.95 + row * 0.55), ty = p.y + p.w * (0.25 + row * 0.4) + Math.sin(this.t * 3 + i) * 6 * S;
       d.x = U.damp(d.x, tx, 9, dt); d.y = U.damp(d.y, ty, 9, dt);
       d.cd -= dt * this.rateMul();
       // в кат-сценах дроны молчат, как и сам корабль
