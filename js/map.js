@@ -25,16 +25,18 @@
   // ── генерация: в каждом шаге 2–3 узла, связи — к тому же или соседнему ряду ──
   MP.generate = function (sector) {
     const cols = [];
-    let shops = 0, elites = 0;
+    let shops = 0, elites = 0, escorts = 0;
     for (let c = 0; c < STEPS; c++) {
       const col = [];
       for (let r = 0; r < LANES; r++) col.push(c === 0 || Math.random() < 0.8 ? { r } : null);
       if (col.filter(Boolean).length < 2) col[1] = col[1] || { r: 1 };
       for (const n of col) {
         if (!n) continue;
-        const types = Object.keys(D.MAP_NODES).filter((t) => (c > 0 || D.MAP_NODES[t].first) && !(t === 'shop' && shops >= 1) && !(t === 'elite' && elites >= 2));
+        // лавка и эскорт — не больше одного на сектор, элита — не больше двух
+        const types = Object.keys(D.MAP_NODES).filter((t) => (c > 0 || D.MAP_NODES[t].first) && !(t === 'shop' && shops >= 1) && !(t === 'escort' && escorts >= 1) && !(t === 'elite' && elites >= 2));
         n.t = U.pickWeighted(types, (t) => D.MAP_NODES[t].w);
         if (n.t === 'shop') shops++;
+        if (n.t === 'escort') escorts++;
         if (n.t === 'elite') elites++;
       }
       cols.push(col);
