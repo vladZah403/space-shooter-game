@@ -32,7 +32,7 @@
       pilot: 'kai',
       bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
-      patch: 31,
+      patch: 40,
     };
   }
 
@@ -130,7 +130,9 @@
       }
       // 3.1: новое древо навыков — старые навыки, которых больше нет, сняты, очки вернулись сами
       if (data && data.patch >= 30 && !(data.patch >= 31) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v31')) this.s.notes.push({ type: 'v31' });
-      this.s.patch = 31;
+      // 4.0: карта, реликвии, дроны, режимы
+      if (data && data.patch >= 30 && !(data.patch >= 40) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v40')) this.s.notes.push({ type: 'v40' });
+      this.s.patch = 40;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
