@@ -91,6 +91,10 @@
 
     // улучшения
     $('#btnPerkReroll').addEventListener('click', () => { const ch = game.rerollPerks(); if (ch) ui.showPerks(ch, true); });
+    // схема корабля: из паузы и из выбора модуля (там подсвечены отсеки предложенных модулей)
+    $('#btnPauseShip').addEventListener('click', () => { A.play('click'); ui.showShip(); });
+    $('#btnPerkShip').addEventListener('click', () => { A.play('click'); ui.showShip(ui._modOffer); });
+    $('#btnShipClose').addEventListener('click', () => ui.closeShip());
 
     // диалог
     $('#dlgCancel').addEventListener('click', () => { A.play('back'); ui.hide('#scr-dialog'); });
@@ -704,7 +708,81 @@
   }
 
   // длинный заголовок («Стартовый модуль») мельче — иначе на узком экране он ломается на две строки
-  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; }
+  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; $('#btnPerkShip').hidden = true; }
+
+  // ════════════════════════════════════════════════════════════
+  // СХЕМА КОРАБЛЯ (3.1): модули забега по отсекам. Картинка — tools/make_cutaway.py,
+  // отсеки — прямоугольники [x0, y0, x1, y1] в долях картинки (нос вверху)
+  // ════════════════════════════════════════════════════════════
+  const SHIP_ROOMS = [
+    { id: 'bridge',  name: 'МОСТИК',           ico: '🎖️', mods: [],                            rects: [[0.31, 0.112, 0.73, 0.18]] },
+    { id: 'armor',   name: 'БРОНЯ',            ico: '🧱', mods: ['plating'],                     rects: [[0.31, 0.075, 0.73, 0.11]] },
+    { id: 'sensors', name: 'СЕНСОРЫ',          ico: '📡', mods: ['targeting', 'scanner'],        rects: [[0.16, 0.158, 0.37, 0.237], [0.68, 0.158, 0.87, 0.237]] },
+    { id: 'cargo',   name: 'ТРЮМ',             ico: '📦', mods: ['salvage', 'bombbay'],          rects: [[0.37, 0.181, 0.68, 0.405]] },
+    { id: 'guns',    name: 'ОРУЖИЕ',           ico: '🔫', mods: ['power', 'wings', 'hunter'],    rects: [[0.15, 0.24, 0.37, 0.526], [0.68, 0.24, 0.89, 0.526]] },
+    { id: 'shields', name: 'ЩИТЫ',             ico: '🔰', mods: ['shieldcore', 'emergency'],     rects: [[0.4, 0.405, 0.667, 0.563]] },
+    { id: 'reactor', name: 'РЕАКТОР',          ico: '⚛️', mods: ['cooling', 'chrono'],           rects: [[0.267, 0.563, 0.8, 0.735]] },
+    { id: 'life',    name: 'РЕМОНТ',           ico: '🩺', mods: ['repair'],                      rects: [[0.06, 0.567, 0.253, 0.693], [0.76, 0.567, 0.97, 0.693]] },
+    { id: 'engines', name: 'ДВИГАТЕЛИ',        ico: '🔥', mods: ['gyro'],                        rects: [[0.253, 0.744, 0.827, 0.98]] },
+  ];
+  // offer — модули, которые сейчас предлагают на выбор (их отсеки мигают)
+  ui.showShip = function (offer) {
+    const run = game.run;
+    if (!run) return;
+    const fig = $('#shipFig');
+    fig.querySelectorAll('.ship-room').forEach((el) => el.remove());
+    const lvl = (r) => r.mods.reduce((n, id) => n + (run.mods[id] || 0), 0);
+    const offered = (r) => !!offer && r.mods.some((id) => offer.includes(id));
+    let sel = ui._shipSel && SHIP_ROOMS.find((r) => r.id === ui._shipSel);
+    if (offer) sel = SHIP_ROOMS.find(offered) || sel;
+    if (!sel) sel = SHIP_ROOMS.find((r) => lvl(r) > 0) || SHIP_ROOMS[0];
+    const render = () => {
+      ui._shipSel = sel.id;
+      fig.querySelectorAll('.ship-room').forEach((el) => el.classList.toggle('sel', el.dataset.room === sel.id));
+      let h = '';
+      for (const r of SHIP_ROOMS) {
+        const n = lvl(r), on = n > 0 || r.id === 'bridge';
+        const ico = r.id === 'bridge' ? (D.PILOTS[run.pilot] || D.PILOTS.kai).ico : r.ico;
+        h += '<button class="sr-row' + (on ? ' on' : '') + (r === sel ? ' sel' : '') + '" data-room="' + r.id + '">' + ico + ' ' + r.name + (n ? '<span class="n">' + n + '</span>' : '') + '</button>';
+        if (r !== sel) continue;
+        h += '<div class="sr-body">';
+        if (r.id === 'bridge') {
+          const pil = D.PILOTS[run.pilot] || D.PILOTS.kai;
+          h += '<p>' + pil.ico + ' <b>' + pil.name + '</b> · ' + pil.title + '</p><p>' + U.escape(pil.desc) + '</p>';
+          h += '<p>Улучшений в забеге: <b>' + Object.keys(run.perks).length + '</b></p>';
+        } else {
+          for (const id of r.mods) {
+            const m = D.MODULES.find((x) => x.id === id), lv = run.mods[id] || 0;
+            if (!m) continue;
+            const off = offer && offer.includes(id);
+            if (lv) h += '<p>' + m.ico + ' <b>' + m.name + (m.max > 1 ? ' ' + lv + '/' + m.max : '') + '</b> — ' + U.escape(m.desc) + '</p>';
+            else h += '<p class="' + (off ? 'offer' : '') + '">' + m.ico + ' ' + m.name + (off ? ' — предлагают сейчас' : ' — свободно') + '</p>';
+          }
+        }
+        h += '</div>';
+      }
+      $('#shipInfo').innerHTML = h;
+      $$('#shipInfo .sr-row').forEach((b) => b.addEventListener('click', () => { sel = SHIP_ROOMS.find((r) => r.id === b.dataset.room); A.play('click'); render(); }));
+    };
+    for (const r of SHIP_ROOMS) {
+      for (const [x0, y0, x1, y1] of r.rects) {
+        const el = document.createElement('button');
+        el.className = 'ship-room' + (lvl(r) > 0 || r.id === 'bridge' ? ' on' : '') + (offered(r) ? ' offer' : '');
+        el.dataset.room = r.id;
+        el.style.cssText = 'left:' + x0 * 100 + '%;top:' + y0 * 100 + '%;width:' + (x1 - x0) * 100 + '%;height:' + (y1 - y0) * 100 + '%';
+        el.addEventListener('click', () => { sel = r; A.play('click'); render(); });
+        fig.appendChild(el);
+      }
+    }
+    render();
+    ui.show('#scr-ship');
+    T.back(() => ui.closeShip());
+  };
+  ui.closeShip = function () {
+    A.play('back');
+    ui.hide('#scr-ship');
+    T.back(ui.isShown('#scr-pause') ? () => game.resume() : null);
+  };
   // картинка над заголовком (3.1: корабль-лавка Торговца); если поздний атлас ещё не скачан — без неё
   function setPerkArt(name) {
     const cv = $('#perkArt'), G = SS.gfx, f = name && G.frame(name), img = f && G.src(f);
@@ -754,6 +832,8 @@
     setPerkTitle(kind === 'start' ? 'СТАРТОВЫЙ МОДУЛЬ' : 'СТАНЦИЯ');
     $('#perkSub').textContent = 'Модуль корабля — до конца забега';
     $('#btnPerkReroll').hidden = true;
+    $('#btnPerkShip').hidden = false;
+    ui._modOffer = choices.map((m) => m.id);
     box.innerHTML = '';
     choices.forEach((m) => {
       const rar = D.RARITY[m.rar], lv = game.mod(m.id);

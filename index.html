@@ -313,6 +313,7 @@
       <button class="toggle-btn" id="pauseSfx"><svg><use href="#i-sound"/></svg><span>Звуки</span></button>
       <button class="toggle-btn" id="pauseVibe"><svg><use href="#i-vibe"/></svg><span>Вибро</span></button>
     </div>
+    <button class="btn wide" id="btnPauseShip">🛠 СХЕМА КОРАБЛЯ</button>
     <button class="btn primary wide" id="btnResume"><svg><use href="#i-play"/></svg>ПРОДОЛЖИТЬ</button>
     <button class="btn wide" id="btnRestart"><svg><use href="#i-retry"/></svg>ЗАНОВО</button>
     <button class="btn wide danger" id="btnQuit"><svg><use href="#i-home"/></svg>В МЕНЮ</button>
@@ -327,6 +328,19 @@
     <div class="perk-sub" id="perkSub">Выберите улучшение</div>
     <div class="perk-cards" id="perkCards"></div>
     <button class="btn ghost" id="btnPerkReroll"><svg><use href="#i-retry"/></svg>ДРУГИЕ <span id="perkRerollCost"></span></button>
+    <button class="btn ghost" id="btnPerkShip" hidden>🛠 СХЕМА КОРАБЛЯ</button>
+  </div>
+</section>
+
+<!-- ═══ СХЕМА КОРАБЛЯ (3.1): модули забега по отсекам ═══ -->
+<section id="scr-ship" class="screen overlay top">
+  <div class="modal ship-modal">
+    <button class="modal-x" id="btnShipClose" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+    <div class="modal-title">КОРАБЛЬ</div>
+    <div class="ship-wrap">
+      <div class="ship-fig" id="shipFig"><img src="assets/ship_cutaway.webp?v=3.0.0" alt="" loading="lazy"></div>
+      <div class="ship-info" id="shipInfo"></div>
+    </div>
   </div>
 </section>
 
