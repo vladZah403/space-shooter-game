@@ -32,7 +32,9 @@
       pilot: 'kai',
       bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
-      patch: 40,
+      // 4.1: коллекция реликвий { id: 1 }, взятые в забег, и закрытые сундуки ['bronze', ...] — открываются после забега
+      relics: {}, relicLoadout: [], chests: [],
+      patch: 41,
     };
   }
 
@@ -49,7 +51,7 @@
       }
     }
     // словари с произвольными ключами копируем целиком
-    for (const k of ['skills', 'achievements', 'general']) if (data[k] && typeof data[k] === 'object') base[k] = Object.assign({}, data[k]);
+    for (const k of ['skills', 'achievements', 'general', 'relics']) if (data[k] && typeof data[k] === 'object') base[k] = Object.assign({}, data[k]);
     if (data.weapons && data.weapons.ups) base.weapons.ups = JSON.parse(JSON.stringify(data.weapons.ups));
     return base;
   }
@@ -91,6 +93,9 @@
       for (const t of D.TRAILS) if (t.price === 0 && !s.ship.trails.includes(t.id)) s.ship.trails.push(t.id);
       if (!s.ship.trails.includes(s.ship.trail)) s.ship.trail = 'ice';
       if (!D.DIFFS[s.settings.diff]) s.settings.diff = 'normal';
+      for (const id of Object.keys(s.relics)) if (!D.RELICS[id]) delete s.relics[id];
+      s.chests = (Array.isArray(s.chests) ? s.chests : []).filter((t) => D.CHESTS[t]);
+      s.relicLoadout = (Array.isArray(s.relicLoadout) ? s.relicLoadout : []).filter((id, i, a) => s.relics[id] && a.indexOf(id) === i);
       s.coins = Math.max(0, Math.floor(s.coins || 0));
       s.shipLvl = U.clamp(Math.floor(s.shipLvl || 1), 1, 999);
     },
@@ -132,7 +137,12 @@
       if (data && data.patch >= 30 && !(data.patch >= 31) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v31')) this.s.notes.push({ type: 'v31' });
       // 4.0: карта, реликвии, дроны, режимы
       if (data && data.patch >= 30 && !(data.patch >= 40) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v40')) this.s.notes.push({ type: 'v40' });
-      this.s.patch = 40;
+      // 4.1: реликвии — коллекция из сундуков; тем, кто уже играл, — серебряный сундук в подарок
+      if (data && !(data.patch >= 41) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v41')) {
+        this.s.notes.push({ type: 'v41' });
+        this.s.chests.push('silver');
+      }
+      this.s.patch = 41;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
@@ -437,6 +447,50 @@
       store.soon();
       return res;
     },
+
+    // ── 4.1: сундуки и коллекция реликвий ──
+    relicSlots() {
+      const s = this.s;
+      return D.RELIC_SLOTS.filter((lvl, i) => SS.DEV || s.shipLvl >= lvl || (s.prestige || 0) >= i).length;
+    },
+    relicCount() { return Object.keys(this.s.relics).length; },
+    // сундук получен в забеге — сразу в сохранение (закрытым): забег может оборваться
+    addChest(tier) {
+      if (!D.CHESTS[tier]) return;
+      this.s.chests.push(tier);
+      store.soon();
+    },
+    // какая реликвия выпадет: вес — по редкости сундука, у уже собранных вдвое меньше
+    rollRelic(tier) {
+      const w = D.CHESTS[tier].w, ids = Object.keys(D.RELICS).filter((id) => w[D.RELICS[id].rar] > 0);
+      return U.pickWeighted(ids, (id) => w[D.RELICS[id].rar] * (this.s.relics[id] ? 0.5 : 1));
+    },
+    // открыть первый закрытый сундук → { tier, id, dupe, coins }
+    openChest() {
+      const s = this.s;
+      if (!s.chests.length) return null;
+      const tier = s.chests.shift(), id = this.rollRelic(tier), dupe = !!s.relics[id];
+      let coins = 0;
+      if (dupe) { coins = D.RELIC_DUPE[D.RELICS[id].rar] || 50; this.addCoins(coins); }
+      else {
+        s.relics[id] = 1;
+        // свободный слот — сразу в забег
+        if (s.relicLoadout.length < this.relicSlots()) s.relicLoadout.push(id);
+      }
+      store.save();
+      return { tier, id, dupe, coins };
+    },
+    toggleRelic(id) {
+      const s = this.s, i = s.relicLoadout.indexOf(id);
+      if (i >= 0) { s.relicLoadout.splice(i, 1); store.save(); return 'off'; }
+      if (!s.relics[id]) return false;
+      if (s.relicLoadout.length >= this.relicSlots()) return 'full';
+      s.relicLoadout.push(id);
+      store.save();
+      return 'on';
+    },
+    // реликвии, которые полетят в забег (лишние сверх открытых слотов — нет)
+    relicLoadout() { return this.s.relicLoadout.filter((id) => this.s.relics[id]).slice(0, this.relicSlots()); },
 
     // ── престиж ──
     canPrestige() { return this.s.shipLvl >= D.PRESTIGE_LVL; },

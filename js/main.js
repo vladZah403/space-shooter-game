@@ -188,6 +188,7 @@
       SS.gfx.bg.init(0);
       prog(0.85, 'Подготовка интерфейса…');
       SS.ui.init();
+      SS.relicsUi.init();
       bindInput();
       window.addEventListener('resize', () => { clearTimeout(main._rt); main._rt = setTimeout(main.resize, 120); });
       SS.on('resize', () => { clearTimeout(main._rt); main._rt = setTimeout(main.resize, 120); });
@@ -225,7 +226,14 @@
     const notes = s.notes.splice(0);
     SS.store.save();
     const refund = notes.find((n) => n.type === 'refund'), v30 = notes.find((n) => n.type === 'v30');
-    if (notes.find((n) => n.type === 'v40')) {
+    if (notes.find((n) => n.type === 'v41')) {
+      SS.ui.dialog({
+        ico: 'star', title: 'ОБНОВЛЕНИЕ 4.1',
+        text: 'Реликвии теперь собираются навсегда: в забеге падают сундуки (элита, боссы, тайники, события, торговец), а открываются они на экране итогов. Перед забегом берите с собой до трёх реликвий — «Реликвии» в меню.' +
+          '\n\nВам в подарок — серебряный сундук: откроется после ближайшего забега. Новая карта галактики и оживший торговец.',
+        ok: 'В БОЙ!', noCancel: true,
+      });
+    } else if (notes.find((n) => n.type === 'v40')) {
       SS.ui.dialog({
         ico: 'star', title: 'ОБНОВЛЕНИЕ 4.0',
         text: 'Карта сектора: перед волной выбирайте путь — элита, торговец, ремонт, тайник или событие. 30 реликвий меняют правила забега.' +

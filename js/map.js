@@ -4,6 +4,9 @@
 //  самой первой в забеге) игрок выбирает узел, связанный с прошлым:
 //  бой, элита, торговец, ремонт, тайник, событие. После волны — награда
 //  узла. Реликвии — редкие предметы забега (эффекты — в game.js).
+//  4.1: реликвии больше не выдаются в забеге — вместо них сундуки (элита, босс,
+//  тайник, события, торговец); открываются на экране итогов, реликвия — в коллекцию,
+//  в забег берутся из коллекции (MP.startRelics).
 // ════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -110,7 +113,7 @@
   MP.reward = function (w) {
     const p = game.player;
     if (game.state !== 'play' || !p.alive) return false;
-    if (w.node === 'elite') return MP.relicOffer('ЭЛИТА ПОВЕРЖЕНА', 'Выберите реликвию');
+    if (w.node === 'elite') { MP.chestScene(Math.random() < 0.25 ? 'silver' : 'bronze', 'ЭЛИТА ПОВЕРЖЕНА', () => game.nextWave()); return true; }
     // торговец, тайник, ремонт и событие — сначала короткая сцена, награда в её конце
     if (w.node === 'shop' || w.node === 'cache' || w.node === 'repair' || w.node === 'event') {
       const ev = w.node === 'event' ? U.pick(D.MAP_EVENTS) : null;
@@ -123,8 +126,8 @@
     const p = game.player, run = game.run;
     if (w.node === 'shop') {
       const o = game.merchantOffer();
-      const rid = rollRelics(1)[0];
-      if (rid) o.cards.splice(o.cards.length - 1, 0, { id: 'relic:' + rid, ico: D.RELICS[rid].ico, name: D.RELICS[rid].name, desc: 'Реликвия: ' + D.RELICS[rid].desc, rar: relicRar(rid), price: Math.round((300 + w.n * 25) * priceCut() / 10) * 10 });
+      // вместо реликвии — закрытый сундук (откроется после забега)
+      o.cards.splice(o.cards.length - 1, 0, { id: 'chest:silver', ico: G.chestImg('silver'), name: D.CHESTS.silver.name, desc: 'Откроется после забега: реликвия в коллекцию', rar: 'epic', price: Math.round((300 + w.n * 25) * priceCut() / 10) * 10 });
       return show(o);
     }
     if (w.node === 'event') {
@@ -140,7 +143,7 @@
       run.coins += coins; M.addCoins(coins);
       FX.text(p.x, p.y - p.w, '📦 +' + coins, '#ffc83d', 16, 1.2);
       A.play('coin', { rate: 0.8 });
-      if (Math.random() < 0.35) { const rid = rollRelics(1)[0]; if (rid) MP.grant(rid); }
+      if (Math.random() < 0.35) MP.giveChest('bronze');
       game.hudDirty = true;
       return false;
     }
@@ -157,32 +160,39 @@
     return true;
   }
   function priceCut() { return (game.skill('sk_scavenger') ? 0.7 : 1) * (game.relic('r_chart') ? 0.75 : 1); }
-  function relicRar(id) { const r = D.RELICS[id].rar; return r === 'cursed' ? 'legendary' : r; }
 
-  // n случайных реликвий, которых ещё нет (вес — по редкости); minRar — не ниже редкой
-  function rollRelics(n, minRar) {
-    const run = game.run, out = [];
-    let pool = Object.keys(D.RELICS).filter((id) => !run.relics[id]);
-    if (minRar) pool = pool.filter((id) => D.RELICS[id].rar !== 'common' && D.RELICS[id].rar !== 'cursed');
-    while (out.length < n && pool.length) {
-      const id = U.pickWeighted(pool, (k) => D.RELIC_RARITY[D.RELICS[k].rar].w);
-      out.push(id);
-      pool = pool.filter((k) => k !== id);
+  // ── 4.1: сундук получен — сразу в сохранение (закрытым), в забеге только счётчик ──
+  // Звёздная карта и высокие сложности иногда улучшают сундук на ступень
+  MP.giveChest = function (tier, quiet) {
+    const run = game.run;
+    const up = (game.relic('r_chart') ? 0.3 : 0) + (['nightmare', 'god', 'hell'].includes(game.diffId) ? 0.2 : 0);
+    if (tier !== 'gold' && Math.random() < up) tier = D.CHEST_ORDER[D.CHEST_ORDER.indexOf(tier) + 1];
+    M.addChest(tier);
+    (run.chests || (run.chests = [])).push(tier);
+    if (!quiet) {
+      A.play('perk', { rate: 0.8 });
+      SS.emit('toast', { ico: 'chest', title: 'СУНДУК', text: D.CHESTS[tier].short + ' — откроется после забега', info: true, dur: 2200 });
     }
-    return out;
-  }
-
-  // выбор реликвии (элита, босс, тайник); after — что дальше ('station' — станция после босса)
-  MP.relicOffer = function (title, sub, after, minRar) {
-    const ids = rollRelics(game.relic('r_chart') ? 4 : 3, minRar);
-    if (!ids.length) return false;
-    const cards = ids.map((id) => ({ id: 'relic:' + id, ico: D.RELICS[id].ico, name: D.RELICS[id].name, desc: (D.RELICS[id].rar === 'cursed' ? '☠ Проклятая: ' : '') + D.RELICS[id].desc, rar: relicRar(id) }));
-    cards.push({ id: 'pass', ico: '👋', name: 'НИЧЕГО НЕ БРАТЬ', desc: 'Лететь дальше', rar: 'common' });
-    return show({ title, sub, cards, art: null, after });
+    SS.emit('chest', tier);
+    game.hudDirty = true;
+    return tier;
+  };
+  // сундук босса: первые боссы — серебро, дальше всё чаще золото
+  MP.bossChest = function () {
+    const n = game.run.bosses;
+    return Math.random() < Math.min(0.75, Math.max(0, n - 1) * 0.2) ? 'gold' : 'silver';
+  };
+  // сцена: сундук падает в кадр, рвётся открыться и улетает в трюм; дальше onEnd
+  MP.chestScene = function (tier, cap, onEnd) {
+    if (game.state !== 'play') { MP.giveChest(tier); onEnd(); return; }
+    tier = MP.giveChest(tier, true);
+    const def = D.CHESTS[tier];
+    game.startScene({ kind: 'visit', node: 'chest', tier, color: def.color, v: { cap, name: def.short + ' СУНДУК', sub: 'Откроется после забега' }, end: 2.3, cardT: 0.55, onEnd, done: false });
+    A.play('teleport', { rate: 1.1, vol: 0.5 });
   };
 
-  // ── реликвия получена ──
-  MP.grant = function (id) {
+  // ── реликвия в забеге (4.1 — только взятые из коллекции на старте) ──
+  MP.grant = function (id, quiet) {
     const run = game.run, p = game.player, def = D.RELICS[id];
     if (!def || run.relics[id]) return;
     run.relics[id] = 1;
@@ -190,11 +200,18 @@
     if (id === 'r_arsenal') p.bombs = Math.min(9, p.bombs + 2);
     if (id === 'r_glassblade') { p.maxLives = Math.max(1, p.maxLives - 2); p.lives = Math.min(p.lives, p.maxLives); }
     game.refreshStats();
-    FX.glowPuff(p.x, p.y, D.RELIC_RARITY[def.rar].color, 120 * G.S, 0.5);
-    FX.ring(p.x, p.y, p.w * 0.4, p.w * 1.8, D.RELIC_RARITY[def.rar].color, 0.5, 4);
-    A.play('perk', { rate: 0.9 });
-    SS.emit('toast', { ico: def.ico, title: 'РЕЛИКВИЯ', text: def.name, info: true, dur: 2200 });
+    if (!quiet) {
+      FX.glowPuff(p.x, p.y, D.RELIC_RARITY[def.rar].color, 120 * G.S, 0.5);
+      FX.ring(p.x, p.y, p.w * 0.4, p.w * 1.8, D.RELIC_RARITY[def.rar].color, 0.5, 4);
+      A.play('perk', { rate: 0.9 });
+      SS.emit('toast', { ico: def.ico, title: 'РЕЛИКВИЯ', text: def.name, info: true, dur: 2200 });
+    }
     game.hudDirty = true;
+  };
+  // старт забега: реликвии из коллекции (в испытании дня — нет: у всех одинаковые условия)
+  MP.startRelics = function () {
+    if (game.run.challenge) return;
+    for (const id of M.relicLoadout()) MP.grant(id, true);
   };
 
   // ════════════════════════════════════════════════════════════
@@ -223,7 +240,41 @@
       if (sc.node === 'elite') FX.vignette('#ff2a48', 1.2, 0.6, true);
     }
     if (sc.node === 'elite' && Math.random() < 0.1) FX.shake(0.05);
+    if (sc.node === 'chest') {
+      const col = D.CHESTS[sc.tier].color, cy = G.H * 0.36;
+      // приземление: удар, искры; потом крышка рвётся открыться; в конце — в трюм
+      if (!sc.landed && sc.t >= 0.6) {
+        sc.landed = true;
+        FX.ring(G.FW / 2, cy + 20 * S, 10 * S, 110 * S, col, 0.45, 4);
+        FX.sparks(G.FW / 2, cy + 24 * S, col, 16, 260);
+        FX.shake(0.18);
+        A.play('mine', { rate: 0.6, vol: 0.45 });
+      }
+      if (sc.landed && sc.t < 1.6 && Math.random() < 0.25) FX.sparks(G.FW / 2 + U.rand(-40, 40) * S, cy + U.rand(-30, 20) * S, col, 1, 60);
+      if (!sc.gone && sc.t >= 1.6) { sc.gone = true; A.play('coin', { rate: 0.7, vol: 0.7 }); }
+    }
   };
+  // падение с отскоком
+  function bounceOut(k) {
+    const n = 7.5625, d = 2.75;
+    if (k < 1 / d) return n * k * k;
+    if (k < 2 / d) return n * (k -= 1.5 / d) * k + 0.75;
+    if (k < 2.5 / d) return n * (k -= 2.25 / d) * k + 0.9375;
+    return n * (k -= 2.625 / d) * k + 0.984375;
+  }
+  // вращающиеся лучи за наградой
+  function rays(ctx, x, y, r, col, t, a, n) {
+    n = n || 10;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, G.hexA(col, 0.9)); g.addColorStop(1, G.hexA(col, 0));
+    ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = g;
+    ctx.translate(x, y); ctx.rotate(t * 0.5); ctx.translate(-x, -y);
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const a0 = i * U.TAU / n; ctx.moveTo(x, y); ctx.arc(x, y, r, a0, a0 + U.TAU / n * 0.38); ctx.closePath(); }
+    ctx.fill();
+    ctx.restore();
+  }
+  MP.rays = rays;
   // актёр сцены в координатах поля
   MP.drawVisit = function (ctx, sc) {
     const S = G.S, t = sc.t, p = game.player, k = Math.min(1, t / 0.9), ease = 1 - Math.pow(1 - k, 3);
@@ -254,6 +305,23 @@
         ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
         G.draw(ctx, 'e_heavyfighter', cx + (i - 1) * 80 * S, y, 58 * S, Math.PI);
       }
+    } else if (sc.node === 'chest') {
+      const col = D.CHESTS[sc.tier].color;
+      let x = cx, y = U.lerp(-90 * S, G.H * 0.36, bounceOut(Math.min(1, t / 0.6))), w = 96 * S, a = 1;
+      // улетает в трюм — к счётчику сундуков вверху справа
+      if (t > 1.6) { const q = U.clamp((t - 1.6) / 0.55, 0, 1), e = q * q; x = U.lerp(cx, G.FW - 34 * S, e); y = U.lerp(G.H * 0.36, 34 * S, e); w *= 1 - 0.75 * e; a = 1 - q * 0.7; }
+      ctx.globalCompositeOperation = 'lighter';
+      rays(ctx, x, y, w * 1.7, col, t, 0.3 * a * Math.min(1, t * 2));
+      ctx.globalAlpha = 0.5 * a; ctx.drawImage(G.soft(col, 64), x - w, y - w, w * 2, w * 2);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = a;
+      // крышка подпрыгивает рывками — сундук «просится» открыться
+      const jolt = t > 0.75 && t < 1.55 && Math.sin(t * 9) > 0.2 ? Math.abs(Math.sin(t * 40)) : 0;
+      const m = G.drawChest(ctx, sc.tier, x + (jolt ? (Math.random() - 0.5) * 3 * S : 0), y, w, 0, jolt);
+      if (jolt > 0.1) {
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = jolt * 0.9 * a;
+        ctx.drawImage(G.glow(col, 64), x - w * 0.55, m.mouth - w * 0.1, w * 1.1, w * 0.2);
+      }
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     } else if (sc.node === 'event') {
       const id = sc.ev.id, y = G.H * 0.36, a = Math.min(1, t * 2);
       ctx.globalAlpha = a;
@@ -277,12 +345,12 @@
     const say = (ico, text) => SS.emit('toast', { ico, title: 'СОБЫТИЕ', text, info: true, dur: 2400 });
     if (card === 'pass') return;
     if (ev === 'wreck' && card === 'search') {
-      if (Math.random() < 0.6) { const id = rollRelics(1)[0]; if (id) MP.grant(id); else say('🔦', 'Пусто'); }
+      if (Math.random() < 0.6) MP.giveChest('bronze');
       else { run.nextDanger = true; say('⚠️', 'Засада! Следующая волна элитная'); }
     } else if (ev === 'black' && card === 'blood') {
       p.lives = Math.max(1, p.lives - 1);
       FX.flash('#ff3d5a', 0.3); A.play('playerHit', { vol: 0.5 }); SS.emit('playerHit');
-      const id = rollRelics(1, true)[0]; if (id) MP.grant(id);
+      MP.giveChest('gold');
     } else if (ev === 'anomaly' && card === 'enter') {
       if (Math.random() < 0.5) {
         const mods = D.MODULES.filter((m) => game.mod(m.id) < m.max);
@@ -290,7 +358,7 @@
       } else { p.lives = Math.max(1, p.lives - 1); FX.flash('#b06bff', 0.3); SS.emit('playerHit'); say('🌀', 'Аномалия задела корабль: −1 жизнь'); }
     } else if (ev === 'distress') {
       if (card === 'help') { run.coins += 100; M.addCoins(100); say('🤝', 'Экипаж спасён: +100 монет'); }
-      else { const id = rollRelics(1)[0]; if (id) MP.grant(id); run.nextDanger = true; say('⚠️', 'Погоня! Следующая волна элитная'); }
+      else { MP.giveChest('silver'); run.nextDanger = true; }
     } else if (ev === 'station') {
       if (card === 'fix') game.heal(1, '🏚️ РЕМОНТ');
       else { p.bombs = Math.min(9, p.bombs + 1); run.coins += 50; M.addCoins(50); say('💣', '+1 бомба и 50 монет'); }

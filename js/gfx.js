@@ -344,6 +344,88 @@
     pu_freeze() { return badge('#9be8ff', (x, s) => { x.strokeStyle = '#d9f6ff'; x.lineWidth = s * 0.05; x.lineCap = 'round'; for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; x.beginPath(); x.moveTo(s / 2 + Math.cos(a) * s * 0.22, s / 2 + Math.sin(a) * s * 0.22); x.lineTo(s / 2 - Math.cos(a) * s * 0.22, s / 2 - Math.sin(a) * s * 0.22); x.stroke(); } x.fillStyle = '#9be8ff'; x.beginPath(); x.arc(s / 2, s / 2, s * 0.06, 0, U.TAU); x.fill(); }); },
   };
 
+  // ── 4.1: сундуки — пиксель-арт в стиле листов (пока нет нарисованных): корпус и крышка отдельно,
+  //    крышку анимируют сцены (тряска, открытие). Рисуется в «больших пикселях» и увеличивается без сглаживания ──
+  const CHEST_PAL = {
+    bronze: { wood: '#8a5228', woodL: '#b0703a', woodD: '#5a3218', metal: '#d89a5a', metalL: '#ffd29a', metalD: '#8a5226', gem: '#ff6a3d' },
+    silver: { wood: '#34446e', woodL: '#4c5f93', woodD: '#212c4a', metal: '#c6d2ea', metalL: '#ffffff', metalD: '#7584a6', gem: '#3de0ff' },
+    gold:   { wood: '#6a2c8a', woodL: '#8c45b0', woodD: '#43195a', metal: '#ffc83d', metalL: '#fff1a6', metalD: '#b8780e', gem: '#ff4df0' },
+  };
+  const PX = 4;   // экранных пикселей в одном «пикселе» рисунка
+  function pixelArt(w, h, paint) {
+    const c = mk(w + 2, h + 2), x = c.getContext('2d');
+    paint((px, py, pw, ph, col) => { x.fillStyle = col; x.fillRect(px + 1, py + 1, pw, ph); });
+    // тёмный контур в 1 пиксель — силуэт, сдвинутый в 4 стороны
+    const o = mk(w + 2, h + 2), ox = o.getContext('2d');
+    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) ox.drawImage(c, d[0], d[1]);
+    ox.globalCompositeOperation = 'source-in'; ox.fillStyle = '#0b0a18'; ox.fillRect(0, 0, o.width, o.height);
+    ox.globalCompositeOperation = 'source-over'; ox.drawImage(c, 0, 0);
+    const big = mk(o.width * PX, o.height * PX), bx = big.getContext('2d');
+    bx.imageSmoothingEnabled = false; bx.drawImage(o, 0, 0, big.width, big.height);
+    return big;
+  }
+  gfx.chest = function (tier) {
+    const key = 'chest_' + tier;
+    if (this._proc[key]) return this._proc[key];
+    const P = CHEST_PAL[tier] || CHEST_PAL.bronze, gold = tier === 'gold', silver = tier === 'silver';
+    const body = pixelArt(32, 16, (r) => {
+      r(0, 0, 32, 16, P.wood);
+      r(0, 2, 32, 1, P.woodL); r(0, 6, 32, 1, P.woodD); r(0, 11, 32, 1, P.woodD); r(0, 7, 32, 1, P.woodL);
+      r(0, 0, 32, 2, P.metal); r(0, 0, 32, 1, P.metalL);
+      r(0, 14, 32, 2, P.metal); r(0, 15, 32, 1, P.metalD);
+      for (const bx of [3, 26]) { r(bx, 0, 3, 16, P.metal); r(bx, 0, 1, 16, P.metalL); r(bx + 2, 0, 1, 16, P.metalD); }
+      r(0, 0, 1, 16, P.metalD); r(31, 0, 1, 16, P.metalD);
+      // замок
+      r(12, 0, 8, 8, P.metal); r(12, 0, 8, 1, P.metalL); r(19, 0, 1, 8, P.metalD); r(12, 7, 8, 1, P.metalD);
+      r(15, 2, 2, 2, P.gem); r(15, 4, 2, 2, '#160c08'); r(15, 2, 1, 1, '#fff');
+      // заклёпки
+      for (const sx of [4, 27]) { r(sx, 4, 1, 1, P.metalL); r(sx, 10, 1, 1, P.metalL); }
+      if (gold || silver) { r(9, 9, 2, 2, P.gem); r(21, 9, 2, 2, P.gem); r(9, 9, 1, 1, '#fff'); r(21, 9, 1, 1, '#fff'); }
+    });
+    const lid = pixelArt(32, 11, (r) => {
+      r(5, 0, 22, 1, P.metal); r(2, 1, 28, 1, P.wood); r(1, 2, 30, 1, P.wood); r(0, 3, 32, 8, P.wood);
+      r(3, 1, 26, 1, P.woodL); r(1, 3, 30, 1, P.woodL); r(0, 6, 32, 1, P.woodD);
+      for (const bx of [3, 26]) { r(bx, 0, 3, 11, P.metal); r(bx, 0, 1, 11, P.metalL); r(bx + 2, 1, 1, 10, P.metalD); }
+      r(0, 9, 32, 2, P.metal); r(0, 9, 32, 1, P.metalL); r(0, 10, 32, 1, P.metalD);
+      r(13, 6, 6, 5, P.metal); r(13, 6, 6, 1, P.metalL); r(15, 7, 2, 2, P.gem);
+      if (gold) { r(4, 4, 1, 2, P.gem); r(27, 4, 1, 2, P.gem); r(9, 2, 14, 1, P.metalL); }
+    });
+    // изнанка крышки (видна, когда она откинута): перевёрнута и в тени
+    const lidIn = mk(lid.width, lid.height), lx = lidIn.getContext('2d');
+    lx.translate(0, lid.height); lx.scale(1, -1); lx.drawImage(lid, 0, 0);
+    lx.setTransform(1, 0, 0, 1, 0, 0);
+    lx.globalCompositeOperation = 'source-atop'; lx.fillStyle = 'rgba(8,4,20,.5)'; lx.fillRect(0, 0, lid.width, lid.height);
+    // закрытый сундук целиком — для значков в окнах
+    const icon = mk(body.width, body.height + lid.height - PX * 3), ix = icon.getContext('2d');
+    ix.drawImage(body, 0, lid.height - PX * 3);
+    ix.drawImage(lid, 0, 0);
+    return (this._proc[key] = { body, lid, lidIn, icon, PX, hinge: lid.height - PX * 3 });
+  };
+  // картинка сундука для HTML (<img>), с кэшем
+  gfx.chestURL = function (tier) {
+    const key = 'chestURL_' + tier;
+    return this._proc[key] || (this._proc[key] = this.chest(tier).icon.toDataURL());
+  };
+  gfx.chestImg = function (tier, cls) { return '<img class="px-ico' + (cls ? ' ' + cls : '') + '" src="' + this.chestURL(tier) + '" alt="">'; };
+  // сундук на холсте: центр (x, y), ширина w; open 0..1 — крышка откидывается, shake — дрожь крышки
+  // возвращает { mouth } — y щели между крышкой и корпусом (оттуда бьёт свет)
+  gfx.drawChest = function (ctx, tier, x, y, w, open, shake) {
+    const c = this.chest(tier), k = w / c.body.width, bh = c.body.height * k, lh = c.lid.height * k;
+    const top = y - (bh + c.hinge * k) / 2, by = top + c.hinge * k, pivot = top + lh;
+    const sm = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(c.body, x - w / 2, by, w, bh);
+    // крышка поворачивается на петлях: сначала «ложится» к ребру, потом встаёт изнанкой вверх
+    const o = U.clamp(open || 0, 0, 1), s = Math.cos(o * Math.PI), lift = (shake || 0) * k * 3 + o * k * 6;
+    ctx.save();
+    ctx.translate(x, pivot - lift);
+    ctx.scale(1, Math.max(0.06, Math.abs(s)));
+    ctx.drawImage(s >= 0 ? c.lid : c.lidIn, -w / 2, -lh, w, lh);
+    ctx.restore();
+    ctx.imageSmoothingEnabled = sm;
+    return { mouth: by + c.PX * k, top, bottom: by + bh };
+  };
+
   function badge(color, drawIcon) {
     const s = 80, c = mk(s, s), x = c.getContext('2d');
     const hex = () => { x.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; x.lineTo(s / 2 + Math.cos(a) * s * 0.44, s / 2 + Math.sin(a) * s * 0.44); } x.closePath(); };

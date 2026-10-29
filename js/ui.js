@@ -211,6 +211,7 @@
   };
 
   ui.open = function (name) {
+    if (name === 'relics') { SS.relicsUi.show(); return; }
     const sel = SUBS[name];
     if (!sel) return;
     Object.values(SUBS).forEach(ui.hide);
@@ -233,6 +234,8 @@
 
   ui.back = function () {
     if (ui.isShown('#scr-dialog')) { ui.hide('#scr-dialog'); return; }
+    if (ui.isShown('#scr-chest')) { SS.relicsUi.chestClose(); return; }
+    if (ui.isShown('#scr-relics')) { SS.relicsUi.close(); return; }
     if (ui.isShown('#scr-diff')) { A.play('back'); ui.hide('#scr-diff'); if (ui.cur === 'menu') T.back(null); return; }
     if (ui.isShown('#scr-pause')) { game.resume(); return; }
     if (ui.isShown('#scr-gameover')) { ui.toMenu(); return; }
@@ -330,6 +333,7 @@
   }
   function syncDiffGo() {
     $('#modeRow').classList.toggle('off', ui._diffSel === 'daily');
+    SS.relicsUi.renderDiff();
     if (ui._diffSel === 'daily') {
       const ch = M.challenge();
       $('#btnDiffGo span').textContent = 'В БОЙ • ИСПЫТАНИЕ';
@@ -466,6 +470,7 @@
       plvl: $('#hudPowerLvl'), pfill: $('#hudPowerFill'), boss: $('#hudBoss'), bossName: $('#hudBossName'), bossFill: $('#hudBossFill'),
       bossShield: $('#hudBossShield'), combo: $('#hudCombo'), comboMult: $('#hudComboMult'), comboLbl: $('#hudComboLbl'),
       comboTimer: $('#hudComboTimer'), buffs: $('#hudBuffs'), bombs: $('#hudBombs'), bomb: $('#btnBomb'),
+      chests: $('#hudChests'), chestN: $('#hudChestN'),
     };
     ui.buildWeapons();
     ui.buildSkills();
@@ -538,6 +543,13 @@
       const bump = c.coins !== undefined;
       c.coins = run.coins; el.coins.textContent = U.fmt(run.coins);
       if (bump) pulse(el.coinsBox, 'bump', 1.15, 300);
+    }
+    // 4.1: сундуки забега
+    const chN = (run.chests || []).length;
+    if (c.chests !== chN) {
+      const bump = c.chests !== undefined && chN > c.chests;
+      c.chests = chN; el.chests.hidden = !chN; el.chestN.textContent = chN;
+      if (bump) pulse(el.chests, 'bump', 1.2, 400);
     }
     const livesKey = p.lives * 10000 + p.maxLives * 10 + (p.shield ? 2 : 0) + (run.skillFx.sk_barrier > 0 ? 1 : 0);
     if (c.lives !== livesKey) {
@@ -694,6 +706,7 @@
       (mods ? '<div class="rb-row"><small>Модули</small>' + mods + '</div>' : '') +
       (perks ? '<div class="rb-row"><small>Улучшения</small>' + perks + '</div>' : '') +
       (relics ? '<div class="rb-row"><small>Реликвии</small>' + relics + '</div>' : '') +
+      ((run.chests || []).length ? '<div class="rb-row"><small>Сундуки</small>' + run.chests.map((t) => '<span class="rb-chip chest">' + G.chestImg(t) + '</span>').join('') + '</div>' : '') +
       (!mods && !perks && !relics ? '<div class="rb-empty">Пока пусто — модули на станциях, улучшения за кристаллы</div>' : '');
   }
 
@@ -963,7 +976,7 @@
   // ════════════════════════════════════════════════════════════
   ui.showGameOver = function (sum) {
     ui.hideHud();
-    ['#scr-pause', '#scr-perk', '#scr-revive'].forEach(ui.hide);
+    ['#scr-pause', '#scr-perk', '#scr-revive', '#scr-map'].forEach(ui.hide);
     T.closingConfirm(false);
     ui.cur = 'over';
     T.back(() => ui.toMenu());
@@ -999,6 +1012,8 @@
     setTimeout(() => { fill.style.transition = ''; fill.style.width = Math.min(100, s.shipXP / D.shipXpNeed(s.shipLvl) * 100) + '%'; }, 250);
     // что открылось за забег: достижения, раскраски, задания
     const evs = ui.runEvents.slice(0, 8);
+    // 4.1: сундуки — открываются только здесь
+    SS.relicsUi.renderGo((sum.chests || []).length);
     $('#goAch').innerHTML = evs.map((a) => '<span class="chip">' + a.ico + ' ' + U.escape(a.text) + '</span>').join('');
     document.body.classList.add('toasts-bottom');
     setTimeout(() => ui.show('#scr-gameover'), 350);

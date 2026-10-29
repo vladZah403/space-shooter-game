@@ -935,3 +935,79 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .modal::-webkit-scrollbar{display:none}
 .perk-wrap,.map-wrap{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px);overflow-y:auto;scrollbar-width:none}
 .map-box{height:min(46dvh,360px)}
+
+/* ═══════════════════════════════════════════════════════════════
+   4.1 — сундуки и коллекция реликвий
+   ═══════════════════════════════════════════════════════════════ */
+.px-ico{image-rendering:pixelated;image-rendering:crisp-edges;width:100%;height:auto;display:block}
+.perk-ico .px-ico{width:44px}
+.hud-right{gap:6px;align-items:center}
+.hud-chests{display:flex;align-items:center;gap:4px;height:32px;padding:0 9px 0 6px;border-radius:16px;background:rgba(8,12,30,.6);border:1px solid rgba(224,150,90,.4);font-family:var(--font-h);font-size:13px;font-weight:700;color:#ffd29a}
+.hud-chests svg{font-size:18px}
+.hud-chests.bump{animation:bump .4s ease}
+.rb-chip.chest{border-color:rgba(224,150,90,.45);background:rgba(224,150,90,.1);padding:4px}
+/* итоги */
+.go-chests{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(255,200,61,.14),rgba(176,107,255,.12));border:1px solid rgba(255,200,61,.45);box-shadow:0 0 18px rgba(255,200,61,.18);animation:popIn .35s .3s both}
+.gc-row{display:flex;align-items:flex-end;gap:2px;flex-shrink:0}
+.gc-row b{font-family:var(--font-h);font-size:12px;color:var(--gold);margin-left:3px}
+.gc-ico{width:34px!important;animation:gcHop 1.6s ease-in-out infinite}
+@keyframes gcHop{0%,70%,100%{transform:none}78%{transform:translateY(-5px) rotate(-6deg)}86%{transform:translateY(0) rotate(4deg)}}
+.gc-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.gc-txt b{font-family:var(--font-h);font-size:11px;letter-spacing:1px;color:var(--gold)}
+.gc-txt small{font-size:12px;color:var(--muted);line-height:1.15}
+.go-chests .btn{height:40px;padding:0 14px;font-size:12px;flex-shrink:0}
+/* строка реликвий в выборе сложности */
+.relic-row{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:12px;background:rgba(10,16,40,.6);border:1px solid rgba(255,200,61,.3);flex-shrink:0}
+.relic-row small{font-family:var(--font-h);font-size:9px;letter-spacing:1px;color:var(--gold)}
+.rr-slots{display:flex;gap:5px}
+.rr-slots span{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;background:color-mix(in srgb,var(--rc,#fff) 14%,rgba(0,0,0,.4));border:1px solid color-mix(in srgb,var(--rc,#fff) 60%,transparent)}
+.rr-slots span.e{border-style:dashed;border-color:rgba(255,255,255,.2);color:var(--dim);font-size:15px}
+.relic-row em{margin-left:auto;font-style:normal;font-size:12px;color:var(--muted)}
+.relic-row.off{opacity:.4;pointer-events:none}
+/* окно коллекции */
+.relic-modal{max-width:400px;position:relative;padding:18px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.relic-modal .modal-x{top:10px;right:10px}
+.relic-slots{display:flex;align-items:center;justify-content:center;gap:10px}
+.relic-slots>small{font-family:var(--font-h);font-size:9px;letter-spacing:1.2px;color:var(--gold);margin-right:2px}
+.rslot{width:58px;height:58px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:30px;background:rgba(0,0,0,.35);border:2px dashed rgba(255,255,255,.18);color:var(--dim)}
+.rslot.full{border:2px solid var(--rc);background:color-mix(in srgb,var(--rc) 16%,rgba(0,0,0,.4));box-shadow:0 0 14px color-mix(in srgb,var(--rc) 45%,transparent);animation:popIn .25s both}
+.rslot.locked{border-style:solid;border-color:rgba(255,255,255,.08);font-size:18px}
+.rslot.locked small{font-size:10px;margin-top:2px}
+.relic-detail{display:flex;align-items:center;gap:10px;min-height:66px;padding:8px 10px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid color-mix(in srgb,var(--rc,#8e9bc9) 40%,transparent)}
+.rd-empty{font-size:13px;color:var(--muted);text-align:center;width:100%}
+.rd-ico{width:48px;height:48px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;background:color-mix(in srgb,var(--rc) 18%,rgba(0,0,0,.4));border:1px solid var(--rc)}
+.rd-txt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.rd-txt small{font-family:var(--font-h);font-size:9px;letter-spacing:1px;color:var(--rc)}
+.rd-txt b{font-family:var(--font-h);font-size:12px;letter-spacing:.5px}
+.rd-txt span{font-size:13px;color:var(--muted);line-height:1.2}
+.relic-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.rcell{aspect-ratio:1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;background:color-mix(in srgb,var(--rc) 12%,rgba(0,0,0,.4));border:1px solid color-mix(in srgb,var(--rc) 55%,transparent);position:relative;transition:transform .12s}
+.rcell:active{transform:scale(.92)}
+.rcell.unknown{font-family:var(--font-h);font-size:16px;color:color-mix(in srgb,var(--rc) 50%,#556);background:rgba(0,0,0,.35);border-color:color-mix(in srgb,var(--rc) 22%,transparent)}
+.rcell.on{box-shadow:0 0 0 2px var(--rc),0 0 12px var(--rc)}
+.rcell.on::after{content:'✓';position:absolute;right:-3px;top:-5px;width:16px;height:16px;border-radius:8px;background:var(--rc);color:#071022;font-size:11px;font-weight:900;line-height:16px;text-align:center}
+.rcell.sel{outline:2px solid #fff;outline-offset:2px}
+.relic-modal .hint-txt{margin:2px 4px 0;font-size:12.5px;line-height:1.3}
+.relic-modal .hint-txt b{color:var(--text)}
+/* открытие сундука */
+#scr-chest{background:radial-gradient(ellipse at 50% 55%,rgba(40,30,80,.75),rgba(3,4,12,.94))}
+.chest-wrap{width:100%;max-width:420px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.chest-left{min-height:20px;font-size:13px;color:var(--muted)}
+.chest-left b{color:var(--gold)}
+.chest-cv{width:100%;flex:1 1 auto;min-height:220px;max-height:440px;touch-action:none}
+.chest-tip{min-height:22px;font-family:var(--font-h);font-size:12px;letter-spacing:1.5px;color:var(--muted)}
+.chest-tip.tap{color:var(--gold);animation:blink 1.2s ease-in-out infinite}
+.chest-card{width:100%;padding:12px 14px;border-radius:16px;background:linear-gradient(180deg,rgba(22,32,74,.96),rgba(10,15,38,.97));border:1px solid var(--rc,var(--gold));box-shadow:0 0 22px color-mix(in srgb,var(--rc,#ffc83d) 35%,transparent);text-align:center;display:flex;flex-direction:column;gap:4px}
+.chest-card.pop{animation:perkIn .35s both}
+.cc-cap{font-family:var(--font-h);font-size:10px;letter-spacing:1.5px;color:var(--gold)}
+.cc-name{font-family:var(--font-h);font-size:17px;font-weight:900;letter-spacing:1px}
+.cc-desc{font-size:15px;color:var(--text);line-height:1.25}
+.cc-dupe{font-size:13px;color:var(--gold);display:flex;align-items:center;justify-content:center;gap:4px}
+.cc-eq{font-size:12.5px;color:var(--muted)}
+.ca-list{display:flex;flex-direction:column;gap:5px;max-height:34vh;overflow-y:auto;text-align:left}
+.ca-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:10px;background:rgba(0,0,0,.25);border-left:3px solid var(--rc)}
+.ca-ico{font-size:22px;width:30px;text-align:center}
+.ca-row b{font-family:var(--font-h);font-size:11px;letter-spacing:.5px;display:block}
+.ca-row small{font-size:12px;color:var(--muted)}
+.chest-btns{width:100%;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+@media (max-height:680px){.chest-cv{min-height:180px}.rslot{width:50px;height:50px;font-size:26px}.relic-grid{gap:5px}.rcell{font-size:21px}}

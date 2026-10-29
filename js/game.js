@@ -79,7 +79,7 @@
     const S = G.S;
     this.run = {
       score: 0, coins: 0, kills: 0, bosses: 0, bossIds: [], combo: 0, comboT: 0, maxCombo: 0,
-      level: 1, xp: 0, pendingPerks: 0, perks: {}, perkCount: 0, rerolls: 0, relics: {}, map: null, mapNode: null, mapStep: 0,
+      level: 1, xp: 0, pendingPerks: 0, perks: {}, perkCount: 0, rerolls: 0, relics: {}, chests: [], map: null, mapNode: null, mapStep: 0,
       time: 0, shots: 0, hits: 0, pickups: 0, reviveUsed: false, phoenixUsed: false,
       waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, bloodKills: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
@@ -114,6 +114,8 @@
     if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
     SS.comp.start();
     if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
+    // 4.1: реликвии из коллекции, взятые в забег
+    SS.map.startRelics();
     if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = withRng(this.run.perkRng, () => this.perkChoices()).find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
     this.buffs = {};
     this.wave = null;
@@ -1252,7 +1254,7 @@
     const summary = Object.assign({}, result, {
       mode: this.mode, score: run.score, wave: wn, sector: run.sector, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
       time: run.time, coins: run.coins, accuracy: run.shots ? Math.round(Math.min(1, run.hits / run.shots) * 100) : 0,
-      diff: this.diffId, level: run.level, cause: run.lastHit,
+      diff: this.diffId, level: run.level, cause: run.lastHit, chests: (run.chests || []).slice(),
     });
     if (this.mode === 'normal') SS.tg.submitScore({ score: run.score, wave: wn, diff: this.diffId, time: run.time, kills: run.kills, bosses: run.bosses, shots: run.shots, hits: Math.min(run.hits, run.shots) });
     SS.emit('runEnd', summary);
@@ -1919,6 +1921,8 @@
     // 4.0: перед обычной волной — выбор узла на карте сектора (map.js); после выбора снова сюда
     if (this.mode === 'normal' && SS.map.need(n)) { SS.map.offer(n); return; }
     const isBoss = n % 5 === 0 && !surv;
+    // 4.1: в выживании сундук за каждые 10 волн
+    if (surv && n > 1 && (n - 1) % 10 === 0 && this.player.alive) SS.map.giveChest(n > 25 ? 'silver' : 'bronze');
     const sector = Math.floor((n - 1) / 5);
     const tn = n + (this.diff.waveOffset || 0);
     const budget = isBoss ? 0 : (9 + tn * 4.4 + Math.pow(tn, 1.28)) * this.diff.count;
@@ -1998,8 +2002,8 @@
     for (const it of this.pickups) if (it.kind !== 'pu' && it.kind !== 'crate') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
     // после босса — станция и прыжок в следующий сектор; после обычной волны иногда событие
-    // 4.0: после босса — трофей (реликвия), потом станция; после обычной волны — награда узла карты
-    if (w.boss) this.after(0.8, () => { if (this.wave === w && !SS.map.relicOffer('ТРОФЕЙ', 'Босс повержен — выберите реликвию', 'station')) this.offerModules('station'); });
+    // 4.1: после босса — трофейный сундук (откроется после забега), потом станция; после обычной волны — награда узла карты
+    if (w.boss) this.after(0.8, () => { if (this.wave === w) SS.map.chestScene(SS.map.bossChest(), 'ТРОФЕЙ БОССА', () => this.offerModules('station')); });
     else this.after(1.2, () => { if (this.wave === w && !SS.map.reward(w)) this.nextWave(); });
   };
 
@@ -2050,7 +2054,7 @@
     if (k === 'danger') this.run.nextDanger = true;
     if (k === 'mod') { this.offerKind = 'module-buy'; this.state = 'perk'; this.chooseModule(v); }
     if (k === 'perk') { this.grantPerk(v, true); A.play('perk'); }
-    if (k === 'relic') SS.map.grant(v);
+    if (k === 'chest') SS.map.giveChest(v);
     if (k === 'ev') SS.map.resolve(v, id.split(':')[2]);
     if (k === 'deal') {
       const p = this.player;

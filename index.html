@@ -69,6 +69,7 @@
   <symbol id="i-magnet" viewBox="0 0 24 24"><path fill="currentColor" d="M4 3h5v8a3 3 0 0 0 6 0V3h5v8a8 8 0 0 1-16 0zM4 3v3.5h5V3zm11 0v3.5h5V3z"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1.4 2L12 12.4 19.6 7z"/></symbol>
+  <symbol id="i-chest" viewBox="0 0 24 24"><path fill="#8a5228" d="M3 11h18v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path fill="#b0703a" d="M3 10.5V8.5c0-2.2 2-4 4.5-4h9c2.5 0 4.5 1.8 4.5 4v2z"/><path fill="#ffc83d" d="M3 10h18v2H3zM5.5 4.8h2v16.7h-2zM16.5 4.8h2v16.7h-2z"/><rect x="9.8" y="8.6" width="4.4" height="5.6" rx="1" fill="#ffe08a"/><rect x="11.3" y="10.4" width="1.4" height="2.2" fill="#5a3218"/></symbol>
   <symbol id="i-gift" viewBox="0 0 24 24"><path fill="currentColor" d="M3 8h18v4H3zM4.5 12h6.5v9.5H4.5zM13 12h6.5v9.5H13zM11 8h2v13.5h-2zM12 8c-1.5-3-5.5-4.5-6.5-2.5S8 8 12 8zm0 0c1.5-3 5.5-4.5 6.5-2.5S16 8 12 8z"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.5" fill="currentColor"/><path fill="currentColor" d="M3.5 21a8.5 8.5 0 0 1 17 0z"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path fill="currentColor" d="M4 20h17v2H2V3h2zM6 14h3v5H6zm5-5h3v10h-3zm5-4h3v14h-3z"/></symbol>
@@ -93,6 +94,7 @@
       <div class="hud-wave" id="hudWave">ВОЛНА 1</div>
     </div>
     <div class="hud-right">
+      <div class="hud-chests" id="hudChests" hidden><svg><use href="#i-chest"/></svg><span id="hudChestN">0</span></div>
       <div class="hud-coins"><svg><use href="#i-coin"/></svg><span id="hudCoins">0</span></div>
     </div>
   </div>
@@ -162,6 +164,7 @@
     <nav class="menu-bar">
       <button class="mb-btn t-pink" data-go="leaders"><svg><use href="#i-trophy"/></svg><span>Рейтинг</span></button>
       <button class="mb-btn t-green" data-go="achievements"><svg><use href="#i-medal"/></svg><span>Награды</span><small class="mb-count" id="achCount">0 / 0</small><i class="badge" id="badgeAch" hidden></i></button>
+      <button class="mb-btn t-gold" data-go="relics"><svg><use href="#i-chest"/></svg><span>Реликвии</span><i class="badge" id="badgeRelics" hidden></i></button>
       <button class="mb-btn t-cyan" data-go="codex"><svg><use href="#i-list"/></svg><span>Справочник</span></button>
       <button class="mb-btn t-blue" data-go="suggest"><svg><use href="#i-mail"/></svg><span>Идея</span></button>
       <button class="mb-btn t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><span>Настройки</span></button>
@@ -304,6 +307,7 @@
       <div class="go-record" id="goRecord" hidden>НОВЫЙ РЕКОРД!</div>
       <div class="go-best">Рекорд: <b id="goBest">0</b></div>
     </div>
+    <div class="go-chests" id="goChests" hidden></div>
     <div class="go-stats" id="goStats"></div>
     <div class="run-build" id="goBuild"></div>
     <div class="go-rewards">
@@ -384,7 +388,34 @@
     <div class="diff-list" id="diffList"></div>
     <div class="diff-desc2" id="diffDesc2"></div>
     <div class="mode-row" id="modeRow"></div>
+    <button class="relic-row" id="diffRelics"></button>
     <button class="btn primary big wide" id="btnDiffGo"><svg><use href="#i-play"/></svg><span>В БОЙ</span></button>
+  </div>
+</section>
+
+<!-- ═══ РЕЛИКВИИ (4.1): коллекция из сундуков и слоты в забег ═══ -->
+<section id="scr-relics" class="screen overlay">
+  <div class="modal relic-modal">
+    <button class="modal-x" id="btnRelicsClose" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+    <div class="modal-title">РЕЛИКВИИ</div>
+    <div class="relic-slots" id="relicSlots"></div>
+    <div class="relic-detail" id="relicDetail"></div>
+    <div class="relic-grid" id="relicGrid"></div>
+    <div class="hint-txt" id="relicHint"></div>
+  </div>
+</section>
+
+<!-- ═══ ОТКРЫТИЕ СУНДУКА (4.1) ═══ -->
+<section id="scr-chest" class="screen overlay top">
+  <div class="chest-wrap">
+    <div class="chest-left" id="chestLeft"></div>
+    <canvas class="chest-cv" id="chestCv"></canvas>
+    <div class="chest-tip" id="chestTip">Нажмите на сундук</div>
+    <div class="chest-card" id="chestCard" hidden></div>
+    <div class="chest-btns">
+      <button class="btn primary wide" id="btnChestNext" hidden>ДАЛЬШЕ</button>
+      <button class="btn ghost wide" id="btnChestAll">ОТКРЫТЬ ВСЕ</button>
+    </div>
   </div>
 </section>
 
@@ -445,6 +476,7 @@
 <script src="js/intro.js?v=4.0.1"></script>
 <script src="js/demo.js?v=4.0.1"></script>
 <script src="js/ui.js?v=4.0.1"></script>
+<script src="js/relics.js?v=4.0.1"></script>
 <script src="js/main.js?v=4.0.1"></script>
 </body>
 </html>
