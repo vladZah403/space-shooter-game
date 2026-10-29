@@ -59,6 +59,7 @@
     tabs('#hangarTabs', (t) => ui.renderHangar(t));
     tabs('#arsenalTabs', (t) => ui.renderArsenal(t));
     tabs('#skillTabs', (t) => ui.renderSkills(t));
+    tabs('#codexTabs', (t) => ui.renderCodex(t));
     tabs('#lbTabs', (t) => ui.renderLeaders(t));
     ui.bindSkillReset();
     $('#lbList').addEventListener('click', (e) => {
@@ -180,7 +181,7 @@
   // ════════════════════════════════════════════════════════════
   // ЭКРАНЫ
   // ════════════════════════════════════════════════════════════
-  const SUBS = { pilot: '#scr-pilot', hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest' };
+  const SUBS = { pilot: '#scr-pilot', hangar: '#scr-hangar', arsenal: '#scr-arsenal', skills: '#scr-skills', missions: '#scr-missions', leaders: '#scr-leaders', achievements: '#scr-achievements', settings: '#scr-settings', suggest: '#scr-suggest', codex: '#scr-codex' };
 
   // холст закрыт экраном меню (непрозрачный), окном с размытием или итогами — main.js его тогда не перерисовывает
   function syncCover() { ui.covered = !!document.querySelector('.screen.show.sub, .screen.show.overlay, #scr-gameover.show'); }
@@ -217,6 +218,7 @@
     if (name === 'skills') ui.renderSkills(activeTab('#skillTabs') || 'combat');
     if (name === 'leaders') ui.renderLeaders(activeTab('#lbTabs') || 'world');
     if (name === 'achievements') ui.renderAchievements();
+    if (name === 'codex') ui.renderCodex(activeTab('#codexTabs') || 'foes');
     if (name === 'settings') ui.renderSettings();
     if (name === 'suggest') ui.renderSuggest();
     if (name === 'missions') ui.renderMissions();
@@ -563,7 +565,7 @@
     const perfect = run.waveDamage === 0 && g.wave && !g.wave.cleared && g.state === 'play';
     let buffKey = perfect ? 'P' : '';
     for (const k in g.buffs) buffKey += k + Math.ceil(g.buffs[k]);
-    if (run.skillFx.sk_overclock > 0) buffKey += 'oc' + Math.ceil(run.skillFx.sk_overclock);
+    for (const id in run.skillFx) if (run.skillFx[id] > 0) buffKey += id + Math.ceil(run.skillFx[id]);
     if (run.overload > 0) buffKey += 'ol' + Math.ceil(run.overload);
     const wev = SS.events.active();
     if (wev) buffKey += 'ev' + wev.id;
@@ -573,7 +575,8 @@
       let h = wev ? '<div class="buff" style="--bc:' + wev.color + '">' + wev.ico + ' ' + wev.name + '</div>' : '';
       if (perfect) h += '<div class="buff" style="--bc:#3dffa2">' + ic('star') + 'БЕЗ УРОНА ×2</div>';
       for (const k of Object.keys(g.buffs)) { const def = D.POWERUPS[k]; h += '<div class="buff" style="--bc:' + def.color + '">' + ic(icons[k] || 'star') + Math.ceil(g.buffs[k]) + 'с</div>'; }
-      if (run.skillFx.sk_overclock > 0) h += '<div class="buff" style="--bc:#3de0ff">' + ic('bolt') + 'РАЗГОН ' + Math.ceil(run.skillFx.sk_overclock) + 'с</div>';
+      // 3.1: сколько ещё работают активные навыки
+      for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) h += '<div class="buff" style="--bc:#3de0ff">' + D.SKILLS[id].ico + ' ' + D.SKILLS[id].name + ' ' + Math.ceil(run.skillFx[id]) + 'с</div>';
       if (run.overload > 0) h += '<div class="buff" style="--bc:#ffc83d">' + ic('bolt') + 'ПЕРЕГРУЗКА</div>';
       el.buffs.innerHTML = h;
     }
@@ -1353,6 +1356,39 @@
   // ════════════════════════════════════════════════════════════
   // НАГРАДЫ
   // ════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
+  // СПРАВОЧНИК (3.1): встреченные враги — с картинкой и защитой; секторы — с механикой
+  // ════════════════════════════════════════════════════════════
+  const W_LETTER = { laser: 'Л', shotgun: 'Д', rocket: 'Р', arc: 'С', plasma: 'П', lightning: 'М', darkmatter: 'Т' };
+  ui.renderCodex = function (tab) {
+    const s = store.s, seen = s.foeSeen || [], G = SS.gfx;
+    const foes = Object.keys(D.ENEMIES).filter((k) => { const d = D.ENEMIES[k]; return (d.weight > 0 || d.mini) && d.wave < 99; }).sort((a, b) => D.ENEMIES[a].wave - D.ENEMIES[b].wave);
+    $('#codexTotal').textContent = foes.filter((k) => seen.includes(k)).length + '/' + foes.length;
+    const list = $('#codexList');
+    if (tab === 'sectors') {
+      const ss = s.sectorSeen || [];
+      list.innerHTML = D.SECTORS.map((sec, i) => {
+        const open = ss.includes(i) || i === 0;
+        return '<div class="ach-item' + (open ? ' done' : '') + '"><div class="ach-ico" style="background:linear-gradient(135deg,' + sec.sky[1] + ',' + sec.neb[0] + ')">' + (open ? '🪐' : '?') + '</div><div class="ach-info"><div class="ach-name" style="color:' + sec.neb[1] + '">' + (open ? sec.name : '???') + '</div><div class="ach-desc">' + (open ? U.escape(sec.desc || 'Без особых правил') : 'Ещё не открыт — встретится в одном из забегов') + '</div></div></div>';
+      }).join('');
+      return;
+    }
+    list.innerHTML = foes.map((k) => {
+      const d = D.ENEMIES[k], known = seen.includes(k);
+      const guard = d.guard ? '<span class="cx-guard" style="--gc:' + D.WEAPONS[d.guard].color + '">' + W_LETTER[d.guard] + '</span>' : '';
+      const desc = known ? (d.hint || (d.mini ? 'Мини-босс' : 'С ' + d.wave + '-й волны')) : 'Встречается с ' + d.wave + '-й волны';
+      return '<div class="ach-item cx-item' + (known ? ' done' : '') + '"><canvas class="cx-ico" data-spr="' + (known ? d.sprite : '') + '" width="88" height="88"></canvas><div class="ach-info"><div class="ach-name">' + (known ? d.name.toUpperCase() : '???') + ' ' + (known ? guard : '') + '</div><div class="ach-desc">' + U.escape(desc) + '</div></div></div>';
+    }).join('');
+    // картинки врагов — из атласа, носом вниз, как в бою (незнакомые — тёмный силуэт не рисуем)
+    $$('#codexList canvas.cx-ico').forEach((cv) => {
+      const name = cv.dataset.spr, f = name && G.frame(name), img = f && G.src(f), x = cv.getContext('2d');
+      x.clearRect(0, 0, 88, 88);
+      if (!img) { x.fillStyle = 'rgba(255,255,255,.12)'; x.font = '900 40px Orbitron, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', 44, 46); return; }
+      const k = Math.min(76 / f[2], 76 / f[3]), w = f[2] * k, h = f[3] * k;
+      x.save(); x.translate(44, 44); x.rotate(Math.PI); x.drawImage(img, f[0], f[1], f[2], f[3], -w / 2, -h / 2, w, h); x.restore();
+    });
+  };
+
   ui.renderAchievements = function () {
     const s = store.s;
     const done = (a) => !!s.achievements[a.id];

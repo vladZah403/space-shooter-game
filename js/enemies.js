@@ -100,6 +100,8 @@
     if (e.ty) e.ty = Math.max(e.ty, minY(e));
     game.enemies.push(e);
     if (def.hint) SS.foes.seen(e);
+    const seen = SS.meta.s.foeSeen || (SS.meta.s.foeSeen = []);
+    if (!seen.includes(type)) { seen.push(type); SS.store.soon(); }
     return e;
   };
 

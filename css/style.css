@@ -363,6 +363,10 @@ svg{width:1em;height:1em;flex-shrink:0}
 
 /* ═══ НАГРАДЫ ═══ */
 .ach-list{display:flex;flex-direction:column;gap:8px}
+/* справочник (3.1) */
+.cx-ico{width:44px;height:44px;border-radius:12px;background:rgba(0,0,0,.3);flex-shrink:0}
+.cx-guard{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:4px;border-radius:50%;border:1.5px solid var(--gc);color:var(--gc);font-size:9px;vertical-align:middle;position:relative}
+.cx-guard::after{content:'';position:absolute;left:2px;right:2px;top:50%;height:1.5px;background:#ff3d5a;transform:rotate(-45deg)}
 .ach-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
 .ach-item .ach-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(0,0,0,.3);flex-shrink:0;filter:grayscale(1);opacity:.5}
 .ach-item.done .ach-ico{filter:none;opacity:1;background:rgba(255,200,61,.12);box-shadow:0 0 14px rgba(255,200,61,.2)}

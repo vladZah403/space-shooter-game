@@ -161,6 +161,7 @@
       <button class="tile t-green" data-go="achievements"><svg><use href="#i-medal"/></svg><b>НАГРАДЫ</b><small id="achCount">0 / 0</small><i class="badge" id="badgeAch" hidden></i></button>
       <button class="tile t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><b>НАСТРОЙКИ</b><small>Звук</small></button>
       <button class="tile t-blue" data-go="suggest"><svg><use href="#i-mail"/></svg><b>ИДЕЯ</b><small>Написать</small></button>
+      <button class="tile t-cyan" data-go="codex"><svg><use href="#i-list"/></svg><b>СПРАВОЧНИК</b><small id="codexCount">Враги</small></button>
     </nav>
 
     <footer class="menu-foot">
@@ -247,6 +248,18 @@
 <section id="scr-achievements" class="screen sub">
   <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>НАГРАДЫ</h2><div class="wallet sm"><svg><use href="#i-medal"/></svg><span id="achTotal">0</span></div></div>
   <div class="sub-body"><div id="achList" class="ach-list"></div></div>
+</section>
+
+<!-- ═══ СПРАВОЧНИК (3.1): встреченные враги и механики секторов ═══ -->
+<section id="scr-codex" class="screen sub">
+  <div class="sub-head"><button class="back-btn" data-back><svg><use href="#i-back"/></svg></button><h2>СПРАВОЧНИК</h2><div class="wallet sm"><svg><use href="#i-list"/></svg><span id="codexTotal">0</span></div></div>
+  <div class="sub-body">
+    <div class="tabs" id="codexTabs">
+      <button class="tab active" data-tab="foes">ВРАГИ</button>
+      <button class="tab" data-tab="sectors">СЕКТОРЫ</button>
+    </div>
+    <div id="codexList" class="ach-list"></div>
+  </div>
 </section>
 
 <!-- ═══ НАСТРОЙКИ ═══ -->
