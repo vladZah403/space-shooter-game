@@ -364,8 +364,14 @@
   // ════════════════════════════════════════════════════════════
   // ФОН
   // ════════════════════════════════════════════════════════════
+  function shrinkCanvas(c, k) {
+    const o = mk(Math.max(2, Math.round(c.width * k)), Math.max(2, Math.round(c.height * k)));
+    o.getContext('2d').drawImage(c, 0, 0, o.width, o.height);
+    return o;
+  }
   const bg = {
     sector: -1, layers: [], stars: [], dust: [], planet: null,
+    feats: [], bright: [], comets: [], ships: [], cometT: 4, shipT: 6,
     warp: 0, scroll: 0, fade: 1, prev: null,
 
     init(sectorIdx) {
@@ -384,6 +390,78 @@
       }
       this.dust = [];
       for (let i = 0; i < 26; i++) this.dust.push({ x: Math.random() * W, y: Math.random() * H, len: U.rand(10, 40), a: U.rand(0.05, 0.16) });
+      // 4.0: несколько ярких звёзд с лучами — мерцают
+      this.bright = [];
+      for (let i = 0; i < 7; i++) this.bright.push({ x: Math.random() * W, y: Math.random() * H, s: U.rand(9, 18), ph: Math.random() * U.TAU, sp: U.rand(0.6, 1.6) });
+    },
+    // звезда с четырьмя лучами (рисуется один раз, дальше копируется)
+    spike() {
+      if (this._spike) return this._spike;
+      const s = 64, c = mk(s, s), x = c.getContext('2d'), h = s / 2;
+      const g = x.createRadialGradient(h, h, 0, h, h, h * 0.35);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(0, 0, s, s);
+      for (const [w, l] of [[1.6, h], [0.9, h * 0.6]]) {
+        const lg = x.createLinearGradient(0, h, s, h);
+        lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,.9)'); lg.addColorStop(1, 'rgba(255,255,255,0)');
+        x.fillStyle = lg;
+        x.fillRect(h - l, h - w / 2, l * 2, w);
+        x.save(); x.translate(h, h); x.rotate(Math.PI / 2); x.fillRect(-l, -w / 2, l * 2, w); x.restore();
+      }
+      return (this._spike = c);
+    },
+    // 4.0: своя деталь вдали у каждого сектора (по порядку D.SECTORS)
+    makeFeats(sec, idx) {
+      const kinds = ['sun', 'rocks', 'galaxy', 'moons', 'giant', 'galaxy', 'blackhole', 'core', 'rocks', 'moons', 'rocks', 'sun', 'blackhole'];
+      const kind = kinds[idx % kinds.length], W = gfx.W, H = gfx.H, out = [];
+      const col = sec.neb[0], col2 = sec.neb[1];
+      if (kind === 'sun' || kind === 'giant') {
+        const giant = kind === 'giant', R = giant ? W * 0.9 : W * 0.12, s = Math.ceil(R * (giant ? 2.4 : 5)), c = mk(s, s), x = c.getContext('2d'), h = s / 2;
+        const g = x.createRadialGradient(h, h, R * 0.2, h, h, h);
+        g.addColorStop(0, giant ? 'rgba(255,120,70,.9)' : 'rgba(255,250,230,1)'); g.addColorStop(giant ? 0.4 : 0.12, giant ? 'rgba(255,60,40,.55)' : hexA(sec.star, 0.7));
+        g.addColorStop(0.5, hexA(giant ? '#ff2d4d' : col, 0.12)); g.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = g; x.fillRect(0, 0, s, s);
+        if (giant) { x.globalAlpha = 0.18; for (let i = 0; i < 30; i++) { x.fillStyle = Math.random() < 0.5 ? '#ffb03d' : '#7a1020'; x.beginPath(); x.arc(h + U.rand(-R, R) * 0.4, h + U.rand(-R, R) * 0.4, U.rand(4, 20), 0, U.TAU); x.fill(); } }
+        out.push({ c, x: giant ? W * 0.5 : W * U.rand(0.1, 0.9), y: giant ? H * 1.15 : H * 0.12, s, speed: 0.6, fixed: true });
+      } else if (kind === 'blackhole') {
+        const R = W * 0.16, s = Math.ceil(R * 5), c = mk(s, s), x = c.getContext('2d'), h = s / 2;
+        const glow = x.createRadialGradient(h, h, R * 0.5, h, h, h);
+        glow.addColorStop(0, hexA(col, 0.4)); glow.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = glow; x.fillRect(0, 0, s, s);
+        // аккреционный диск — наклонное кольцо, ближняя часть ярче
+        x.save(); x.translate(h, h); x.rotate(-0.35); x.scale(1, 0.32);
+        for (let i = 0; i < 18; i++) { x.strokeStyle = hexA(i % 2 ? col2 : '#ffb03d', 0.12); x.lineWidth = R * 0.12; x.beginPath(); x.arc(0, 0, R * (1.15 + i * 0.05), 0, U.TAU); x.stroke(); }
+        x.restore();
+        x.fillStyle = '#000'; x.beginPath(); x.arc(h, h, R * 0.62, 0, U.TAU); x.fill();
+        x.strokeStyle = hexA('#ffd9a0', 0.7); x.lineWidth = 2; x.beginPath(); x.arc(h, h, R * 0.66, 0, U.TAU); x.stroke();
+        out.push({ c, x: W * U.rand(0.2, 0.8), y: H * 0.3, s, speed: 0.8, fixed: true, spin: 0 });
+      } else if (kind === 'galaxy' || kind === 'core') {
+        const R = W * (kind === 'core' ? 0.45 : 0.24), s = Math.ceil(R * 2.4), c = mk(s, s), x = c.getContext('2d'), h = s / 2;
+        x.globalCompositeOperation = 'lighter';
+        const core = x.createRadialGradient(h, h, 0, h, h, R * (kind === 'core' ? 0.7 : 0.35));
+        core.addColorStop(0, 'rgba(255,245,220,.8)'); core.addColorStop(0.4, hexA(col, 0.35)); core.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = core; x.fillRect(0, 0, s, s);
+        x.save(); x.translate(h, h); x.scale(1, 0.55); x.rotate(0.4);
+        for (let arm = 0; arm < 2; arm++) for (let i = 0; i < 260; i++) {
+          const t = i / 260, a = arm * Math.PI + t * 7, r = R * (0.08 + t * 0.9);
+          x.fillStyle = hexA(i % 3 ? col : col2, 0.5 * (1 - t));
+          x.fillRect(Math.cos(a) * r + U.rand(-6, 6), Math.sin(a) * r + U.rand(-6, 6), 2, 2);
+        }
+        x.restore();
+        out.push({ c, x: W * U.rand(0.25, 0.75), y: -s / 2, s, speed: kind === 'core' ? 2 : 3 });
+      } else if (kind === 'moons') {
+        for (let i = 0; i < 2; i++) { const p = this.makePlanet(Object.assign({}, sec, { planet: sec.planet + 40 + i * 60 })); p.c = shrinkCanvas(p.c, 0.45 - i * 0.12); p.s = p.c.width; p.y = -p.s - H * (0.3 + i * 0.6); p.speed = 6 + i * 3; out.push(p); }
+      } else if (kind === 'rocks') {
+        // далёкие глыбы: тёмные многоугольники с подсветкой края
+        for (let i = 0; i < 9; i++) {
+          const r = U.rand(6, 18), s = Math.ceil(r * 2.6), c = mk(s, s), x = c.getContext('2d'), h = s / 2, n = 7;
+          x.beginPath();
+          for (let k = 0; k <= n; k++) { const a = k / n * U.TAU, rr = r * U.rand(0.7, 1); if (k) x.lineTo(h + Math.cos(a) * rr, h + Math.sin(a) * rr); else x.moveTo(h + Math.cos(a) * rr, h + Math.sin(a) * rr); }
+          x.fillStyle = '#0d0f1c'; x.fill(); x.strokeStyle = hexA(col, 0.5); x.lineWidth = 1.2; x.stroke();
+          out.push({ c, x: Math.random() * W, y: Math.random() * H, s, speed: U.rand(18, 30), rock: true });
+        }
+      }
+      return out;
     },
     setSector(idx, instant) {
       const sec = D.SECTORS[((idx % D.SECTORS.length) + D.SECTORS.length) % D.SECTORS.length];
@@ -395,6 +473,8 @@
       this.sky = this.makeSky(sec);
       this.layers = [this.makeNebula(sec, 0.5, 1), this.makeNebula(sec, 0.35, 2)];
       this.planet = this.makePlanet(sec);
+      this.prevFeats = instant ? null : this.feats;
+      this.feats = this.makeFeats(sec, ((idx % D.SECTORS.length) + D.SECTORS.length) % D.SECTORS.length);
     },
     makeSky(sec) {
       const c = mk(4, 256), x = c.getContext('2d');
@@ -488,6 +568,25 @@
         p.y += p.speed * dt * sp;
         if (p.y - p.s / 2 > H) { p.y = -p.s / 2 - H * U.rand(1.5, 3); p.x = U.rand(0.1, 0.9) * W; }
       }
+      // 4.0: детали сектора, кометы и далёкие корабли
+      for (const f of this.feats) {
+        f.y += f.speed * dt * sp;
+        if (f.y - f.s / 2 > H) { f.y = -f.s / 2 - (f.rock ? Math.random() * H * 0.5 : H * U.rand(1, 2)); if (f.rock) f.x = Math.random() * W; }
+      }
+      this.cometT -= dt;
+      if (this.cometT <= 0) {
+        this.cometT = U.rand(6, 13);
+        const fromL = Math.random() < 0.5, a = fromL ? U.rand(0.35, 0.7) : Math.PI - U.rand(0.35, 0.7), v = U.rand(260, 420);
+        this.comets.push({ x: fromL ? -30 : W + 30, y: U.rand(0.02, 0.4) * H, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 3, len: U.rand(60, 120) });
+      }
+      for (let i = this.comets.length - 1; i >= 0; i--) { const c = this.comets[i]; c.x += c.vx * dt; c.y += c.vy * dt; c.life -= dt; if (c.life <= 0) this.comets.splice(i, 1); }
+      this.shipT -= dt;
+      if (this.shipT <= 0 && gfx.img) {
+        this.shipT = U.rand(10, 20);
+        const spr = U.pick(['e_cruiser', 'e_heavyfighter', 'e_bombardier', 'interceptor', 'gunship']), n = U.randi(1, 3), up = Math.random() < 0.5;
+        for (let i = 0; i < n; i++) this.ships.push({ spr, x: U.rand(0.15, 0.85) * W + i * 22, y: up ? H + 40 + i * 26 : -40 - i * 26, vy: (up ? -1 : 1) * U.rand(30, 45), w: U.rand(16, 26) });
+      }
+      for (let i = this.ships.length - 1; i >= 0; i--) { const s = this.ships[i]; s.y += s.vy * dt * (0.6 + sp * 0.4); if (s.y < -80 || s.y > H + 80) this.ships.splice(i, 1); }
     },
 
     // небо и туманности одного сектора
@@ -546,6 +645,11 @@
       ctx.drawImage(this.compose(quality), 0, 0, W, H);
       // при смене сектора старая планета гаснет, новая проявляется
       if (fading) this.drawPlanet(ctx, this.prev.planet, 1 - this.fade);
+      // 4.0: детали сектора (солнце, гигант, чёрная дыра, галактика, луны, глыбы)
+      if (quality > 0) {
+        if (fading && this.prevFeats) for (const f of this.prevFeats) this.drawPlanet(ctx, f, (1 - this.fade) * (f.rock ? 0.8 : 1));
+        for (const f of this.feats) this.drawPlanet(ctx, f, (fading ? this.fade : 1) * (f.rock ? 0.8 : 1));
+      }
       this.drawPlanet(ctx, this.planet, fading ? this.fade : 1);
       // звёзды
       const t = performance.now() / 1000;
@@ -562,6 +666,29 @@
         } else {
           ctx.fillRect(st.x, st.y, st.s, st.s);
         }
+      }
+      // яркие звёзды с лучами, кометы и далёкие корабли
+      if (quality > 0) {
+        const sp = this.spike();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const b of this.bright) {
+          const k = 0.45 + 0.4 * Math.sin(t * b.sp + b.ph), s = b.s * (0.8 + 0.3 * k);
+          ctx.globalAlpha = k;
+          ctx.drawImage(sp, b.x - s, b.y - s, s * 2, s * 2);
+        }
+        for (const c of this.comets) {
+          const a = Math.min(1, c.life), d = Math.hypot(c.vx, c.vy), tx = c.x - c.vx / d * c.len, ty = c.y - c.vy / d * c.len;
+          const g = ctx.createLinearGradient(c.x, c.y, tx, ty);
+          g.addColorStop(0, 'rgba(255,255,255,' + (0.9 * a).toFixed(2) + ')'); g.addColorStop(0.2, hexA(col, 0.5 * a)); g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.globalAlpha = 1; ctx.strokeStyle = g; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(tx, ty); ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        for (const s of this.ships) {
+          ctx.globalAlpha = 0.28;
+          gfx.draw(ctx, s.spr, s.x, s.y, s.w, s.vy > 0 ? Math.PI : 0);
+        }
+        ctx.globalAlpha = 1;
       }
       // пыль скорости
       // только во время гиперпрыжка: в обычном полёте одиночные штрихи выглядели как царапины на экране,
