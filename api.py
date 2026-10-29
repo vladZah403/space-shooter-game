@@ -37,7 +37,7 @@ MAX_LEADERBOARD_LIMIT = 50
 INIT_DATA_MAX_AGE = 24 * 3600          # initData старше суток не принимаем
 SCORE_COOLDOWN = 8                     # секунд между результатами одного игрока
 SUGGESTION_COOLDOWN = 60               # секунд между предложениями одного игрока
-DIFFICULTIES = {'zen', 'easy', 'normal', 'hard', 'nightmare', 'god'}
+DIFFICULTIES = {'zen', 'easy', 'normal', 'hard', 'nightmare', 'god', 'hell'}
 CATEGORIES = {
     'gameplay': '🎮 Геймплей', 'balance': '⚖️ Баланс', 'graphics': '🎨 Графика',
     'music': '🎵 Музыка', 'bug': '🐛 Баг-репорт', 'general': '💡 Общее',

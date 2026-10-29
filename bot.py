@@ -3,6 +3,7 @@ Space Shooter Telegram Bot v2.0
 Улучшенная версия с достижениями, заданиями и расширенной статистикой
 """
 
+import html
 import logging
 import logging.handlers
 import json
@@ -16,7 +17,7 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 from database import db, DatabaseError
-from api import run_api_server
+from api import DIFFICULTIES as GAME_DIFFICULTIES, _int, run_api_server
 from config import (
     BOT_TOKEN, GAME_URL, DIFFICULTIES, ACHIEVEMENTS,
     Messages, BOT_COMMANDS, LEADERBOARD_SIZE, ADMIN_CHAT_ID,
@@ -86,7 +87,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     rank = db.get_user_rank(user.id) or '—'
     
     welcome_text = Messages.WELCOME.format(
-        name=user.first_name,
+        name=html.escape(user.first_name or ''),
         best_score=stats['best_score'],
         games_played=stats['games_played'],
         rank=rank
@@ -156,7 +157,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     avg_dur_str = f"{avg_dur // 60}м {avg_dur % 60}с" if avg_dur > 0 else "—"
 
     stats_text = f"""
-📊 <b>Статистика игрока {user.first_name}</b>
+📊 <b>Статистика игрока {html.escape(user.first_name or '')}</b>
 
 <b>🏆 Основные показатели:</b>
 • Лучший счет: <code>{stats['best_score']}</code>
@@ -225,7 +226,7 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         medal = medals[i-1] if i <= 3 else f"{i}."
         premium = "⭐" if player.get('is_premium') else ""
         leaderboard_text += (
-            f"{medal} {player['name']} {premium}\n"
+            f"{medal} {html.escape(str(player['name']))} {premium}\n"
             f"   └ <code>{player['score']}</code> очков "
             f"({player['games_played']} игр)\n"
         )
@@ -274,7 +275,7 @@ async def achievements_command(update: Update, context: ContextTypes.DEFAULT_TYP
     stats = db.get_user_stats(user.id) or {}
     stats['rank'] = db.get_user_rank(user.id) or 999
 
-    achievements_text = f"🎯 <b>Достижения {user.first_name}</b>\n\n"
+    achievements_text = f"🎯 <b>Достижения {html.escape(user.first_name or '')}</b>\n\n"
     achievements_text += f"Разблокировано: {len(unlocked)}/{len(ACHIEVEMENTS)}\n\n"
 
     for key, achievement in ACHIEVEMENTS.items():
@@ -470,7 +471,7 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     welcome_text = f"""
 🚀 <b>Space Shooter - Главное меню</b>
 
-Привет, {user.first_name}! Готовы к новым космическим приключениям?
+Привет, {html.escape(user.first_name or '')}! Готовы к новым космическим приключениям?
 
 <b>📊 Ваша статистика:</b>
 🏆 Лучший счет: <code>{stats['best_score']}</code>
@@ -515,15 +516,20 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         user_id = update.effective_user.id
         user = update.effective_user
 
-        score = data.get('score', 0)
-        level = data.get('level', 1)
-        difficulty = data.get('difficulty', 'normal')
-        duration = data.get('duration_seconds', 0)
-        enemies_killed = data.get('enemies_killed', 0)
-        accuracy = data.get('accuracy_percent', 0.0)
+        # данные присылает клиент — приводим к числам и границам, как в api.py
+        score = _int(data.get('score'), 0, 500_000_000)
+        level = _int(data.get('level'), 1, 9999, 1)
+        difficulty = data.get('difficulty') if data.get('difficulty') in GAME_DIFFICULTIES else 'normal'
+        duration = _int(data.get('duration_seconds'), 0, 24 * 3600)
+        enemies_killed = _int(data.get('enemies_killed'), 0, 10_000_000)
+        accuracy = _int(data.get('accuracy_percent'), 0, 100)
         # Новые поля аналитики
-        bosses_killed = data.get('bosses_killed', 0)
-        level_deltas  = data.get('level_deltas', [])   # секунды между уровнями
+        bosses_killed = _int(data.get('bosses_killed'), 0, 100_000)
+        level_deltas = data.get('level_deltas')   # секунды между уровнями
+        level_deltas = [x for x in level_deltas if isinstance(x, (int, float))][:500] if isinstance(level_deltas, list) else []
+        if score > duration * 150_000 + 50_000:
+            logger.warning(f'⚠️ Подозрительный результат (sendData): user={user_id} score={score} dur={duration}')
+            return
 
         # Вычисляем агрегаты из дельт уровней
         avg_level_time = round(sum(level_deltas) / len(level_deltas), 1) if level_deltas else 0
@@ -699,11 +705,11 @@ async def suggestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             try:
                 admin_msg = (
                     f"📬 <b>Новое предложение по игре!</b>\n\n"
-                    f"👤 От: {user.first_name}"
-                    + (f" @{user.username}" if user.username else "")
+                    f"👤 От: {html.escape(user.first_name or '')}"
+                    + (f" @{html.escape(user.username)}" if user.username else "")
                     + f" (ID: <code>{user.id}</code>)\n"
                     f"📁 Категория: {cat_label}\n\n"
-                    f"💬 <b>Текст:</b>\n{suggestion_text}"
+                    f"💬 <b>Текст:</b>\n{html.escape(suggestion_text)}"
                 )
                 await context.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
