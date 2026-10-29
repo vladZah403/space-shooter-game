@@ -739,7 +739,15 @@
   }
 
   // длинный заголовок («Стартовый модуль») мельче — иначе на узком экране он ломается на две строки
-  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; SS.scenes.portrait($('#perkArt'), false); $('#btnPerkShip').hidden = true; }
+  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; SS.scenes.portrait($('#perkArt'), false); $('#btnPerkShip').hidden = true; $('#perkCards').classList.remove('dense'); }
+  // метка справа («ЛЕГЕНДАРНОЕ», «● 320 · мало») бывает шире обычной — название не должно под неё заезжать.
+  // Мерить можно только на показанном окне
+  function fitPerkRar() {
+    for (const c of $('#perkCards').children) {
+      const r = c.querySelector('.perk-rar'), n = c.querySelector('.perk-name');
+      if (r && n) n.style.paddingRight = Math.max(58, r.offsetWidth + 6) + 'px';
+    }
+  }
 
   // ════════════════════════════════════════════════════════════
   // СХЕМА КОРАБЛЯ (3.1): модули забега по отсекам. Картинка — tools/make_cutaway.py,
@@ -856,6 +864,7 @@
     $('#perkRerollCost').innerHTML = ic('coin', 'coin-ico') + cost;
     $('#btnPerkReroll').disabled = store.s.coins < cost && !SS.DEV;
     ui.show('#scr-perk');
+    fitPerkRar();
     // защита от случайного нажатия пальцем, который вёл корабль
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), reroll ? 120 : 480);
   };
@@ -884,6 +893,7 @@
       box.appendChild(b);
     });
     ui.show('#scr-perk');
+    fitPerkRar();
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
   };
 
@@ -900,6 +910,8 @@
     $('#perkSub').textContent = offer.sub;
     $('#btnPerkReroll').hidden = true;
     box.innerHTML = '';
+    // торговец: портрет и 4–5 карточек — плотнее, чтобы «Пройти мимо» влезала без прокрутки
+    box.classList.toggle('dense', offer.cards.length + (offer.art ? 1 : 0) > 4);
     for (const c of offer.cards) {
       const rar = D.RARITY[c.rar], poor = c.price && store.s.coins < c.price && !SS.DEV;
       const b = document.createElement('button');
@@ -915,6 +927,7 @@
       box.appendChild(b);
     }
     ui.show('#scr-perk');
+    fitPerkRar();
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
   };
 

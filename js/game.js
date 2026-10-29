@@ -711,11 +711,12 @@
   game.updateDrones = function (dt) {
     const p = this.player, S = G.S;
     // у каждого дрона своё место: слева, справа, дальше слева-сзади, дальше справа-сзади.
-    // Место слева занимает дрон из Ангара (кроме Стража — он кружит), его пропускаем
-    const skip = SS.comp.d && SS.comp.d.id !== 'guard' ? 1 : 0;
+    // Место слева занимает дрон из Ангара, его пропускаем; Страж кружит по обоим ближним — тогда начинаем со второго ряда
+    const skip = SS.comp.d ? (SS.comp.d.id === 'guard' ? 2 : 1) : 0;
     for (let i = 0; i < this.drones.length; i++) {
       const d = this.drones[i], j = i + skip, side = j % 2 ? 1 : -1, row = j >> 1;
-      const tx = p.x + side * p.w * (0.95 + row * 0.55), ty = p.y + p.w * (0.25 + row * 0.4) + Math.sin(this.t * 3 + i) * 6 * S;
+      // у края экрана дальние места прижимаются к краю, а не улетают за него
+      const tx = U.clamp(p.x + side * p.w * (0.95 + row * 0.55), 12 * S, G.FW - 12 * S), ty = p.y + p.w * (0.25 + row * 0.5) + Math.sin(this.t * 3 + i) * 6 * S;
       d.x = U.damp(d.x, tx, 9, dt); d.y = U.damp(d.y, ty, 9, dt);
       d.cd -= dt * this.rateMul();
       // в кат-сценах дроны молчат, как и сам корабль
