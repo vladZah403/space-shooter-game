@@ -95,24 +95,28 @@
     game.state = 'play';
     game.player.inv = Math.max(game.player.inv, 0.8);
     A.play('click');
-    if (run.mapNode === 'elite') MP.visit('elite', null, () => game.nextWave());
+    if (run.mapNode === 'elite' || run.mapNode === 'escort') MP.visit(run.mapNode, null, () => game.nextWave());
     else game.nextWave();
     return true;
   };
 
-  // узел меняет саму волну: элита — больше врагов и элита чаще (как опасный путь), тайник — волна полегче
+  // узел меняет саму волну: элита — больше врагов и элита чаще (как опасный путь), тайник — волна полегче,
+  // эскорт — в волне летит Торговец
   MP.apply = function (w) {
     const run = game.run;
     w.node = w.boss ? 'boss' : run.mapNode || 'fight';
     run.mapNode = null;
+    run.escort = null;
     if (w.node === 'elite') { w.danger = true; w.budget *= D.DANGER.count; }
     if (w.node === 'cache') w.budget *= 0.8;
+    if (w.node === 'escort') run.escort = { x: G.FW / 2, y: G.H * 0.66, hp: ESCORT.hp, t: 0, cd: 2.5, flash: 0 };
   };
 
   // ── награда узла после волны; true — показано окно, волна начнётся после выбора ──
   MP.reward = function (w) {
     const p = game.player;
     if (game.state !== 'play' || !p.alive) return false;
+    if (w.node === 'escort') return escortDone();
     if (w.node === 'elite') { MP.chestScene(Math.random() < 0.25 ? 'silver' : 'bronze', 'ЭЛИТА ПОВЕРЖЕНА', () => game.nextWave()); return true; }
     // торговец, тайник, ремонт и событие — сначала короткая сцена, награда в её конце
     if (w.node === 'shop' || w.node === 'cache' || w.node === 'repair' || w.node === 'event') {
@@ -127,7 +131,7 @@
     if (w.node === 'shop') {
       const o = game.merchantOffer();
       // вместо реликвии — закрытый сундук (откроется после забега)
-      o.cards.splice(o.cards.length - 1, 0, { id: 'chest:silver', ico: G.chestImg('silver'), name: D.CHESTS.silver.name, desc: 'Откроется после забега: реликвия в коллекцию', rar: 'epic', price: Math.round((300 + w.n * 25) * priceCut() / 10) * 10 });
+      o.cards.splice(o.cards.length - 1, 0, { id: 'chest:silver', ico: G.chestImg('silver'), name: D.CHESTS.silver.name, desc: 'Откроется после забега: реликвия в коллекцию', rar: 'epic', price: Math.round((300 + w.n * 25) * o.cut / 10) * 10 });
       return show(o);
     }
     if (w.node === 'event') {
@@ -159,7 +163,85 @@
     SS.emit('eventOffer', offer);
     return true;
   }
-  function priceCut() { return (game.skill('sk_scavenger') ? 0.7 : 1) * (game.relic('r_chart') ? 0.75 : 1); }
+
+  // ════════════════════════════════════════════════════════════
+  // 4.2: ЭСКОРТ — Торговец идёт через волну снизу вверх, враги по очереди бьют по нему огненными
+  //  снарядами. Его ранят только они (пули в игрока пролетают мимо), и их можно сбить своими выстрелами.
+  //  Довели живым — скидка в следующей лавке и сундук; сбили — без награды (и без штрафа)
+  // ════════════════════════════════════════════════════════════
+  const ESCORT = { hp: 10, w: 84, cut: 0.7, shotCd: 2.0 };
+  MP.updateEscort = function (dt) {
+    const es = game.run && game.run.escort, w = game.wave;
+    if (!es || !w) return;
+    const S = G.S;
+    es.t += dt; es.flash -= dt;
+    // поднимается по мере того, как волна выпускает врагов, и покачивается из стороны в сторону
+    const k = w.budget > 0 ? U.clamp(w.spent / w.budget, 0, 1) : 1;
+    const ty = U.lerp(G.H * 0.66, G.H * 0.3, k), tx = G.FW / 2 + Math.sin(es.t * 0.45) * G.FW * 0.2;
+    es.x = U.damp(es.x, tx, 1.2, dt); es.y = U.damp(es.y, ty, 0.8, dt);
+    if (game.state !== 'play' || w.intro > 0) return;
+    // время от времени кто-то из врагов выше Торговца бьёт по нему
+    es.cd -= dt;
+    if (es.cd <= 0) {
+      es.cd = ESCORT.shotCd * U.rand(0.7, 1.3);
+      const shooters = game.enemies.filter((e) => e.alive && e.hittable && !e.def.prop && !e.leaving && e.y > 20 * S && e.y < es.y - 60 * S);
+      if (shooters.length) {
+        const e = U.pick(shooters), a = Math.atan2(es.y - e.y, es.x - e.x), sp = game.bspd(150);
+        game.ebullet(e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp, 'fire', { escort: true });
+      }
+    }
+    // снаряды, летящие в Торговца, сбиваются выстрелами игрока
+    for (const b of game.ebullets) {
+      if (b.dead || !b.escort) continue;
+      for (const pb of game.bullets) {
+        if (pb.dead) continue;
+        const rr = b.r + (pb.r || 4 * S) + 6 * S;
+        if (U.dist2(b.x, b.y, pb.x, pb.y) < rr * rr) { b.dead = true; pb.dead = true; FX.hit(b.x, b.y, '#ffc83d'); FX.text(b.x, b.y - 10 * S, 'СБИТ', '#ffc83d', 11, 0.6, -40); break; }
+      }
+    }
+  };
+  // снаряд, пущенный в Торговца, попал в него (из game.updateEBullets); true — снаряд погас
+  MP.escortHit = function (b) {
+    const run = game.run, es = run && run.escort;
+    if (!es || !b.escort) return false;
+    const S = G.S;
+    if (Math.abs(b.x - es.x) > ESCORT.w * S * 0.42 || Math.abs(b.y - es.y) > ESCORT.w * S * 0.6) return false;
+    es.hp--; es.flash = 0.12;
+    FX.hit(b.x, b.y, '#ffc83d');
+    A.play('shieldHit', { vol: 0.3, rate: 0.8 });
+    if (es.hp <= 0) {
+      run.escort = null;
+      FX.explode(es.x, es.y, 1.6, '#ffc83d'); FX.shake(0.25);
+      A.play('explodeL', { vol: 0.7 });
+      SS.emit('toast', { ico: '💥', title: 'ЭСКОРТ', text: 'Торговца сбили — награды не будет', info: true, dur: 2600 });
+    }
+    return true;
+  };
+  MP.drawEscort = function (ctx) {
+    const es = game.run && game.run.escort;
+    if (!es) return;
+    const S = G.S, w = ESCORT.w * S;
+    ctx.save();
+    SS.scenes.merchant(ctx, es.x, es.y, w, es.t, { thrust: 0.35 });
+    if (es.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(G.glow('#ff5c3d', 64), es.x - w * 0.6, es.y - w * 0.6, w * 1.2, w * 1.2); }
+    ctx.restore();
+    // полоска прочности над кораблём
+    const bw = w * 0.8, bh = 5 * S, bx = es.x - bw / 2, by = es.y - w * G.aspect('p_merchant') * 0.62 - 10 * S, k = es.hp / ESCORT.hp;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+    ctx.fillStyle = k > 0.5 ? '#3dffa2' : k > 0.25 ? '#ffc83d' : '#ff3d5a'; ctx.fillRect(bx, by, bw * k, bh);
+  };
+  // волна зачищена: Торговец уходит в прыжок, скидка в следующей лавке и сундук
+  function escortDone() {
+    const run = game.run, es = run.escort, S = G.S;
+    run.escort = null;
+    if (!es) return false;
+    run.shopCut = ESCORT.cut;
+    FX.ring(es.x, es.y, 10 * S, 120 * S, '#ffc83d', 0.5, 4); FX.glowPuff(es.x, es.y, '#ffc83d', 140 * S, 0.5);
+    A.play('teleport', { rate: 1.2, vol: 0.5 });
+    SS.emit('toast', { ico: '🛡', title: 'ЭСКОРТ', text: 'Торговец доставлен: −30% в следующей лавке', info: true, dur: 2600 });
+    MP.chestScene(Math.random() < 0.35 ? 'silver' : 'bronze', 'ТОРГОВЕЦ ДОСТАВЛЕН', () => game.nextWave());
+    return true;
+  }
 
   // ── 4.1: сундук получен — сразу в сохранение (закрытым), в забеге только счётчик ──
   // Звёздная карта и высокие сложности иногда улучшают сундук на ступень
@@ -222,6 +304,7 @@
     cache:  { cap: 'УЗЕЛ КАРТЫ', name: 'ТАЙНИК', sub: 'Контейнер с добычей', color: '#b06bff' },
     repair: { cap: 'УЗЕЛ КАРТЫ', name: 'РЕМОНТ', sub: 'Ремонтный корабль чинит обшивку', color: '#3dffa2' },
     elite:  { cap: 'ТРЕВОГА', name: 'ЭЛИТНЫЙ ПАТРУЛЬ', sub: 'Врагов больше — награда: сундук', color: '#ff3d5a' },
+    escort: { cap: 'УЗЕЛ КАРТЫ', name: 'ЭСКОРТ', sub: 'Доведите Торговца живым — скидка и сундук', color: '#ffc83d' },
   };
   MP.visit = function (node, ev, onEnd) {
     if (game.state !== 'play') { onEnd(); return; }

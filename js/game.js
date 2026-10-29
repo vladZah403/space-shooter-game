@@ -356,6 +356,7 @@
     SS.skills.echo(nb);
     this.updateDrones(dt);
     SS.comp.update(dt);
+    SS.map.updateEscort(dt);
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
     SS.foes.update(edt);
@@ -1520,6 +1521,7 @@
     b.redirT = (o && o.redir) || 0; b.redirSpd = (o && o.redirSpd) || 0; b.redone = false;
     b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0; b.ebc = null;
     b.sine = (o && o.sine) || null; b.tpT = 0;
+    b.escort = !!(o && o.escort);   // 4.2: летит в Торговца (map.js — эскорт)
     this.ebullets.push(b);
     return b;
   };
@@ -1608,6 +1610,7 @@
       // барьер (навык) отражает пули обратно во врагов, дрон-Страж их ловит
       if (barrier && SS.skills.reflect(b)) { b.dead = true; continue; }
       if (SS.comp.block(b)) { b.dead = true; continue; }
+      if (SS.map.escortHit(b)) { b.dead = true; continue; }
       // попадание в игрока (стреловидная проверка — снаряд не «проскакивает»)
       if (p.alive && p.inv <= 0) {
         const rr = pr + b.r * 0.75;
@@ -2070,7 +2073,10 @@
     ] };
   };
   game.merchantOffer = function () {
-    const n = this.wave.n, p = this.player, cards = [], cut = (this.skill('sk_scavenger') ? 0.7 : 1) * (this.relic('r_chart') ? 0.75 : 1);
+    // 4.2: скидка за эскорт (map.js) — на одну лавку
+    const disc = this.run.shopCut || 1;
+    this.run.shopCut = 0;
+    const n = this.wave.n, p = this.player, cards = [], cut = (this.skill('sk_scavenger') ? 0.7 : 1) * (this.relic('r_chart') ? 0.75 : 1) * disc;
     const mods = this.moduleChoices();
     if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
     const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
@@ -2080,7 +2086,7 @@
     const ep = epic.length && p.lives >= 2 ? U.pick(epic) : null;
     if (ep) cards.push({ id: 'deal:' + ep.id, ico: '🩸', name: 'СДЕЛКА: ' + ep.name, desc: '−1 жизнь, взамен: ' + ep.desc, rar: 'legendary' });
     cards.push({ id: 'pass', ico: '👋', name: 'ПРОЙТИ МИМО', desc: 'Сберечь монеты', rar: 'common' });
-    return { title: 'ТОРГОВЕЦ', art: 'p_merchant', sub: 'Цены в монетах — монеты уходят из кошелька', cards };
+    return { title: 'ТОРГОВЕЦ', art: 'p_merchant', sub: disc < 1 ? 'Скидка за эскорт −' + Math.round((1 - disc) * 100) + '% · монеты из кошелька' : 'Цены в монетах — монеты уходят из кошелька', cards, cut };
   };
   game.pickOffer = function (id) {
     if (this.state !== 'perk' || this.offerKind !== 'event') return false;
@@ -2524,6 +2530,7 @@
     SS.events.drawBack(ctx);
     SS.foes.drawBack(ctx);
     SS.skills.drawBack(ctx);
+    SS.map.drawEscort(ctx);
     SS.enemies.drawAll(ctx);
     SS.foes.drawFront(ctx);
     SS.events.drawMid(ctx);

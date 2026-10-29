@@ -138,12 +138,16 @@
     if (o.sign) neon(ctx, x, y - h * 0.62, 'ЛАВКА', '#ffc83d', t, o.sign);
   }
 
+  // 4.2: эскорт рисует того же Торговца прямо в бою (map.js)
+  SC.merchant = merchant;
+
   // ════════════════════════════════════════════════════════════
   // СЦЕНЫ УЗЛОВ
   // ════════════════════════════════════════════════════════════
   SC.update = function (sc) {
     const p = game.player, S = G.S, t = sc.t, cx = G.FW / 2;
-    if (!sc.card && t >= sc.cardT) sc.card = { cap: sc.v.cap, name: sc.v.name, sub: sc.v.sub, at: t, y: 0.58 };
+    // в эскорте Торговец встаёт посередине — подпись выше него
+    if (!sc.card && t >= sc.cardT) sc.card = { cap: sc.v.cap, name: sc.v.name, sub: sc.v.sub, at: t, y: sc.node === 'escort' ? 0.4 : 0.58 };
     if (sc.node === 'shop') {
       if (!sc.hello) sc.hello = U.pick(HELLO);
       if (!sc.braked && t > 0.5) { sc.braked = true; A.play('teleport', { rate: 0.6, vol: 0.35 }); FX.shake(0.08); }
@@ -253,6 +257,10 @@
         }
         ctx.globalAlpha = 1;
       }
+    } else if (sc.node === 'escort') {
+      // 4.2: Торговец поднимается снизу на позицию, откуда пойдёт под охраной (map.js — ESCORT)
+      const k = U.clamp(t / 1.3, 0, 1);
+      merchant(ctx, cx, U.lerp(G.H + 90 * S, G.H * 0.66, ease3(k)), 84 * S, t, { thrust: 1 - ease3(k) * 0.65 });
     } else if (sc.node === 'elite') {
       // мигалки тревоги из верхних углов
       ctx.save(); ctx.globalCompositeOperation = 'lighter';

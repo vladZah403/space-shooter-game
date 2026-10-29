@@ -281,6 +281,12 @@
       G.draw(c, 'p_merchant_s', x, y + Math.sin(t * 2 + n.ph) * 1.5, R * 1.45);
       // мигают огни лавки
       if (Math.sin(t * 5 + n.ph) > 0.3) { c.globalCompositeOperation = 'lighter'; c.drawImage(G.glow('#ffc83d', 32), x - R * 0.7 - 5, y - R * 0.55 - 5, 10, 10); c.drawImage(G.glow('#ff5c3d', 32), x + R * 0.7 - 5, y - R * 0.55 - 5, 10, 10); c.globalCompositeOperation = 'source-over'; }
+    } else if (n.t === 'escort') {
+      // 4.2: лавка под защитным куполом
+      G.draw(c, 'p_merchant_s', x, y + Math.sin(t * 2 + n.ph) * 1.5, R * 1.15);
+      c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha *= 0.55 + 0.25 * Math.sin(t * 2.5 + n.ph);
+      c.strokeStyle = '#7fd8ff'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, R * 0.95, 0, U.TAU); c.stroke();
+      c.restore();
     } else if (n.t === 'repair') {
       G.draw(c, 'p_medship', x, y, R * 1.05);
       c.globalCompositeOperation = 'lighter'; c.globalAlpha *= 0.5 + 0.5 * Math.sin(t * 3 + n.ph);
