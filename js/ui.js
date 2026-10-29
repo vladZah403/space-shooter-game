@@ -582,7 +582,8 @@
       const m10 = Math.round(g.comboMul() * 10);
       if (c.mult !== m10) { c.mult = m10; el.comboMult.textContent = 'x' + (m10 / 10).toFixed(1); pulse(el.comboMult, 'pop', 1.12, 200); }
       if (c.combo !== run.combo) { c.combo = run.combo; el.comboLbl.textContent = 'КОМБО ' + run.combo; }
-      const ct = Math.round(Math.max(0, run.comboT / 2.6) * 50) / 50;
+      // окно комбо: 2,6 с, с реликвией «r_combo» — 5,2 с (game.js) — полоска всегда в пределах дорожки
+      const ct = Math.round(Math.max(0, run.comboT / (g.relic('r_combo') ? 5.2 : 2.6)) * 50) / 50;
       if (c.ct !== ct) { c.ct = ct; el.comboTimer.style.transform = 'scaleX(' + ct + ')'; }
       if (c.fever !== run.fever) { c.fever = run.fever; el.combo.classList.toggle('fever', run.fever); }
     }
