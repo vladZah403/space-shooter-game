@@ -92,7 +92,8 @@
     game.state = 'play';
     game.player.inv = Math.max(game.player.inv, 0.8);
     A.play('click');
-    game.nextWave();
+    if (run.mapNode === 'elite') MP.visit('elite', null, () => game.nextWave());
+    else game.nextWave();
     return true;
   };
 
@@ -107,9 +108,19 @@
 
   // ── награда узла после волны; true — показано окно, волна начнётся после выбора ──
   MP.reward = function (w) {
-    const p = game.player, run = game.run, S = G.S;
+    const p = game.player;
     if (game.state !== 'play' || !p.alive) return false;
     if (w.node === 'elite') return MP.relicOffer('ЭЛИТА ПОВЕРЖЕНА', 'Выберите реликвию');
+    // торговец, тайник, ремонт и событие — сначала короткая сцена, награда в её конце
+    if (w.node === 'shop' || w.node === 'cache' || w.node === 'repair' || w.node === 'event') {
+      const ev = w.node === 'event' ? U.pick(D.MAP_EVENTS) : null;
+      MP.visit(w.node, ev, () => { if (!nodeReward(w, ev)) game.nextWave(); });
+      return true;
+    }
+    return false;
+  };
+  function nodeReward(w, ev) {
+    const p = game.player, run = game.run;
     if (w.node === 'shop') {
       const o = game.merchantOffer();
       const rid = rollRelics(1)[0];
@@ -117,7 +128,6 @@
       return show(o);
     }
     if (w.node === 'event') {
-      const ev = U.pick(D.MAP_EVENTS);
       return show({ title: ev.title, sub: ev.sub, cards: ev.cards.map((c) => Object.assign({}, c, { id: 'ev:' + ev.id + ':' + c.id })) });
     }
     if (w.node === 'repair') {
@@ -135,7 +145,7 @@
       return false;
     }
     return false;
-  };
+  }
 
   function show(offer) {
     game.state = 'perk';
@@ -185,6 +195,80 @@
     A.play('perk', { rate: 0.9 });
     SS.emit('toast', { ico: def.ico, title: 'РЕЛИКВИЯ', text: def.name, info: true, dur: 2200 });
     game.hudDirty = true;
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // СЦЕНЫ УЗЛОВ: 2,4 с — что происходит, до окна выбора (тап — пропустить)
+  // ════════════════════════════════════════════════════════════
+  const VISIT = {
+    shop:   { cap: 'УЗЕЛ КАРТЫ', name: 'ТОРГОВЕЦ', sub: 'Лавка пристыковалась — заглянем', color: '#ffc83d' },
+    cache:  { cap: 'УЗЕЛ КАРТЫ', name: 'ТАЙНИК', sub: 'Контейнер с добычей', color: '#b06bff' },
+    repair: { cap: 'УЗЕЛ КАРТЫ', name: 'РЕМОНТ', sub: 'Ремонтный корабль чинит обшивку', color: '#3dffa2' },
+    elite:  { cap: 'ТРЕВОГА', name: 'ЭЛИТНЫЙ ПАТРУЛЬ', sub: 'Врагов больше — награда: реликвия', color: '#ff3d5a' },
+  };
+  MP.visit = function (node, ev, onEnd) {
+    if (game.state !== 'play') { onEnd(); return; }
+    const v = node === 'event' ? { cap: 'СОБЫТИЕ', name: ev.title, sub: ev.sub, color: '#7fe7ff' } : VISIT[node];
+    game.startScene({ kind: 'visit', node, ev, color: v.color, v, end: 2.4, cardT: 0.35, onEnd, done: false });
+    A.play(node === 'elite' ? 'warning' : 'teleport', { rate: node === 'elite' ? 1 : 0.8, vol: 0.6 });
+  };
+  MP.updateVisit = function (sc) {
+    const p = game.player, S = G.S;
+    if (!sc.card && sc.t >= sc.cardT) sc.card = { cap: sc.v.cap, name: sc.v.name, sub: sc.v.sub, at: sc.t, y: 0.58 };
+    // ремонт и тайник отдают награду прямо в сцене — видно, откуда она
+    if (!sc.done && sc.t >= 1.5) {
+      sc.done = true;
+      if (sc.node === 'repair') { FX.ring(p.x, p.y, p.w * 0.3, p.w * 1.6, '#3dffa2', 0.5, 4); FX.sparks(p.x, p.y, '#3dffa2', 14, 200); }
+      if (sc.node === 'cache') { FX.explode(G.FW / 2, G.H * 0.42, 1, '#ffc83d'); FX.ring(G.FW / 2, G.H * 0.42, 10 * S, 90 * S, '#ffc83d', 0.4, 4); }
+      if (sc.node === 'elite') FX.vignette('#ff2a48', 1.2, 0.6, true);
+    }
+    if (sc.node === 'elite' && Math.random() < 0.1) FX.shake(0.05);
+  };
+  // актёр сцены в координатах поля
+  MP.drawVisit = function (ctx, sc) {
+    const S = G.S, t = sc.t, p = game.player, k = Math.min(1, t / 0.9), ease = 1 - Math.pow(1 - k, 3);
+    const cx = G.FW / 2;
+    ctx.save();
+    if (sc.node === 'shop') {
+      const y = U.lerp(-120 * S, G.H * 0.36, ease) + Math.sin(t * 2) * 4 * S;
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4;
+      ctx.drawImage(G.soft('#ffc83d', 64), cx - 110 * S, y - 110 * S, 220 * S, 220 * S);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      G.draw(ctx, 'p_merchant', cx, y, 130 * S);
+    } else if (sc.node === 'repair') {
+      const y = U.lerp(-100 * S, p.y - p.w * 1.5, ease) + Math.sin(t * 3) * 3 * S;
+      G.draw(ctx, 'p_medship', cx, y, 60 * S, Math.PI);
+      if (t > 0.9) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 20); ctx.strokeStyle = '#3dffa2'; ctx.lineWidth = 3 * S; ctx.beginPath(); ctx.moveTo(cx, y + 25 * S); ctx.lineTo(p.x, p.y - p.w * 0.3); ctx.stroke(); }
+    } else if (sc.node === 'cache') {
+      const y = U.lerp(-60 * S, G.H * 0.42, ease);
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.2 * Math.sin(t * 8);
+      ctx.drawImage(G.soft('#ffc83d', 64), cx - 60 * S, y - 60 * S, 120 * S, 120 * S);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = sc.done ? Math.max(0, 1 - (t - 1.5) * 3) : 1;
+      G.draw(ctx, 'p_crate', cx, y, 64 * S, Math.sin(t * 3) * 0.1);
+    } else if (sc.node === 'elite') {
+      // строй элиты проходит по верху экрана
+      for (let i = 0; i < 3; i++) {
+        const y = U.lerp(-80 * S, G.H * 0.22, ease) - Math.abs(i - 1) * 30 * S;
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5;
+        ctx.drawImage(G.soft('#ff3d5a', 64), cx + (i - 1) * 80 * S - 40 * S, y - 40 * S, 80 * S, 80 * S);
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+        G.draw(ctx, 'e_heavyfighter', cx + (i - 1) * 80 * S, y, 58 * S, Math.PI);
+      }
+    } else if (sc.node === 'event') {
+      const id = sc.ev.id, y = G.H * 0.36, a = Math.min(1, t * 2);
+      ctx.globalAlpha = a;
+      if (id === 'anomaly' && G.frame('fx_vortex')) { ctx.globalCompositeOperation = 'lighter'; G.draw(ctx, 'fx_vortex', cx, y, 180 * S, t * 2); }
+      else if (id === 'wreck' || id === 'distress') {
+        G.draw(ctx, 'e_cargo', cx + Math.sin(t * 0.7) * 10 * S, y, 110 * S, 2.4 + t * 0.15);
+        if (id === 'distress' && Math.sin(t * 10) > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(G.glow('#ff3d5a', 64), cx - 40 * S, y - 40 * S, 80 * S, 80 * S); }
+      } else if (id === 'black') G.draw(ctx, 'p_merchant_s', cx, y + Math.sin(t * 2) * 4 * S, 100 * S);
+      else if (id === 'station') G.draw(ctx, 'p_merchant', cx, y, 140 * S, 0.3);
+      else {
+        ctx.font = Math.round(80 * S) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(sc.ev.ico, cx, y + Math.sin(t * 3) * 5 * S);
+      }
+    }
+    ctx.restore();
   };
 
   // ── событие на карте: исход выбора ──

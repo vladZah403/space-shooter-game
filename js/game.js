@@ -2128,6 +2128,8 @@
     if (sc.kind === 'boss') {
       if (!sc.spawned && sc.t >= sc.spawnT) { sc.spawned = true; SS.enemies.spawnBoss(sc.n); }
       if (!sc.card && sc.t >= sc.cardT) this.bossCard();
+    } else if (sc.kind === 'visit') {
+      SS.map.updateVisit(sc);
     } else {
       // разгон до вспышки, после неё торможение
       sc.warp = sc.t < sc.flashT ? ease3((sc.t - 0.25) / (sc.flashT - 0.25)) : Math.max(0, 1 - (sc.t - sc.flashT) * 0.9);
@@ -2175,6 +2177,8 @@
     SS.emit('cinema', false);
     this.hudDirty = true;
     if (sc.kind === 'jump') this.nextWave();
+    // сцена узла карты: дальше — окно награды или следующая волна
+    if (sc.kind === 'visit' && sc.onEnd) { const f = sc.onEnd; sc.onEnd = null; f(); }
   };
 
   game.skipScene = function () {
@@ -2186,7 +2190,7 @@
       if (!sc.card) { A.play('bossRoar'); SS.emit('bossWarning', sc.def); }
       // босс сразу встаёт на место, дальше обычный выход (enemies.updateBoss)
       if (this.boss && this.boss.entering) this.boss.y = this.boss.baseY;
-    } else {
+    } else if (sc.kind === 'jump') {
       if (!sc.flashed) this.jumpFlash();
       sc.warp = 0;
     }
@@ -2200,7 +2204,8 @@
 
   // затемнение фона под боем; в прыжке гуще, и поверх него летят звёзды
   game.drawSceneDim = function (ctx) {
-    const sc = this.scene, k = sceneK(sc);
+    // в сцене узла карты фон темнеет меньше — бой виден
+    const sc = this.scene, k = sceneK(sc) * (sc.kind === 'visit' ? 0.7 : 1);
     if (k <= 0) return;
     const warp = sc.kind === 'jump' ? sc.warp : 0;
     ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.92, 0.5 * k + 0.42 * warp).toFixed(3) + ')';
@@ -2468,6 +2473,7 @@
     this.drawPlayer(ctx);
     SS.skills.drawFront(ctx);
     this.drawEBullets(ctx);
+    if (this.scene && this.scene.kind === 'visit') SS.map.drawVisit(ctx, this.scene);
     SS.events.draw(ctx);
     this.drawOverlays(ctx);
     FX.drawFront(ctx);
