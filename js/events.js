@@ -33,7 +33,7 @@
       const si = game.sectorIdx(run.sector), ss = M.s.sectorSeen || (M.s.sectorSeen = []);
       if (!ss.includes(si)) { ss.push(si); SS.store.soon(); }
       // k: 0..3 — номер волны в секторе; бой с боссом проходит без механики
-      this.mech = sec.mech && !w.boss ? { id: sec.mech, wave: w, k: (w.n - 1) % 5, cd: 0.6 } : null;
+      this.mech = sec.mech && !w.boss ? { id: sec.mech, wave: w, k: Math.min(3, (w.n - 1) % 5), cd: 0.6 } : null;
       if (w.boss) return;
       const always = !!(ch && ch.mods.includes('events'));
       if (w.n < (always ? 3 : D.EVENT_WAVE)) return;

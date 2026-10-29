@@ -670,23 +670,30 @@
       st.perks += run.perks;
       st.shots += run.shots;
       st.deaths++;
-      const isRecord = run.score > st.bestScore;
-      st.bestScore = Math.max(st.bestScore, run.score);
-      st.bestWave = Math.max(st.bestWave, run.wave);
-      const dd = st.diff[run.diff] || (st.diff[run.diff] = { best: 0, wave: 0 });
-      dd.best = Math.max(dd.best, run.score);
-      dd.wave = Math.max(dd.wave, run.wave);
-      if (run.diff === 'nightmare' && run.wave >= 10) this.unlock('nightmare10');
-      if (run.diff === 'god' && run.wave >= 15) this.unlock('god_mode_clear');
+      // 4.0: режимы (босс-раш, выживание) — свои рекорды; в рекорды сложностей и рейтинг не идут, опыт корабля дают
+      let isRecord;
+      if (run.mode && run.mode !== 'normal') {
+        const md = (st.modes || (st.modes = {}))[run.mode] || (st.modes[run.mode] = { best: 0, wave: 0, time: 0 });
+        isRecord = run.score > md.best;
+        md.best = Math.max(md.best, run.score); md.wave = Math.max(md.wave, run.wave); md.time = Math.max(md.time, run.time);
+      } else {
+        isRecord = run.score > st.bestScore;
+        st.bestScore = Math.max(st.bestScore, run.score);
+        st.bestWave = Math.max(st.bestWave, run.wave);
+        const dd = st.diff[run.diff] || (st.diff[run.diff] = { best: 0, wave: 0 });
+        dd.best = Math.max(dd.best, run.score);
+        dd.wave = Math.max(dd.wave, run.wave);
+        if (run.diff === 'nightmare' && run.wave >= 10) this.unlock('nightmare10');
+        if (run.diff === 'god' && run.wave >= 15) this.unlock('god_mode_clear');
+        if (run.challenge) { const c = this.challengeState(); c.best = Math.max(c.best, run.score); c.wave = Math.max(c.wave, run.wave); }
+        // 3.0: рекорды по сложностям — по 10 лучших забегов на каждой (очки разных сложностей не сравниваются)
+        s.lb.push({ score: run.score, wave: run.wave, diff: run.diff, date: Date.now() });
+        s.lb.sort((a, b) => b.score - a.score);
+        const per = {};
+        s.lb = s.lb.filter((r) => (per[r.diff] = (per[r.diff] || 0) + 1) <= 10);
+      }
       if (run.shots >= 150 && run.hits / run.shots >= 0.8) this.unlock('accuracy80');
       if (run.time >= 600) this.unlock('survive_10min');
-      if (run.challenge) { const c = this.challengeState(); c.best = Math.max(c.best, run.score); c.wave = Math.max(c.wave, run.wave); }
-
-      // 3.0: рекорды по сложностям — по 10 лучших забегов на каждой (очки разных сложностей не сравниваются)
-      s.lb.push({ score: run.score, wave: run.wave, diff: run.diff, date: Date.now() });
-      s.lb.sort((a, b) => b.score - a.score);
-      const per = {};
-      s.lb = s.lb.filter((r) => (per[r.diff] = (per[r.diff] || 0) + 1) <= 10);
 
       // опыт корабля: за врагов, волны и боссов
       // опыт за врагов и очки нормирован на число врагов и множитель очков, затем умножен на опыт сложности

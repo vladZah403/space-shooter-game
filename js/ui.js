@@ -50,9 +50,9 @@
       A.play('click'); T.haptic('medium');
       // испытание дня всегда на «Норме», правила — в meta.challenge
       if (ui._diffSel === 'daily') { ui.startRun('normal', { challenge: M.challenge() }); return; }
-      const id = D.DIFFS[ui._diffSel] ? ui._diffSel : 'normal';
+      const id = D.DIFFS[ui._diffSel] ? ui._diffSel : 'normal', mode = D.MODES[store.s.settings.mode] ? store.s.settings.mode : 'normal';
       store.s.settings.diff = id; store.soon();
-      ui.startRun(id);
+      ui.startRun(id, mode !== 'normal' ? { mode } : null);
     });
 
     // вкладки
@@ -329,6 +329,7 @@
     return rec;
   }
   function syncDiffGo() {
+    $('#modeRow').classList.toggle('off', ui._diffSel === 'daily');
     if (ui._diffSel === 'daily') {
       const ch = M.challenge();
       $('#btnDiffGo span').textContent = 'В БОЙ • ИСПЫТАНИЕ';
@@ -342,7 +343,9 @@
     const weak = d.power && power < d.power ? '<br><b style="color:#ff8a3d">⚠️ Рекомендуемая мощь ' + U.fmt(d.power) + '+, у вас ' + U.fmt(power) + ' — будет тяжело</b>' : '';
     const k = M.overpowerK(ui._diffSel, power);
     const easy = k < 1 ? '<br><b style="color:#ffc83d">Вы намного сильнее этой сложности — монеты ×' + fmtMul(d.coins * k) + ' вместо ×' + fmtMul(d.coins) + '</b>' : '';
-    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc + weak + easy;
+    const md = D.MODES[store.s.settings.mode];
+    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc + weak + easy + (md && store.s.settings.mode !== 'normal' ? '<br><b>' + md.ico + ' ' + md.name + '</b>: ' + md.desc + '. Свои рекорды, в рейтинг не идут.' : '');
+    if (md && store.s.settings.mode !== 'normal') $('#btnDiffGo span').textContent += ' • ' + md.name;
   }
   ui.showDiff = function () {
     const s = store.s;
@@ -368,6 +371,14 @@
         '<div class="diff-meta">' + (meta || '<span>Обычные враги и награды</span>') + '</div></div>' +
         '<div class="diff-rew">' + ic('coin') + ' ×' + fmtMul(d.coins * M.overpowerK(id, power)) + '<small>' + (d.power ? 'мощь ' + U.fmt(d.power) + '+' : 'любая мощь') + '</small></div></button>';
     }).join('');
+    // 4.0: режим забега
+    const cur = D.MODES[s.settings.mode] ? s.settings.mode : 'normal';
+    $('#modeRow').innerHTML = Object.keys(D.MODES).map((k) => '<button class="mode-btn' + (k === cur ? ' sel' : '') + '" data-mode="' + k + '"><span>' + D.MODES[k].ico + '</span>' + D.MODES[k].name + '</button>').join('');
+    $$('#modeRow .mode-btn').forEach((b) => b.addEventListener('click', () => {
+      s.settings.mode = b.dataset.mode; store.soon(); A.play('click');
+      $$('#modeRow .mode-btn').forEach((x) => x.classList.toggle('sel', x === b));
+      syncDiffGo();
+    }));
     syncDiffGo();
     ui.show('#scr-diff');
     T.back(() => ui.back());

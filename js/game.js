@@ -62,6 +62,8 @@
   // o.challenge — испытание дня { date, mods, weapon } (см. meta.challenge)
   game.start = function (diffId, o) {
     const s = M.s, ch = o && o.challenge;
+    // 4.0: режим забега — обычный, босс-раш или выживание (испытание дня всегда обычное)
+    this.mode = !ch && o && D.MODES[o.mode] ? o.mode : 'normal';
     this.diffId = D.DIFFS[diffId] ? diffId : 'normal';
     this.diff = D.DIFFS[this.diffId];
     if (ch) {
@@ -120,10 +122,11 @@
     G.bg.warp = 0.6;
     this.state = 'play';
     this.hudDirty = true;
-    this.nextWave();
+    // в босс-раше первый босс выходит после выбора стартового модуля (chooseModule)
+    if (this.mode !== 'rush') this.nextWave();
     SS.emit('runStart');
     // стартовый модуль корабля — первый выбор забега
-    this.after(0.7, () => this.offerModules('start'));
+    this.after(this.mode === 'rush' ? 0.2 : 0.7, () => this.offerModules('start'));
   };
 
   game.clearWorld = function () {
@@ -1241,14 +1244,15 @@
     if (this.state === 'over') return;
     this.state = 'over';
     const run = this.run;
-    const result = M.finishRun({ score: run.score, wave: this.wave.n, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
-      time: run.time, diff: this.diffId, perks: run.perkCount, shots: run.shots, hits: run.hits, challenge: !!run.challenge });
+    const wn = this.wave ? this.wave.n : 0;
+    const result = M.finishRun({ score: run.score, wave: wn, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
+      time: run.time, diff: this.diffId, perks: run.perkCount, shots: run.shots, hits: run.hits, challenge: !!run.challenge, mode: this.mode });
     const summary = Object.assign({}, result, {
-      score: run.score, wave: this.wave.n, sector: run.sector, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
+      mode: this.mode, score: run.score, wave: wn, sector: run.sector, kills: run.kills, bosses: run.bosses, maxCombo: run.maxCombo,
       time: run.time, coins: run.coins, accuracy: run.shots ? Math.round(Math.min(1, run.hits / run.shots) * 100) : 0,
       diff: this.diffId, level: run.level, cause: run.lastHit,
     });
-    SS.tg.submitScore({ score: run.score, wave: this.wave.n, diff: this.diffId, time: run.time, kills: run.kills, bosses: run.bosses, shots: run.shots, hits: Math.min(run.hits, run.shots) });
+    if (this.mode === 'normal') SS.tg.submitScore({ score: run.score, wave: wn, diff: this.diffId, time: run.time, kills: run.kills, bosses: run.bosses, shots: run.shots, hits: Math.min(run.hits, run.shots) });
     SS.emit('runEnd', summary);
   };
 
@@ -1862,6 +1866,7 @@
     this.state = 'play';
     this.hudDirty = true;
     if (kind === 'station') this.after(0.4, () => this.jumpScene());
+    if (kind === 'start' && this.mode === 'rush' && !this.wave) this.after(0.4, () => this.nextWave());
   };
   game.rerollCost = function () { return 40 + this.run.rerolls * 40; };
   game.rerollPerks = function () {
@@ -1906,14 +1911,16 @@
   // ВОЛНЫ
   // ════════════════════════════════════════════════════════════
   game.nextWave = function () {
-    const n = this.wave ? this.wave.n + 1 : 1;
+    // босс-раш: волны 5, 10, 15… — только боссы; выживание: боссов нет, волны идут без пауз
+    const rush = this.mode === 'rush', surv = this.mode === 'survival';
+    const n = this.wave ? this.wave.n + (rush ? 5 : 1) : rush ? 5 : 1;
     // 4.0: перед обычной волной — выбор узла на карте сектора (map.js); после выбора снова сюда
-    if (SS.map.need(n)) { SS.map.offer(n); return; }
-    const isBoss = n % 5 === 0;
+    if (this.mode === 'normal' && SS.map.need(n)) { SS.map.offer(n); return; }
+    const isBoss = n % 5 === 0 && !surv;
     const sector = Math.floor((n - 1) / 5);
     const tn = n + (this.diff.waveOffset || 0);
     const budget = isBoss ? 0 : (9 + tn * 4.4 + Math.pow(tn, 1.28)) * this.diff.count;
-    this.wave = { n, boss: isBoss, budget, spent: 0, spawnT: 0.8, intro: n === 1 ? 1.2 : 1.6, done: false, clearT: 0, miniDone: !(n % 5 === 3 && n >= 8), startT: this.t };
+    this.wave = { n, boss: isBoss, budget, spent: 0, spawnT: 0.8, intro: n === 1 ? 1.2 : surv ? 0 : 1.6, done: false, clearT: 0, miniDone: !(n % 5 === 3 && n >= 8), startT: this.t };
     this.run.waveDamage = 0;
     // после прыжка (jumpScene) сектор уже сменён
     if (sector !== this.run.sector) {
@@ -1967,6 +1974,8 @@
         if (!w.miniDone && w.spent > w.budget * 0.4) { w.miniDone = true; SS.enemies.spawnMini(w.n); }
         if (w.spent >= w.budget) w.done = true;
       });
+      // выживание: следующая волна сразу, без зачистки и наград
+      if (w.done && this.mode === 'survival') { w.cleared = true; this.nextWave(); return; }
     } else if (alive === 0) {
       w.clearT += dt;
       if (w.clearT > 0.9) this.waveCleared();

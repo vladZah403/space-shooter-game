@@ -30,9 +30,17 @@
     hard:      { name: 'СЛОЖНО',    color: '#ffc83d', lead: 0.75, waveOffset: 3,  count: 1.25, hp: 2.0,  spd: 1.08, fire: 1.3,  bspd: 1.1,  elite: 0.08, coins: 1.5,  score: 1, xp: 1, power: 250,  unlock: 'normal',    eliteShield: true,    desc: 'Больше врагов, элита со щитами и ускорением' },
     nightmare: { name: 'КОШМАР',    color: '#ff8a3d', lead: 0.85, waveOffset: 6,  count: 1.5,  hp: 3.0,  spd: 1.16, fire: 1.6,  bspd: 1.2,  elite: 0.14, coins: 2.1,  score: 1, xp: 1, power: 450,  unlock: 'hard',      bossRage: true,      desc: 'Плотный огонь, у боссов дополнительная фаза ярости' },
     god:       { name: 'БОГ ВОЙНЫ', short: 'БОГ', color: '#ff3d5a', lead: 0.95, waveOffset: 10, count: 1.8, hp: 3.9, spd: 1.25, fire: 1.95, bspd: 1.3, elite: 0.22, coins: 3, score: 1, xp: 1, power: 700, unlock: 'nightmare', eliteShield: true, bossRage: true, drops: 0.6, desc: 'Щиты у элиты, ярость боссов и меньше бонусов' },
+    // 4.0: Ад — сверх «Бога войны»; каждый сбитый враг огрызается кольцом пуль (hell)
+    hell:      { name: 'АД', color: '#ff2a1a', lead: 1, waveOffset: 14, count: 2.0, hp: 5.2, spd: 1.3, fire: 2.3, bspd: 1.4, elite: 0.3, coins: 4, score: 1, xp: 1, power: 1100, unlock: 'god', eliteShield: true, bossRage: true, drops: 0.5, hell: true, desc: 'Всё как на «Боге войны», только злее: сбитый враг огрызается кольцом пуль' },
   };
   D.DIFF_UNLOCK_WAVE = 25;
-  D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god'];
+  D.DIFF_ORDER = ['zen', 'easy', 'normal', 'hard', 'nightmare', 'god', 'hell'];
+  // 4.0: режимы забега (выбор в окне сложности); испытание дня — всегда обычный
+  D.MODES = {
+    normal:   { name: 'ОБЫЧНЫЙ',   ico: '🗺️', desc: 'Карта секторов, боссы, станции' },
+    rush:     { name: 'БОСС-РАШ',  ico: '👑', desc: 'Только боссы, один за другим; между ними станция и трофей' },
+    survival: { name: 'ВЫЖИВАНИЕ', ico: '⏱️', desc: 'Без передышек и боссов: враги идут сплошным потоком и всё злее' },
+  };
 
   // ── Оружие ───────────────────────────────────────────────────
   // base: базовые параметры; ups: ветки прокачки за монеты (уровень → эффект в game.js)

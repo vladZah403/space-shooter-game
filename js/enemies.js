@@ -1024,6 +1024,11 @@
       for (let i = 0; i < d.death.n; i++) { const a = off + i / d.death.n * U.TAU; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, d.death.bullet); }
     }
     if (d.brood && !quiet && !e.isChild) brood(e.x, e.y, d.brood, !!d.larva, 18);
+    // «Ад»: сбитый враг огрызается кольцом медленных пуль
+    if (game.diff.hell && !quiet && !d.prop && !e.isChild && game.player.alive) {
+      const s = game.bspd(95), off = Math.random() * U.TAU, n = e.mini ? 10 : 5;
+      for (let i = 0; i < n; i++) { const a = off + i / n * U.TAU; game.ebullet(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, 'dot'); }
+    }
     SS.foes.onKill(e);
     game.onEnemyKilled(e, src);
   };
