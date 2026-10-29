@@ -96,11 +96,7 @@
     $('#btnPauseShip').addEventListener('click', () => { A.play('click'); ui.showShip(); });
     $('#btnPerkShip').addEventListener('click', () => { A.play('click'); ui.showShip(ui._modOffer); });
     $('#btnShipClose').addEventListener('click', () => ui.closeShip());
-    $('#btnMapGo').addEventListener('click', () => {
-      const m = ui._mapSel;
-      if (!m || !SS.map.choose(m.step, m.r)) { A.play('error'); return; }
-      ui.hide('#scr-map'); T.haptic('success');
-    });
+    $('#btnMapGo').addEventListener('click', () => { if (!SS.galaxy.go()) A.play('error'); });
 
     // диалог
     $('#dlgCancel').addEventListener('click', () => { A.play('back'); ui.hide('#scr-dialog'); });
@@ -889,45 +885,9 @@
   };
 
   // ════════════════════════════════════════════════════════════
-  // КАРТА СЕКТОРА (4.0): снизу вверх 4 шага по 3 ряда и босс; доступные узлы мигают
+  // КАРТА ГАЛАКТИКИ (4.1): холст и выбор — в galaxy.js
   // ════════════════════════════════════════════════════════════
-  ui.showMap = function (d) {
-    const box = $('#mapBox'), map = d.map, sec = game.sectorDef(map.sector);
-    $('#mapTitle').textContent = 'МАРШРУТ';
-    $('#mapSub').textContent = 'Сектор ' + (map.sector + 1) + ' · ' + sec.name + ' · волна ' + d.n;
-    const X = (r) => 18 + r * 32, Y = (c) => 86 - c * 19;   // в процентах
-    let h = '<svg viewBox="0 0 100 100" preserveAspectRatio="none">';
-    for (const k in map.links) {
-      const [c, r] = k.split(':').map(Number);
-      for (const q of map.links[k]) {
-        const walk = map.path.includes(k) && map.path.includes((c + 1) + ':' + q);
-        const can = map.at && map.at.c === c && map.at.r === r && d.choices.includes(q) && c + 1 === d.step;
-        h += '<path vector-effect="non-scaling-stroke" class="' + (walk ? 'walk' : can ? 'can' : '') + '" d="M' + X(r) + ' ' + Y(c) + ' L' + X(q) + ' ' + Y(c + 1) + '"/>';
-      }
-    }
-    for (let r = 0; r < 3; r++) if (map.cols[3][r]) h += '<path vector-effect="non-scaling-stroke" d="M' + X(r) + ' ' + Y(3) + ' L50 9"/>';
-    h += '</svg>';
-    map.cols.forEach((col, c) => col.forEach((n, r) => {
-      if (!n) return;
-      const nd = D.MAP_NODES[n.t], done = map.path.includes(c + ':' + r), can = c === d.step && d.choices.includes(r);
-      h += '<button class="map-node' + (done ? ' done' : '') + (can ? ' can' : '') + '" data-c="' + c + '" data-r="' + r + '" style="left:' + X(r) + '%;top:' + Y(c) + '%;--nc:' + nd.color + '">' + nd.ico + '</button>';
-    }));
-    h += '<div class="map-node boss" style="left:50%;top:9%">👑</div>';
-    box.innerHTML = h;
-    ui._mapSel = null;
-    $('#btnMapGo').disabled = true;
-    $('#mapInfo').innerHTML = 'Выберите мигающий узел';
-    $$('#mapBox .map-node.can').forEach((b) => b.addEventListener('click', () => {
-      const c = +b.dataset.c, r = +b.dataset.r, nd = D.MAP_NODES[map.cols[c][r].t];
-      $$('#mapBox .map-node').forEach((x) => x.classList.remove('sel'));
-      b.classList.add('sel');
-      ui._mapSel = { step: c, r };
-      $('#btnMapGo').disabled = false;
-      $('#mapInfo').innerHTML = '<b style="color:' + nd.color + '">' + nd.ico + ' ' + nd.name + '</b><br>' + nd.desc;
-      A.play('click');
-    }));
-    ui.show('#scr-map');
-  };
+  ui.showMap = function (d) { SS.galaxy.show(d); };
 
   // события между волнами: Развилка, Торговец (карточки с ценой; не хватает монет — карточка гаснет)
   ui.showEvent = function (offer) {

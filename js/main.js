@@ -189,6 +189,7 @@
       prog(0.85, 'Подготовка интерфейса…');
       SS.ui.init();
       SS.relicsUi.init();
+      SS.galaxy.init();
       bindInput();
       window.addEventListener('resize', () => { clearTimeout(main._rt); main._rt = setTimeout(main.resize, 120); });
       SS.on('resize', () => { clearTimeout(main._rt); main._rt = setTimeout(main.resize, 120); });

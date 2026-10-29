@@ -564,19 +564,27 @@ body.cinema .banner{visibility:hidden}
 .mode-btn.sel{border-color:var(--cyan);color:var(--text);background:rgba(61,224,255,.12);box-shadow:0 0 10px rgba(61,224,255,.25)}
 .mode-row.off{opacity:.35;pointer-events:none}
 /* карта сектора (4.0) */
-.map-wrap{width:100%;max-width:400px;display:flex;flex-direction:column;align-items:center;gap:8px}
-.map-box{position:relative;width:100%;height:min(52vh,380px);border-radius:18px;background:radial-gradient(ellipse at 50% 30%,rgba(61,90,255,.18),rgba(5,8,22,.6));border:1px solid var(--line)}
-.map-box svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.map-box path{fill:none;stroke:rgba(255,255,255,.14);stroke-width:2;stroke-dasharray:5 5}
-.map-box path.walk{stroke:var(--cyan);stroke-dasharray:none;stroke-width:3;filter:drop-shadow(0 0 4px var(--cyan))}
-.map-box path.can{stroke:rgba(255,255,255,.45)}
-.map-node{position:absolute;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:23px;background:rgba(10,16,40,.95);border:2px solid color-mix(in srgb,var(--nc) 35%,transparent);opacity:.45;transition:transform .15s,opacity .2s}
-.map-node.can{opacity:1;border-color:var(--nc);box-shadow:0 0 12px color-mix(in srgb,var(--nc) 55%,transparent);animation:skPulse 1.1s ease-in-out infinite alternate;--bc:var(--nc)}
-.map-node.done{opacity:.9;border-color:var(--cyan);background:rgba(61,224,255,.14)}
-.map-node.sel{transform:scale(1.18);outline:2px solid #fff;outline-offset:3px}
-.map-node.boss{width:62px;height:62px;margin:-31px 0 0 -31px;font-size:30px;--nc:#ff3d5a;opacity:.9}
-.map-info{min-height:44px;font-size:14px;color:var(--muted);text-align:center;line-height:1.3}
-.map-info b{color:var(--text);font-family:var(--font-h);font-size:12px;letter-spacing:1px}
+/* 4.1: карта галактики — во весь экран, холст рисует galaxy.js */
+#scr-map.map-scr{background:#02030a;padding:calc(var(--sat) + 8px) 0 calc(var(--sab) + 10px)}
+.map-wrap{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.map-head{display:flex;align-items:center;justify-content:space-between;padding:0 14px;gap:10px}
+.map-title{font-family:var(--font-h);font-weight:900;font-size:17px;letter-spacing:2.5px;color:var(--cyan);text-shadow:0 0 12px rgba(61,224,255,.5)}
+.map-sub{font-size:13px;color:var(--muted);letter-spacing:.3px}
+.map-steps{display:flex;align-items:center;gap:5px}
+.map-steps i{width:16px;height:6px;border-radius:3px;background:rgba(255,255,255,.12)}
+.map-steps i.done{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.map-steps i.cur{background:#fff;animation:blink 1s ease-in-out infinite}
+.map-steps .boss{display:flex;color:#ff5c7a;font-size:16px;margin-left:2px;filter:drop-shadow(0 0 5px #ff3d5a)}
+.map-cv{flex:1 1 auto;min-height:0;width:100%;touch-action:none;display:block}
+.map-info{margin:0 12px;min-height:62px;padding:8px 12px;border-radius:14px;background:rgba(10,15,38,.9);border:1px solid color-mix(in srgb,var(--nc,#8e9bc9) 55%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--nc,#000) 22%,transparent);font-size:14px;color:var(--muted);line-height:1.25;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.mi-hint{text-align:center;font-size:13.5px}
+.mi-name{font-family:var(--font-h);font-size:13px;letter-spacing:1px;color:var(--nc,#fff);display:flex;align-items:center;gap:8px}
+.mi-tag{font-size:8.5px;letter-spacing:1px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);color:var(--muted)}
+.mi-tag.ok{background:rgba(61,255,162,.15);color:var(--green)}
+.mi-tag.no{background:rgba(255,77,94,.12);color:#ff8fa3}
+.mi-desc{color:var(--text);font-size:14px}
+.mi-more{font-size:12.5px;color:#ffd678}
+#btnMapGo{margin:0 12px;width:auto}
 .rb-chip.relic{border-color:rgba(255,200,61,.45);background:rgba(255,200,61,.1)}
 /* схема корабля (3.1) */
 .ship-modal{max-width:420px;padding:20px 14px 16px;position:relative}
@@ -933,8 +941,7 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .diff-modal .btn.big span{overflow:hidden;text-overflow:ellipsis}
 .modal{overflow-y:auto;scrollbar-width:none}
 .modal::-webkit-scrollbar{display:none}
-.perk-wrap,.map-wrap{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px);overflow-y:auto;scrollbar-width:none}
-.map-box{height:min(46dvh,360px)}
+.perk-wrap{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px);overflow-y:auto;scrollbar-width:none}
 
 /* ═══════════════════════════════════════════════════════════════
    4.1 — сундуки и коллекция реликвий

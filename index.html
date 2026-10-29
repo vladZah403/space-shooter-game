@@ -356,12 +356,14 @@
   </div>
 </section>
 
-<!-- ═══ КАРТА СЕКТОРА (4.0): выбор узла перед волной ═══ -->
-<section id="scr-map" class="screen overlay">
+<!-- ═══ КАРТА ГАЛАКТИКИ (4.1): выбор узла перед волной, рисует galaxy.js ═══ -->
+<section id="scr-map" class="screen overlay map-scr">
   <div class="map-wrap">
-    <div class="perk-title" id="mapTitle">МАРШРУТ</div>
-    <div class="perk-sub" id="mapSub">Куда летим?</div>
-    <div class="map-box" id="mapBox"></div>
+    <div class="map-head">
+      <div><div class="map-title" id="mapTitle">СЕКТОР 1</div><div class="map-sub" id="mapSub"></div></div>
+      <div class="map-steps" id="mapSteps"></div>
+    </div>
+    <canvas class="map-cv" id="mapCv"></canvas>
     <div class="map-info" id="mapInfo"></div>
     <button class="btn primary wide" id="btnMapGo" disabled>ЛЕТИМ</button>
   </div>
@@ -472,6 +474,7 @@
 <script src="js/skills.js?v=4.0.1"></script>
 <script src="js/sectors.js?v=4.0.1"></script>
 <script src="js/map.js?v=4.0.1"></script>
+<script src="js/galaxy.js?v=4.0.1"></script>
 <script src="js/companion.js?v=4.0.1"></script>
 <script src="js/intro.js?v=4.0.1"></script>
 <script src="js/demo.js?v=4.0.1"></script>
