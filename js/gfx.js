@@ -344,13 +344,15 @@
     pu_freeze() { return badge('#9be8ff', (x, s) => { x.strokeStyle = '#d9f6ff'; x.lineWidth = s * 0.05; x.lineCap = 'round'; for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; x.beginPath(); x.moveTo(s / 2 + Math.cos(a) * s * 0.22, s / 2 + Math.sin(a) * s * 0.22); x.lineTo(s / 2 - Math.cos(a) * s * 0.22, s / 2 - Math.sin(a) * s * 0.22); x.stroke(); } x.fillStyle = '#9be8ff'; x.beginPath(); x.arc(s / 2, s / 2, s * 0.06, 0, U.TAU); x.fill(); }); },
   };
 
-  // ── 4.1: сундуки — пиксель-арт в стиле листов (пока нет нарисованных): корпус и крышка отдельно,
-  //    крышку анимируют сцены (тряска, открытие). Рисуется в «больших пикселях» и увеличивается без сглаживания ──
+  // ── 4.1: сундуки — космические грузовые контейнеры, пиксель-арт в стиле листов (пока нет нарисованных):
+  //    корпус и крышка отдельно, крышка раскрывается двумя створками (тряска, открытие — в сценах).
+  //    Рисуется в «больших пикселях» и увеличивается без сглаживания ──
   const CHEST_PAL = {
-    bronze: { wood: '#8a5228', woodL: '#b0703a', woodD: '#5a3218', metal: '#d89a5a', metalL: '#ffd29a', metalD: '#8a5226', gem: '#ff6a3d' },
-    silver: { wood: '#34446e', woodL: '#4c5f93', woodD: '#212c4a', metal: '#c6d2ea', metalL: '#ffffff', metalD: '#7584a6', gem: '#3de0ff' },
-    gold:   { wood: '#6a2c8a', woodL: '#8c45b0', woodD: '#43195a', metal: '#ffc83d', metalL: '#fff1a6', metalD: '#b8780e', gem: '#ff4df0' },
+    bronze: { hull: '#4a3a33', hullL: '#6b5447', hullD: '#2a201d', trim: '#d0894a', trimL: '#ffc58a', trimD: '#7a4a22', neon: '#ff9a4d' },
+    silver: { hull: '#34405a', hullL: '#52648c', hullD: '#1e2638', trim: '#b9c6de', trimL: '#ffffff', trimD: '#66749a', neon: '#3de0ff' },
+    gold:   { hull: '#2e2244', hullL: '#4a3870', hullD: '#181026', trim: '#ffc83d', trimL: '#fff1a6', trimD: '#a8700c', neon: '#ff4df0' },
   };
+  const HAZARD = ['#ffc83d', '#1b1622'];
   const PX = 4;   // экранных пикселей в одном «пикселе» рисунка
   function pixelArt(w, h, paint) {
     const c = mk(w + 2, h + 2), x = c.getContext('2d');
@@ -369,37 +371,46 @@
     if (this._proc[key]) return this._proc[key];
     const P = CHEST_PAL[tier] || CHEST_PAL.bronze, gold = tier === 'gold', silver = tier === 'silver';
     const body = pixelArt(32, 16, (r) => {
-      r(0, 0, 32, 16, P.wood);
-      r(0, 2, 32, 1, P.woodL); r(0, 6, 32, 1, P.woodD); r(0, 11, 32, 1, P.woodD); r(0, 7, 32, 1, P.woodL);
-      r(0, 0, 32, 2, P.metal); r(0, 0, 32, 1, P.metalL);
-      r(0, 14, 32, 2, P.metal); r(0, 15, 32, 1, P.metalD);
-      for (const bx of [3, 26]) { r(bx, 0, 3, 16, P.metal); r(bx, 0, 1, 16, P.metalL); r(bx + 2, 0, 1, 16, P.metalD); }
-      r(0, 0, 1, 16, P.metalD); r(31, 0, 1, 16, P.metalD);
-      // замок
-      r(12, 0, 8, 8, P.metal); r(12, 0, 8, 1, P.metalL); r(19, 0, 1, 8, P.metalD); r(12, 7, 8, 1, P.metalD);
-      r(15, 2, 2, 2, P.gem); r(15, 4, 2, 2, '#160c08'); r(15, 2, 1, 1, '#fff');
-      // заклёпки
-      for (const sx of [4, 27]) { r(sx, 4, 1, 1, P.metalL); r(sx, 10, 1, 1, P.metalL); }
-      if (gold || silver) { r(9, 9, 2, 2, P.gem); r(21, 9, 2, 2, P.gem); r(9, 9, 1, 1, '#fff'); r(21, 9, 1, 1, '#fff'); }
+      // проём под створками (виден, когда они раскрыты): изнутри светится цветом сундука
+      r(1, 0, 30, 2, P.hullD); r(3, 1, 26, 1, P.neon);
+      // корпус и верхний обод
+      r(0, 2, 32, 13, P.hull);
+      r(0, 2, 32, 1, P.trimL); r(0, 3, 32, 1, P.trim); r(3, 4, 26, 1, P.hullL);
+      // вентиляционные щели
+      for (const vx of [5, 22]) for (const vy of [5, 7]) r(vx, vy, 5, 1, P.hullD);
+      // неоновая полоса и тень под ней
+      r(3, 9, 26, 1, P.neon); r(3, 10, 26, 1, P.hullD);
+      // жёлто-чёрная разметка груза
+      for (let y = 11; y < 13; y++) for (let x = 3; x < 29; x++) r(x, y, 1, 1, HAZARD[((x + y) >> 1) & 1]);
+      // замок: тёмный экран со световым индикатором и кнопками
+      r(12, 4, 8, 7, P.trimD); r(13, 5, 6, 4, '#0a0d18'); r(14, 6, 4, 1, P.neon); r(14, 7, 1, 1, P.trimL); r(17, 7, 1, 1, P.trimL);
+      // рёбра жёсткости по бокам, заклёпки
+      for (const bx of [0, 29]) { r(bx, 2, 3, 13, P.trim); r(bx, 2, 1, 13, P.trimL); r(bx + 2, 3, 1, 12, P.trimD); r(bx + 1, 6, 1, 1, P.trimD); r(bx + 1, 11, 1, 1, P.trimD); }
+      // основание и опоры
+      r(0, 13, 32, 1, P.trim); r(0, 14, 32, 1, P.trimD);
+      r(1, 15, 5, 1, P.trimD); r(26, 15, 5, 1, P.trimD);
+      if (gold || silver) { r(8, 9, 1, 1, '#fff'); r(23, 9, 1, 1, '#fff'); }
     });
     const lid = pixelArt(32, 11, (r) => {
-      r(5, 0, 22, 1, P.metal); r(2, 1, 28, 1, P.wood); r(1, 2, 30, 1, P.wood); r(0, 3, 32, 8, P.wood);
-      r(3, 1, 26, 1, P.woodL); r(1, 3, 30, 1, P.woodL); r(0, 6, 32, 1, P.woodD);
-      for (const bx of [3, 26]) { r(bx, 0, 3, 11, P.metal); r(bx, 0, 1, 11, P.metalL); r(bx + 2, 1, 1, 10, P.metalD); }
-      r(0, 9, 32, 2, P.metal); r(0, 9, 32, 1, P.metalL); r(0, 10, 32, 1, P.metalD);
-      r(13, 6, 6, 5, P.metal); r(13, 6, 6, 1, P.metalL); r(15, 7, 2, 2, P.gem);
-      if (gold) { r(4, 4, 1, 2, P.gem); r(27, 4, 1, 2, P.gem); r(9, 2, 14, 1, P.metalL); }
+      // ручка (делится пополам вместе со створками)
+      r(11, 0, 10, 1, P.trimL); r(11, 1, 2, 1, P.trimD); r(19, 1, 2, 1, P.trimD);
+      // скошенный верх и панель
+      r(2, 2, 28, 1, P.trimL); r(1, 3, 30, 1, P.trim); r(0, 4, 32, 5, P.hull);
+      r(3, 4, 26, 1, P.hullL); r(3, 6, 9, 1, P.hullD); r(20, 6, 9, 1, P.hullD);
+      // огни по краям и эмблема-кристалл посередине
+      r(4, 7, 1, 1, P.neon); r(27, 7, 1, 1, P.neon);
+      r(15, 4, 2, 1, P.neon); r(14, 5, 4, 2, P.neon); r(15, 7, 2, 1, P.neon); r(15, 5, 1, 1, '#fff');
+      // рёбра жёсткости, как на корпусе
+      for (const bx of [0, 29]) { r(bx, 3, 3, 8, P.trim); r(bx, 3, 1, 8, P.trimL); r(bx + 2, 4, 1, 7, P.trimD); }
+      // нижняя кромка: светящийся шов между крышкой и корпусом
+      r(0, 9, 32, 1, P.trim); r(0, 10, 32, 1, P.trimD); r(3, 10, 26, 1, P.neon);
+      if (gold) { r(6, 5, 1, 1, '#fff'); r(25, 5, 1, 1, '#fff'); }
     });
-    // изнанка крышки (видна, когда она откинута): перевёрнута и в тени
-    const lidIn = mk(lid.width, lid.height), lx = lidIn.getContext('2d');
-    lx.translate(0, lid.height); lx.scale(1, -1); lx.drawImage(lid, 0, 0);
-    lx.setTransform(1, 0, 0, 1, 0, 0);
-    lx.globalCompositeOperation = 'source-atop'; lx.fillStyle = 'rgba(8,4,20,.5)'; lx.fillRect(0, 0, lid.width, lid.height);
     // закрытый сундук целиком — для значков в окнах
     const icon = mk(body.width, body.height + lid.height - PX * 3), ix = icon.getContext('2d');
     ix.drawImage(body, 0, lid.height - PX * 3);
     ix.drawImage(lid, 0, 0);
-    return (this._proc[key] = { body, lid, lidIn, icon, PX, hinge: lid.height - PX * 3 });
+    return (this._proc[key] = { body, lid, icon, PX, hinge: lid.height - PX * 3 });
   };
   // картинка сундука для HTML (<img>), с кэшем
   gfx.chestURL = function (tier) {
@@ -407,7 +418,7 @@
     return this._proc[key] || (this._proc[key] = this.chest(tier).icon.toDataURL());
   };
   gfx.chestImg = function (tier, cls) { return '<img class="px-ico' + (cls ? ' ' + cls : '') + '" src="' + this.chestURL(tier) + '" alt="">'; };
-  // сундук на холсте: центр (x, y), ширина w; open 0..1 — крышка откидывается, shake — дрожь крышки
+  // сундук на холсте: центр (x, y), ширина w; open 0..1 — створки раскрываются, shake — дрожь крышки
   // возвращает { mouth } — y щели между крышкой и корпусом (оттуда бьёт свет)
   gfx.drawChest = function (ctx, tier, x, y, w, open, shake) {
     const c = this.chest(tier), k = w / c.body.width, bh = c.body.height * k, lh = c.lid.height * k;
@@ -415,13 +426,15 @@
     const sm = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(c.body, x - w / 2, by, w, bh);
-    // крышка поворачивается на петлях: сначала «ложится» к ребру, потом встаёт изнанкой вверх
-    const o = U.clamp(open || 0, 0, 1), s = Math.cos(o * Math.PI), lift = (shake || 0) * k * 3 + o * k * 6;
-    ctx.save();
-    ctx.translate(x, pivot - lift);
-    ctx.scale(1, Math.max(0.06, Math.abs(s)));
-    ctx.drawImage(s >= 0 ? c.lid : c.lidIn, -w / 2, -lh, w, lh);
-    ctx.restore();
+    // крышка делится посередине: створки поворачиваются на петлях по внешним углам и встают «крыльями»
+    const o = U.clamp(open || 0, 0, 1), e = 1 - Math.pow(1 - o, 3), lift = (shake || 0) * k * 3 + e * k * 4, hw = c.lid.width / 2;
+    for (const sd of [-1, 1]) {
+      ctx.save();
+      ctx.translate(x + sd * w / 2, pivot - lift);
+      ctx.rotate(sd * e * 1.15);
+      ctx.drawImage(c.lid, sd < 0 ? 0 : hw, 0, hw, c.lid.height, sd < 0 ? 0 : -w / 2, -lh, w / 2, lh);
+      ctx.restore();
+    }
     ctx.imageSmoothingEnabled = sm;
     return { mouth: by + c.PX * k, top, bottom: by + bh };
   };
