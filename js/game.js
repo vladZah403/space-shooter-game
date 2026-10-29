@@ -2264,26 +2264,28 @@
   }
 
   // корабль с пламенем: (x, y) — центр, w — ширина
-  // 3.1: модули забега видны на корабле — детали с листа «Кастомизация» (sp_*).
+  // 3.1: модули забега видны на корабле — у каждого модуля своя деталь (листы art/sheet14–15, спрайты sp_*).
   // Деталь: [спрайт, x, y (доли ширины/высоты корабля), ширина (доля ширины корабля), слой: 0 — под корпусом, 1 — поверх].
   // Парные стоят зеркально; правая копия без своего спрайта «_r» отражается
   game.shipParts = function (mods) {
     const out = [], m = (id) => mods[id] || 0;
     const pair = (l, r, x, y, w, layer) => { out.push([l, -x, y, w, layer], [r, x, y, w, layer]); };
-    // крылья и двигатели — одни на корабль, по старшему модулю
-    const wing = m('plating') >= 2 ? 'armor' : m('gyro') ? 'speed' : m('salvage') ? 'heavy' : m('repair') ? 'light' : '';
-    if (wing) pair('sp_wing_' + wing + '_l', 'sp_wing_' + wing + '_r', 0.42, 0.22, 0.36, 0);
-    const eng = m('cooling') ? 'sp_eng_ion' : m('chrono') ? 'sp_eng_burn' : '';
-    if (eng) pair(eng, eng, 0.2, 0.46, 0.18, 0);
+    // крылья — одни на корабль: с пушками (бортовые пушки), тяжёлые (бронеплиты ×2) или лёгкие (гироскоп)
+    const wing = m('wings') ? 'gun' : m('plating') >= 2 ? 'heavy' : m('gyro') ? 'light' : '';
+    if (wing) pair('sp_wing_' + wing + '_l', 'sp_wing_' + wing + '_r', 0.4, 0.18, 0.42, 0);
+    if (m('gyro')) pair('sp_eng', 'sp_eng', 0.22, 0.44, 0.13, 0);
+    if (m('chrono')) out.push(['sp_warp', 0, 0.46, 0.2, 0]);
     if (m('hunter')) out.push(['sp_gun_plasma', 0, -0.44, 0.12, 0]);
-    if (m('wings')) pair('sp_gun_blaster', 'sp_gun_blaster', 0.36, 0, 0.13, 1);
-    if (m('power')) pair('sp_gun_laser', 'sp_gun_laser', 0.24, -0.12, m('power') >= 2 ? 0.13 : 0.11, 1);
-    if (m('bombbay')) pair('sp_gun_rocket', 'sp_gun_rocket', 0.3, 0.18, 0.08, 1);
-    if (m('plating')) out.push(['sp_arm_nose', 0, -0.27, 0.18, 1]);
-    if (m('plating') >= 2) pair('sp_arm_plate', 'sp_arm_plate', 0.16, 0.06, 0.13, 1);
-    if (m('targeting') || m('scanner')) out.push(['sp_arm_sensor', 0, -0.06, 0.13, 1]);
-    if (m('shieldcore')) out.push(['sp_arm_core', 0, 0.14, 0.16, 1]);
-    if (m('emergency')) out.push(['sp_arm_shield', 0, 0.33, 0.14, 1]);
+    if (m('salvage')) out.push(['sp_hook', 0, 0.58, 0.1, 0]);
+    if (m('power')) { const g = m('power') >= 2 ? 'sp_gun_minigun' : 'sp_gun_lancer'; pair(g, g, 0.24, -0.14, 0.1, 1); }
+    if (m('bombbay')) pair('sp_gun_rockets', 'sp_gun_rockets', 0.32, 0.12, 0.1, 1);
+    if (m('cooling')) pair('sp_heatsink', 'sp_heatsink', 0.13, 0.3, 0.1, 1);
+    if (m('plating')) out.push(['sp_arm_nose', 0, -0.28, 0.16, 1]);
+    if (m('plating') >= 2) pair('sp_arm_plate_l', 'sp_arm_plate_r', 0.16, 0.05, 0.13, 1);
+    if (m('targeting')) out.push(['sp_arm_sensor', 0, -0.06, 0.14, 1]);
+    if (m('shieldcore')) out.push(['sp_arm_core', 0, 0.14, 0.17, 1]);
+    if (m('scanner')) out.push(['sp_radar', 0.2, 0.3, 0.11, 1]);
+    if (m('emergency')) out.push(['sp_arm_emblem', 0, 0.32, 0.13, 1]);
     return out;
   };
   function drawParts(ctx, parts, layer, w, h) {

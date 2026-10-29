@@ -24,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 9 — эффекты (VFX: взрывы, щиты, порталы, мины, ракеты), 10 — каталог эффектов (экраны, индикаторы, разрушения),
 # 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы),
 # 12 — враги 3.1 (защиты от оружия и поддержка), 13 — разное 3.1 (торговец, энергоблоки, яйца улья, конвой,
-# медкорабль, лавовые астероиды)
+# медкорабль, лавовые астероиды), 14–15 — детали корабля 3.1 (модули забега на корабле)
 SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet00_main.png',
     'sheet01_player_ships.png',
@@ -40,6 +40,8 @@ SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet11_asteroids.png',
     'sheet12_enemies_30.png',
     'sheet13_props_31.png',
+    'sheet14_parts_31.jpg',
+    'sheet15_parts2_31.jpg',
 )]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -255,27 +257,28 @@ SPRITES = {
     'e_graviton':  ((726, 570, 942, 808), 'glow', 12, {'max': 180, 'sat': 0.8}),
     'e_icebreaker': ((950, 490, 1180, 826), 'solid', 12, {'max': 200}),
 
-    # ── лист 8: детали корабля (3.1) — модули забега видны на корабле (game.shipParts) ──
-    # крылья: левое и правое; оружие нарисовано стволом вправо — поворачиваем стволом вверх
-    'sp_wing_light_l': ((33, 420, 80, 468), 'solid', 8),
-    'sp_wing_light_r': ((95, 420, 141, 468), 'solid', 8),
-    'sp_wing_heavy_l': ((162, 416, 206, 481), 'solid', 8),
-    'sp_wing_heavy_r': ((216, 415, 260, 481), 'solid', 8),
-    'sp_wing_speed_l': ((283, 421, 332, 472), 'solid', 8),
-    'sp_wing_speed_r': ((344, 421, 394, 472), 'solid', 8),
-    'sp_wing_armor_l': ((423, 423, 475, 476), 'solid', 8),
-    'sp_wing_armor_r': ((486, 423, 537, 476), 'solid', 8),
-    'sp_eng_ion':      ((174, 631, 216, 699), 'solid', 8),
-    'sp_eng_burn':     ((350, 628, 389, 703), 'solid', 8),
-    'sp_gun_laser':    ((588, 433, 623, 465), 'solid', 8, {'deg': 90}),
-    'sp_gun_rocket':   ((740, 429, 803, 448), 'solid', 8, {'deg': 90}),
-    'sp_gun_plasma':   ((841, 429, 914, 468), 'solid', 8, {'deg': 90}),
-    'sp_gun_blaster':  ((998, 428, 1065, 471), 'solid', 8, {'deg': 90}),
-    'sp_arm_nose':     ((850, 645, 891, 698), 'solid', 8),
-    'sp_arm_plate':    ((782, 651, 821, 692), 'solid', 8),
-    'sp_arm_sensor':   ((658, 653, 693, 690), 'solid', 8),
-    'sp_arm_core':     ((921, 642, 967, 700), 'solid', 8),
-    'sp_arm_shield':   ((997, 640, 1052, 703), 'solid', 8),
+    # ── листы 14–15: детали корабля (3.1) — модули забега видны на корабле (game.shipParts) ──
+    'sp_wing_light_l': ((35, 155, 170, 280), 'solid', 14, {'max': 90}),
+    'sp_wing_light_r': ((220, 155, 355, 280), 'solid', 14, {'max': 90}),
+    'sp_wing_gun_l':   ((35, 320, 165, 470), 'solid', 14, {'max': 90}),
+    'sp_wing_gun_r':   ((225, 320, 355, 470), 'solid', 14, {'max': 90}),
+    'sp_wing_heavy_l': ((35, 490, 165, 655), 'solid', 14, {'max': 90}),
+    'sp_wing_heavy_r': ((225, 490, 360, 655), 'solid', 14, {'max': 90}),
+    'sp_eng':          ((755, 160, 845, 370), 'solid', 14, {'max': 64}),
+    'sp_gun_lancer':   ((730, 465, 795, 715), 'solid', 14, {'max': 70}),
+    'sp_gun_minigun':  ((590, 465, 695, 715), 'solid', 14, {'max': 70}),
+    'sp_gun_rockets':  ((845, 480, 930, 715), 'solid', 14, {'max': 70}),
+    'sp_gun_plasma':   ((970, 485, 1055, 715), 'solid', 14, {'max': 70}),
+    'sp_arm_nose':     ((450, 795, 530, 900), 'solid', 14, {'max': 56}),
+    'sp_arm_plate_l':  ((570, 795, 628, 885), 'solid', 14, {'max': 56}),
+    'sp_arm_plate_r':  ((632, 795, 695, 885), 'solid', 14, {'max': 56}),
+    'sp_arm_sensor':   ((720, 795, 805, 885), 'solid', 14, {'max': 56}),
+    'sp_arm_core':     ((845, 795, 940, 890), 'solid', 14, {'max': 56}),
+    'sp_arm_emblem':   ((970, 790, 1050, 900), 'solid', 14, {'max': 56}),
+    'sp_warp':         ((300, 165, 395, 295), 'solid', 15, {'max': 64}),
+    'sp_radar':        ((455, 800, 545, 900), 'solid', 15, {'max': 56}),
+    'sp_heatsink':     ((850, 800, 940, 900), 'solid', 15, {'max': 56}),
+    'sp_hook':         ((985, 800, 1040, 905), 'solid', 15, {'max': 56}),
 
     # ── лист 13: разное 3.1 ──
     'p_merchant':   ((34, 37, 318, 399), 'solid', 13, {'max': 220}),
@@ -365,6 +368,8 @@ CLOSE = {'pu_spread': 4, 'boss': 5, 'interceptor': 2, 'assault': 2, 'techno': 2,
          'ship7': 2, 'ship8': 2, 'ship9': 2, 'ship10': 2, 'ship11': 2, 'ship12': 2, 'ship13': 2}
 # у астероидов тёмные щели между глыбами
 CLOSE.update({n: 2 for n in SPRITES if n.startswith('ast')})
+# детали корабля (JPEG-листы 14–15): тёмные щели между пластинами
+CLOSE.update({n: 2 for n in SPRITES if n.startswith('sp_')})
 
 
 def flood_outside(x0, y0, w, h, trav, blocked=None):
