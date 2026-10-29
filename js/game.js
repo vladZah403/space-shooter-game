@@ -104,7 +104,7 @@
       weapons: s.weapons.loadout.slice(), weapon: s.weapons.loadout[0] || 'laser', wcd: {}, mag: {}, side: 1,
     };
     const pil = this.run.pilot;
-    p.maxLives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0) + (pil === 'bork' ? 1 : 0);
+    p.maxLives = D.BASE_LIVES + (D.SHIPS[s.ship.model].stats.lives || 0) + (pil === 'bork' ? 1 : 0) + this.skillLv('sk_armor');
     p.lives = p.maxLives;
     p.shield = false;
     p.bombs = 1 + (D.SHIPS[s.ship.model].stats.bombs || 0) + (pil === 'rex' ? 2 : 0);
@@ -138,6 +138,7 @@
     SS.enemies.corpses.length = 0;
     SS.events.reset();
     SS.foes.reset();
+    SS.skills.reset();
     FX.clear();
   };
 
@@ -165,6 +166,8 @@
   // ════════════════════════════════════════════════════════════
   game.perk = function (id) { return (this.run && this.run.perks[id]) || 0; };
   game.skill = function (id) { return !!M.s.skills[id]; };
+  // 3.1: ранг навыка (0 — не изучен)
+  game.skillLv = function (id) { return +M.s.skills[id] || 0; };
 
   game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
   // сектор и босс по номеру в забеге (с учётом перемешанного порядка)
@@ -172,34 +175,34 @@
   game.sectorDef = function (k) { return D.SECTORS[this.sectorIdx(k)]; };
   game.bossDef = function (num) { const o = this.run && this.run.bossOrder, i = (num - 1) % D.BOSSES.length; return D.BOSSES[o ? o[i] : i]; };
   game.computeStats = function () {
-    const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skill(id);
+    const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skillLv(id);
     const pl = (id) => !!(this.run && this.run.pilot === id);
     const ship = D.SHIPS[s.ship.model].stats;
     const pres = M.prestigeBonus();
     const S = G.S;
-    let shieldRegen = md('shieldcore') ? 20 : 0;
+    let shieldRegen = md('shieldcore') ? 20 : sk('sk_capacitor') ? 30 : 0;
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
     if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + (sk('sk_sniper') ? 0.5 : 0) + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
-      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (sk('sk_sniper') ? 0.8 : 1),
-      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0),
+      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
+      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05),
+      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0) + sk('sk_precision') * 0.04,
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5,
       pierce: pk('pierce'),
       multi: pk('multi') + (ship.multi || 0),
       wings: ship.wings || md('wings'),
-      magnet: sk('sk_magnet') ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)),
+      magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (sk('sk_doublecoins') ? 2 : 1) * this.coinK,
-      luck: 1 + pk('luck') * 0.4,
-      speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (sk('sk_doublecoins') ? 0.85 : 1),
-      dodge: Math.min(0.45, (sk('sk_ghost') ? 0.2 : 0) + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
-      cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1),
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * this.coinK,
+      luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25),
+      speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15),
+      dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
+      cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1) * (1 - sk('sk_chrono') * 0.15),
       bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0) + (pl('rex') ? 0.5 : 0),
       bombCd: pl('rex') ? 0.5 : 1,
-      invMul: pl('nox') ? 2 : 1,
+      invMul: (pl('nox') ? 2 : 1) * (sk('sk_secondwind') ? 2 : 1),
       bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35,
       eliteDmg: 1 + md('hunter') * 0.35,
       xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1),
@@ -329,11 +332,14 @@
     if (p.lx !== undefined && dt > 0) { p.vxm = U.damp(p.vxm || 0, (p.x - p.lx) / dt, 6, dt); p.vym = U.damp(p.vym || 0, (p.y - p.ly) / dt, 6, dt); }
     p.lx = p.x; p.ly = p.y;
     if (run.focus.t > 0) run.focus.t -= dt;
+    const nb = this.bullets.length;
     if (p.alive && this.state === 'play') this.fireWeapons(dt);
+    SS.skills.echo(nb);
     this.updateDrones(dt);
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
     SS.foes.update(edt);
+    SS.skills.update(dt);
     this.updateEBullets(edt);
     this.collide();
     this.processBlasts();
@@ -394,7 +400,8 @@
     } else run.emergT = 0;
     if (this.skill('sk_regen') && p.alive && p.lives < p.maxLives) {
       run.regenT += dt;
-      if (run.regenT >= (p.lives === 1 ? 20 : 45)) { run.regenT = 0; this.heal(1, '💚 РЕГЕНЕРАЦИЯ'); }
+      const rt = this.skillLv('sk_regen') >= 2 ? 35 : 45;
+      if (run.regenT >= (p.lives === 1 ? rt / 2 : rt)) { run.regenT = 0; this.heal(1, '💚 РЕГЕНЕРАЦИЯ'); }
     }
   };
 
@@ -414,6 +421,8 @@
     let d = this.st.dmg + (wid ? wl(wid, 'dmg') * 0.12 : 0);
     if (this.buffs.power > 0) d *= 1.6;
     if (this.wave && this.wave.danger && this.skill('sk_daredevil')) d *= 1.25;
+    // хладнокровие: +10% урона за каждые 4 с без попаданий, до +30%
+    if (this.skill('sk_coolhead')) d *= 1 + Math.min(3, Math.floor((this.run.time - (this.run.hitAt || 0)) / 4)) * 0.1;
     if (this.skill('sk_berserker')) {
       const p = this.player;
       const lost = p.maxLives > 1 ? (p.maxLives - p.lives) / (p.maxLives - 1) : 0;
@@ -503,6 +512,9 @@
     return b;
   }
 
+  game.spawnShot = shot;
+  game.skillCast = function (id, sk) { SS.skills.cast(id, sk); };
+
   game.fire = function (wid) {
     const p = this.player, S = G.S, st = this.st;
     const def = D.WEAPONS[wid], base = def.base;
@@ -571,6 +583,9 @@
       const ldmg = base.dmg * dmgMul * (1 + multi * 0.15) * (full ? 1 : base.spark);
       if (this.chainLightning(p.x, nose, ldmg, jumps, range, 360 * S, false, !full) && full) { run.energy = Math.max(0, run.energy - base.cost); this.hudDirty = true; }
       if (spread && full) this.chainLightning(p.x, nose, ldmg * 0.6, Math.ceil(jumps / 2), range, 360 * S, true);
+      // двойник бьёт своей молнией (энергию не тратит)
+      const cl = SS.skills.clone;
+      if (cl) this.chainLightning(cl.x, cl.y - p.w * 0.4, ldmg * 0.6, jumps, range, 360 * S, true, !full);
       A.play('zap', full ? undefined : { vol: 0.4, rate: 1.6 });
     } else if (wid === 'arc') {
       // серп: волна-полумесяц летит вперёд, расширяется и прошивает всех на пути; заряд от движения — шире и сильнее
@@ -904,6 +919,7 @@
     if (e.vuln > 0) dmg *= 1.5;
     if (this.skill('sk_executioner') && e.hp < e.maxHp * 0.25) dmg *= 2;
     if (e.frozen > 0) dmg *= 1.15;
+    if (e.emp > 0) dmg *= 1.3;
     // щит щитоносца / дредноута
     if (e.shield > 0) {
       const mul = o.heavy || o.src === 'rail' || o.src === 'bomb' ? 3 : 1;
@@ -1015,6 +1031,7 @@
     if (Math.random() < chance || e.mini) this.dropPowerup(e.x, e.y);
     if (e.mini) this.dropPowerup(e.x + 20 * S, e.y);
     // навыки и улучшения
+    if ((e.elite || e.mini) && this.skill('sk_jackpot')) this.dropCrate(e.x, e.y);
     if (this.skill('sk_vamp')) { run.killsForVamp++; if (run.killsForVamp >= 25) { run.killsForVamp = 0; this.heal(1, '🧛 ВАМПИР'); } }
     if (this.skill('sk_detonator')) { run.detCount++; if (run.detCount % 5 === 0) this.blast(e.x, e.y, 80 * S, 40 * this.dmgMul(), '#ff9f3d', 'det'); }
     if (this.st.nova > 0) this.blast(e.x, e.y, (46 + this.st.nova * 14) * S, 12 * this.st.nova * this.dmgMul(), '#ffb03d', 'nova');
@@ -1065,11 +1082,14 @@
       return true;
     }
     p.lives--;
+    run.hitAt = run.time;
     run.lastHit = cause || 'Вражеский огонь';
     run.waveDamage++;
     run.bossDamaged = true;
     p.inv = 1.8 * this.st.invMul;
-    this.clearBulletsAround(p.x, p.y, 130 * G.S);
+    // второе дыхание: пули вокруг гаснут в большом радиусе
+    this.clearBulletsAround(p.x, p.y, (this.skill('sk_secondwind') ? 260 : 130) * G.S);
+    if (this.skill('sk_secondwind')) FX.ring(p.x, p.y, p.w * 0.5, 260 * G.S, '#bff4ff', 0.5, 4);
     FX.explode(p.x, p.y, 1.2, '#ff5c7a');
     FX.vignette('#ff2a48', 0.6, 0.85);
     FX.shake(0.55);
@@ -1238,15 +1258,8 @@
     const p = this.player, S = G.S;
     A.play('skill');
     SS.tg.haptic('medium');
-    if (id === 'sk_nova') this.novaWave(true);
-    else if (id === 'sk_barrier') { FX.ring(p.x, p.y, p.w * 0.5, p.w * 1.6, '#ffd23d', 0.5, 5); FX.sprite('fx_sh_restore', 0, 0, { follow: p, w0: p.w * 2.4, w1: p.w * 1.3, dur: 0.5, hold: 0.4, hue: 46 }); }
-    else if (id === 'sk_overclock') { FX.glowPuff(p.x, p.y, '#3de0ff', 120 * S, 0.4); this.speedFx(190); }
-    else if (id === 'sk_airstrike') this.airstrike();
-    else if (id === 'sk_timewarp') {
-      FX.flash('#3d6bff', 0.25); FX.ring(G.FW / 2, G.H / 2, 20, G.H, '#7fb8ff', 0.8, 6);
-    }
-    else if (id === 'sk_rail') { this.ov.rail = { t: 0, dur: sk.dur, tick: 0, charge: 0.35 }; A.play('railCharge'); }
-    else if (id === 'sk_blackhole') { this.ov.hole = { x: G.FW / 2, y: G.H * 0.32, t: 0, dur: sk.dur, tick: 0 }; A.play('dark', { rate: 0.6 }); }
+    // 3.1: у каждого активного навыка — своя анимация запуска (SKILL_FX)
+    this.skillCast(id, sk);
     M.trackMission('skills', 1);
     this.hudDirty = true;
   };
@@ -1467,6 +1480,7 @@
     // астероиды сектора закрывают от вражеских снарядов
     cover.length = 0;
     for (const e of this.enemies) if (e.alive && e.def.cover) cover.push(e);
+    const barrier = this.run.skillFx.sk_barrier > 0;
     for (const b of this.ebullets) {
       if (b.dead) continue;
       b.age += dt; b.life -= dt;
@@ -1522,6 +1536,8 @@
       }
       if (b.life <= 0 || b.y > H + 40 || b.y < -80 || b.x < -50 || b.x > FW + 50) { b.dead = true; continue; }
       if (cover.length && hitsCover(b)) { b.dead = true; FX.hit(b.x, b.y, '#d8c3a5'); continue; }
+      // барьер (навык) отражает пули обратно во врагов
+      if (barrier && SS.skills.reflect(b)) { b.dead = true; continue; }
       // попадание в игрока (стреловидная проверка — снаряд не «проскакивает»)
       if (p.alive && p.inv <= 0) {
         const rr = pr + b.r * 0.75;
@@ -2388,10 +2404,12 @@
     FX.drawBack(ctx);
     this.drawPickups(ctx);
     SS.foes.drawBack(ctx);
+    SS.skills.drawBack(ctx);
     SS.enemies.drawAll(ctx);
     SS.foes.drawFront(ctx);
     this.drawBullets(ctx);
     this.drawPlayer(ctx);
+    SS.skills.drawFront(ctx);
     this.drawEBullets(ctx);
     SS.events.draw(ctx);
     this.drawOverlays(ctx);

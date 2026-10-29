@@ -218,12 +218,15 @@
   <div class="sub-body">
     <div class="skill-slots" id="skillSlots"></div>
     <div class="tabs" id="skillTabs">
-      <button class="tab active" data-tab="passive">ПАССИВНЫЕ</button>
-      <button class="tab" data-tab="active">АКТИВНЫЕ</button>
+      <button class="tab active" data-tab="combat">АТАКА</button>
+      <button class="tab" data-tab="survival">ЗАЩИТА</button>
+      <button class="tab" data-tab="tech">ТЕХНИКА</button>
+      <button class="tab" data-tab="special">УДАЧА</button>
     </div>
+    <div class="sk-detail" id="skillDetail"></div>
     <div id="skillList"></div>
     <button class="btn ghost" id="btnSkillReset"><svg><use href="#i-retry"/></svg>СНЯТЬ ВСЕ НАВЫКИ</button>
-    <div class="hint-txt">Очки навыков — за каждый уровень корабля. Навык можно снять: очки вернутся.</div>
+    <div class="hint-txt">Очки навыков — за каждый уровень корабля. Навык можно снять: очки вернутся. Активных навыков — не больше двух, это кнопки в бою.</div>
   </div>
 </section>
 
@@ -406,6 +409,7 @@
 <script src="js/enemies.js?v=3.0.0"></script>
 <script src="js/events.js?v=3.0.0"></script>
 <script src="js/foes.js?v=3.0.0"></script>
+<script src="js/skills.js?v=3.0.0"></script>
 <script src="js/intro.js?v=3.0.0"></script>
 <script src="js/demo.js?v=3.0.0"></script>
 <script src="js/ui.js?v=3.0.0"></script>

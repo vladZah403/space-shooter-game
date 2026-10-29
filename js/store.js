@@ -80,6 +80,7 @@
       s.weapons.loadout = s.weapons.loadout.filter((w, i, a) => s.weapons.owned.includes(w) && a.indexOf(w) === i).slice(0, 3);
       if (!s.weapons.loadout.length) s.weapons.loadout = ['laser'];
       for (const id of Object.keys(s.skills)) if (!D.SKILLS[id]) delete s.skills[id];
+      this.fixSkillSlots();
       if (!D.SHIPS[s.ship.model] || !s.ship.models.includes(s.ship.model)) s.ship.model = 'ship1';
       if (!s.ship.models.includes('ship1')) s.ship.models.unshift('ship1');
       if (!D.SKINS.find((k) => k.id === s.ship.skin)) s.ship.skin = 'default';
@@ -226,9 +227,19 @@
       this.save();
     },
 
-    // если навыков больше, чем слотов (старые сохранения), снимаем лишние с возвратом очков
+    // старые сохранения: ранги в пределах, навыки без пути к ним по древу (3.1) и лишние активные снимаются —
+    // очки возвращаются сами (считаются от изученного)
     fixSkillSlots() {
       const s = this.s;
+      for (const id of Object.keys(s.skills)) s.skills[id] = Math.min(D.SKILLS[id].max || 1, Math.max(1, Math.floor(+s.skills[id]) || 1));
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const id of Object.keys(s.skills)) {
+          const req = D.SKILLS[id].req;
+          if (req && !req.some((r) => s.skills[r])) { delete s.skills[id]; changed = true; }
+        }
+      }
       const byType = { passive: [], active: [] };
       for (const id of Object.keys(s.skills)) byType[D.SKILLS[id].type].push(id);
       const limit = { passive: D.MAX_PASSIVE, active: D.MAX_ACTIVE };
@@ -347,22 +358,23 @@
 
     // ── навыки ──
     skillPointsTotal() { return Math.max(0, this.s.shipLvl - 1) + (this.s.spBonus || 0); },
-    skillPointsSpent() { let n = 0; for (const id of Object.keys(this.s.skills)) n += (D.SKILLS[id] ? D.SKILLS[id].cost : 0); return n; },
+    skillPointsSpent() { let n = 0; for (const id of Object.keys(this.s.skills)) n += (D.SKILLS[id] ? D.SKILLS[id].cost * (+this.s.skills[id] || 0) : 0); return n; },
     skillPoints() { return Math.max(0, this.skillPointsTotal() - this.skillPointsSpent()); },
     skillCount(type) { return Object.keys(this.s.skills).filter((id) => D.SKILLS[id] && D.SKILLS[id].type === type).length; },
+    // 3.1: у навыка бывает несколько рангов; req — нужен хотя бы один из списка
     skillState(id) {
-      const sk = D.SKILLS[id];
-      const learned = !!this.s.skills[id];
-      const locked = !!(sk.req && !this.s.skills[sk.req]);
+      const sk = D.SKILLS[id], rank = +this.s.skills[id] || 0, max = sk.max || 1;
+      const learned = rank > 0, maxed = rank >= max;
+      const locked = !!(sk.req && !sk.req.some((r) => this.s.skills[r]));
       const slotsFull = !learned && this.skillCount(sk.type) >= (sk.type === 'active' ? D.MAX_ACTIVE : D.MAX_PASSIVE);
       const afford = this.skillPoints() >= sk.cost;
-      return { learned, locked, slotsFull, afford, canLearn: !learned && !locked && !slotsFull && afford };
+      return { rank, max, learned, maxed, locked, slotsFull, afford, canLearn: !maxed && !locked && !slotsFull && afford };
     },
     learnSkill(id) {
       const st = this.skillState(id);
-      if (!st.canLearn && !(SS.DEV && !st.learned && !st.locked && !st.slotsFull)) return false;
+      if (!st.canLearn && !(SS.DEV && !st.maxed && !st.locked && !st.slotsFull)) return false;
       if (SS.DEV && !st.afford) this.s.spBonus += D.SKILLS[id].cost;
-      this.s.skills[id] = 1;
+      this.s.skills[id] = st.rank + 1;
       store.save();
       this.checkAchievements();
       return true;
@@ -379,7 +391,7 @@
         changed = false;
         for (const k of Object.keys(this.s.skills)) {
           const req = D.SKILLS[k].req;
-          if (req && !this.s.skills[req]) { delete this.s.skills[k]; removed.push(k); changed = true; }
+          if (req && !req.some((r) => this.s.skills[r])) { delete this.s.skills[k]; removed.push(k); changed = true; }
         }
       }
       store.save();

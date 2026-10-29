@@ -968,6 +968,8 @@
       if (e.boss) { updateBoss(e, edt, dt); continue; }
       let edt2 = edt;
       if (e.frozen > 0) { e.frozen -= dt; edt2 *= 0.15; }
+      // ЭМИ (навык): враг замирает и молчит
+      if (e.emp > 0) { e.emp -= dt; edt2 = 0; }
       e.age += edt2;
       e.lastX = e.x;
       const ai = AI[e.ai || e.def.ai];
@@ -1531,7 +1533,9 @@
     b.fx = U.damp(b.fx, horizFlip(b), 7, dt);
     if (b.flashTele > 0) b.flashTele -= dt;
     if (b.frozen > 0) b.frozen -= dt;
-    if (game.player.alive) BOSS[b.bdef.id](b);
+    // ЭМИ (навык) глушит атаки босса, двигаться он продолжает
+    if (b.emp > 0) b.emp -= dt;
+    else if (game.player.alive) BOSS[b.bdef.id](b);
     // искры повреждённого босса
     if (b.phase >= 2 && Math.random() < dt * (b.phase >= 3 ? 8 : 3)) {
       const x = b.x + U.rand(-0.35, 0.35) * b.w, y = b.y + U.rand(-0.3, 0.3) * b.h;

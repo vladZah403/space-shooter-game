@@ -214,7 +214,7 @@
     if (name === 'pilot') ui.renderPilot();
     if (name === 'hangar') ui.renderHangar(activeTab('#hangarTabs') || 'models');
     if (name === 'arsenal') ui.renderArsenal(activeTab('#arsenalTabs') || 'weapons');
-    if (name === 'skills') ui.renderSkills(activeTab('#skillTabs') || 'passive');
+    if (name === 'skills') ui.renderSkills(activeTab('#skillTabs') || 'combat');
     if (name === 'leaders') ui.renderLeaders(activeTab('#lbTabs') || 'world');
     if (name === 'achievements') ui.renderAchievements();
     if (name === 'settings') ui.renderSettings();
@@ -1226,92 +1226,100 @@
   // ════════════════════════════════════════════════════════════
   // НАВЫКИ
   // ════════════════════════════════════════════════════════════
+  // 3.1: древо навыков — ветка на вкладке, ярусы сверху вниз, линии от требуемых навыков; карточка выбранного сверху
   ui.renderSkills = function (tab) {
-    const s = store.s;
+    const s = store.s, br = D.SKILL_BRANCHES.find((b) => b.id === tab) || D.SKILL_BRANCHES[0];
     $('#skillPts').textContent = M.skillPoints();
-    // слоты
+    // слоты активных навыков и счётчик пассивных
     const act = Object.keys(s.skills).filter((id) => D.SKILLS[id].type === 'active');
-    const pas = Object.keys(s.skills).filter((id) => D.SKILLS[id].type === 'passive');
     let h = '';
-    for (let i = 0; i < D.MAX_ACTIVE; i++) { const sk = D.SKILLS[act[i]]; h += '<div class="sk-slot act' + (sk ? ' filled' : '') + '">' + (sk ? sk.ico : '⚡') + '<small>АКТИВ</small></div>'; }
-    for (let i = 0; i < D.MAX_PASSIVE; i++) { const sk = D.SKILLS[pas[i]]; h += '<div class="sk-slot' + (sk ? ' filled' : '') + '">' + (sk ? sk.ico : '◇') + '<small>ПАССИВ</small></div>'; }
+    for (let i = 0; i < D.MAX_ACTIVE; i++) { const sk = D.SKILLS[act[i]]; h += '<div class="sk-slot act' + (sk ? ' filled' : '') + '">' + (sk ? sk.ico : '⚡') + '<small>АКТИВ ' + (i + 1) + '</small></div>'; }
+    h += '<div class="sk-slot filled sum"><b>' + M.skillCount('passive') + '</b><small>ПАССИВНЫХ</small></div>';
     $('#skillSlots').innerHTML = h;
-    const list = $('#skillList');
-    list.innerHTML = '';
-    const node = (id, color) => {
-      const sk = D.SKILLS[id], st = M.skillState(id);
-      const b = document.createElement('button');
-      b.className = 'sk-node' + (st.learned ? ' learned' : st.locked ? ' locked' : st.canLearn ? ' available' : '');
-      b.style.setProperty('--bc', color);
-      const meta = [];
-      if (sk.cd) meta.push('⏱ ' + sk.cd + ' с');
-      if (sk.req) meta.push((st.locked ? '🔒 ' : '✓ ') + D.SKILLS[sk.req].name);
-      b.innerHTML = '<div class="sk-ico">' + sk.ico + '</div><div class="sk-info"><div class="sk-name">' + sk.name + '</div><div class="sk-desc">' + sk.desc + '</div>' + (meta.length ? '<div class="sk-meta">' + meta.join('<span>•</span>') + '</div>' : '') + '</div>' +
-        '<div class="sk-cost">' + (st.learned ? ic('check') : ic('atom') + sk.cost) + '</div>';
-      b.addEventListener('click', () => skillDialog(id));
-      return b;
-    };
-    if (tab === 'passive') {
-      for (const br of D.SKILL_BRANCHES) {
-        const ids = Object.keys(D.SKILLS).filter((id) => D.SKILLS[id].type === 'passive' && D.SKILLS[id].branch === br.id).sort((a, b) => D.SKILLS[a].tier - D.SKILLS[b].tier);
-        const wrap = document.createElement('div');
-        wrap.className = 'sk-branch';
-        wrap.style.setProperty('--bc', br.color);
-        wrap.innerHTML = '<div class="sk-branch-title">' + br.name + '</div>';
-        const row = document.createElement('div');
-        row.className = 'sk-row';
-        ids.forEach((id, i) => {
-          if (i > 0 && br.id !== 'special') { const ln = document.createElement('div'); ln.className = 'sk-link' + (s.skills[ids[i - 1]] ? ' on' : ''); row.appendChild(ln); }
-          row.appendChild(node(id, br.color));
-        });
-        wrap.appendChild(row);
-        list.appendChild(wrap);
+    const ids = Object.keys(D.SKILLS).filter((id) => D.SKILLS[id].branch === br.id);
+    if (!ui._skSel || !ids.includes(ui._skSel)) ui._skSel = ids.find((id) => M.skillState(id).canLearn) || ids[0];
+    let t = '<div class="sk-tree" style="--bc:' + br.color + '"><svg class="sk-lines"></svg>';
+    for (let tier = 1; tier <= 5; tier++) {
+      const row = ids.filter((id) => D.SKILLS[id].tier === tier).sort((a, b) => D.SKILLS[a].col - D.SKILLS[b].col);
+      if (!row.length) continue;
+      t += '<div class="sk-tier">';
+      for (const id of row) {
+        const sk = D.SKILLS[id], st = M.skillState(id);
+        const cls = (st.learned ? ' learned' : st.locked ? ' locked' : st.canLearn ? ' available' : '') + (st.maxed ? ' maxed' : '') + (sk.type === 'active' ? ' act' : '') + (id === ui._skSel ? ' sel' : '');
+        let pips = '';
+        if (st.max > 1) { pips = '<div class="sk-pips">'; for (let i = 0; i < st.max; i++) pips += '<i' + (i < st.rank ? ' class="on"' : '') + '></i>'; pips += '</div>'; }
+        t += '<button class="sk-tnode' + cls + '" data-id="' + id + '"><div class="sk-tico">' + sk.ico + (sk.type === 'active' ? '<span class="sk-act">⚡</span>' : '') + '</div>' + pips +
+          '<div class="sk-tname">' + sk.name + '</div><div class="sk-tcost">' + (st.maxed ? ic('check') : ic('atom') + sk.cost) + '</div></button>';
       }
-    } else {
-      const wrap = document.createElement('div');
-      wrap.className = 'sk-branch';
-      wrap.style.setProperty('--bc', '#3de0ff');
-      wrap.innerHTML = '<div class="sk-branch-title">АКТИВНЫЕ — КНОПКИ В БОЮ</div>';
-      const row = document.createElement('div');
-      row.className = 'sk-row';
-      Object.keys(D.SKILLS).filter((id) => D.SKILLS[id].type === 'active').sort((a, b) => D.SKILLS[a].tier - D.SKILLS[b].tier).forEach((id) => row.appendChild(node(id, '#3de0ff')));
-      wrap.appendChild(row);
-      list.appendChild(wrap);
+      t += '</div>';
     }
+    t += '</div>';
+    const list = $('#skillList');
+    list.innerHTML = t;
+    $$('#skillList .sk-tnode').forEach((b) => b.addEventListener('click', () => { ui._skSel = b.dataset.id; A.play('click'); ui.renderSkills(br.id); }));
+    renderSkillDetail(br);
+    requestAnimationFrame(() => skillLines(list.querySelector('.sk-tree'), ids));
   };
+  // линии от требуемого навыка к зависимому (подсвечены, если требуемый изучен)
+  function skillLines(tree, ids) {
+    if (!tree) return;
+    const svg = tree.querySelector('.sk-lines'), r0 = tree.getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + r0.width + ' ' + r0.height);
+    let h = '';
+    for (const id of ids) {
+      const sk = D.SKILLS[id], el = tree.querySelector('[data-id="' + id + '"] .sk-tico');
+      if (!sk.req || !el) continue;
+      for (const r of sk.req) {
+        const from = tree.querySelector('[data-id="' + r + '"] .sk-tico');
+        if (!from) continue;
+        const a = from.getBoundingClientRect(), b = el.getBoundingClientRect();
+        const x1 = a.left + a.width / 2 - r0.left, y1 = a.bottom - r0.top, x2 = b.left + b.width / 2 - r0.left, y2 = b.top - r0.top;
+        h += '<path class="' + (store.s.skills[r] ? 'on' : '') + '" d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + (y1 + y2) / 2 + ' ' + x2 + ' ' + (y1 + y2) / 2 + ' ' + x2 + ' ' + y2 + '"/>';
+      }
+    }
+    svg.innerHTML = h;
+  }
+  // карточка выбранного навыка: описание, ранг, требования и кнопки
+  function renderSkillDetail(br) {
+    const id = ui._skSel, sk = D.SKILLS[id], st = M.skillState(id), box = $('#skillDetail');
+    box.style.setProperty('--bc', br.color);
+    const meta = [];
+    if (sk.type === 'active') meta.push('⚡ Активный · перезарядка ' + sk.cd + ' с');
+    if (st.max > 1) meta.push('Ранг ' + st.rank + ' из ' + st.max);
+    if (sk.req) meta.push((st.locked ? '🔒 Нужен: ' : '✓ ') + sk.req.map((r) => D.SKILLS[r].name).join(' или '));
+    let why = '';
+    if (!st.maxed) {
+      if (st.locked) why = 'Сначала изучите ' + sk.req.map((r) => '«' + D.SKILLS[r].name + '»').join(' или ');
+      else if (st.slotsFull) why = 'Уже два активных навыка — снимите один';
+      else if (!st.afford) why = 'Нужно ' + sk.cost + ' ' + U.plural(sk.cost, 'очко', 'очка', 'очков') + ', есть ' + M.skillPoints();
+    }
+    box.innerHTML = '<div class="skd-head"><div class="skd-ico">' + sk.ico + '</div><div><div class="skd-name">' + sk.name + '</div><div class="skd-meta">' + meta.join(' · ') + '</div></div></div>' +
+      '<div class="skd-desc">' + sk.desc + '</div>' + (why ? '<div class="skd-why">' + why + '</div>' : '') +
+      '<div class="skd-btns">' + (st.maxed ? '' : '<button class="btn primary" id="skdLearn"' + (st.canLearn || SS.DEV && !st.locked && !st.slotsFull ? '' : ' disabled') + '>' + (st.learned ? 'РАНГ ' + (st.rank + 1) : 'ИЗУЧИТЬ') + ' · ' + ic('atom') + sk.cost + '</button>') +
+      (st.learned ? '<button class="btn ghost" id="skdForget">СНЯТЬ</button>' : '') + '</div>';
+    const learn = $('#skdLearn');
+    if (learn) learn.addEventListener('click', () => {
+      if (M.learnSkill(id)) { A.play('levelup'); T.haptic('success'); ui.toast({ ico: sk.ico, title: st.learned ? 'РАНГ ' + (st.rank + 1) : 'НАВЫК ИЗУЧЕН', text: sk.name, info: true }); }
+      else A.play('error');
+      ui.renderSkills(br.id);
+    });
+    const forget = $('#skdForget');
+    if (forget) forget.addEventListener('click', () => {
+      const removed = M.forgetSkill(id);
+      A.play('back');
+      if (removed.length > 1) ui.toast({ ico: '↩️', title: 'НАВЫКИ СНЯТЫ', text: removed.map((r) => D.SKILLS[r].name).join(', '), info: true });
+      ui.renderSkills(br.id);
+    });
+  }
 
   ui.bindSkillReset = function () {
     $('#btnSkillReset').addEventListener('click', () => {
       if (!Object.keys(store.s.skills).length) { A.play('error'); return; }
       ui.dialog({ ico: 'retry', title: 'СНЯТЬ ВСЕ НАВЫКИ?', text: 'Все очки навыков вернутся — можно собрать пилота заново.', ok: 'СНЯТЬ', onOk: () => {
-        M.resetSkills(); A.play('back'); ui.renderSkills(activeTab('#skillTabs') || 'passive');
+        M.resetSkills(); A.play('back'); ui.renderSkills(activeTab('#skillTabs') || 'combat');
       } });
     });
   };
-  function skillDialog(id) {
-    const sk = D.SKILLS[id], st = M.skillState(id);
-    const tab = activeTab('#skillTabs');
-    if (st.learned) {
-      ui.dialog({ ico: sk.ico, title: sk.name, text: sk.desc + '\n\nСнять навык? Вернётся ' + sk.cost + ' ' + U.plural(sk.cost, 'очко', 'очка', 'очков') + '.', ok: 'СНЯТЬ', danger: true, onOk: () => {
-        const removed = M.forgetSkill(id);
-        A.play('back');
-        if (removed.length > 1) ui.toast({ ico: '↩️', title: 'НАВЫКИ СНЯТЫ', text: removed.map((r) => D.SKILLS[r].name).join(', '), info: true });
-        ui.renderSkills(tab);
-      } });
-      return;
-    }
-    let why = '';
-    if (st.locked) why = 'Сначала изучите «' + D.SKILLS[sk.req].name + '»';
-    else if (st.slotsFull) why = 'Все слоты заняты — снимите другой ' + (sk.type === 'active' ? 'активный' : 'пассивный') + ' навык';
-    else if (!st.afford) why = 'Не хватает очков: нужно ' + sk.cost + ', есть ' + M.skillPoints();
-    ui.dialog({ ico: sk.ico, title: sk.name, text: sk.desc + (sk.cd ? '\nПерезарядка: ' + sk.cd + ' с' : '') + '\n\n' + (why || 'Стоимость: ' + sk.cost + ' ' + U.plural(sk.cost, 'очко', 'очка', 'очков')), ok: why ? 'ПОНЯТНО' : 'ИЗУЧИТЬ', noCancel: !!why, onOk: () => {
-      if (why) return;
-      if (M.learnSkill(id)) { A.play('levelup'); T.haptic('success'); ui.toast({ ico: sk.ico, title: 'НАВЫК ИЗУЧЕН', text: sk.name, info: true }); }
-      else A.play('error');
-      ui.renderSkills(tab);
-    } });
-  }
-
   // ════════════════════════════════════════════════════════════
   // РЕЙТИНГ
   // ════════════════════════════════════════════════════════════

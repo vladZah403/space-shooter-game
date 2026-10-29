@@ -364,39 +364,54 @@
   ];
 
   // ── Навыки (дерево за очки навыков) ─────────────────────────
+  // 3.1: древо навыков — 4 ветки по 5 ярусов. tier — ярус, col — место в ярусе (0 слева, 1 справа, 0.5 посередине);
+  // req — нужен хотя бы один из навыков; max — сколько рангов (cost — цена одного ранга).
+  // Активные — кнопки в бою, изучить можно не больше D.MAX_ACTIVE
   D.SKILL_BRANCHES = [
-    { id: 'combat',   name: 'БОЕЦ',      color: '#ff4d6d' },
-    { id: 'survival', name: 'ВЫЖИВАНИЕ', color: '#3dffa2' },
-    { id: 'tech',     name: 'ТЕХНИК',    color: '#b06bff' },
-    { id: 'special',  name: 'ОСОБЫЕ',    color: '#ffc83d' },
+    { id: 'combat',   name: 'АТАКА',     color: '#ff4d6d' },
+    { id: 'survival', name: 'ЗАЩИТА',    color: '#3dffa2' },
+    { id: 'tech',     name: 'ТЕХНИКА',   color: '#b06bff' },
+    { id: 'special',  name: 'УДАЧА',     color: '#ffc83d' },
   ];
   D.SKILLS = {
-    sk_vamp:        { type: 'passive', branch: 'combat',   tier: 1, ico: '🧛', name: 'ВАМПИР',       cost: 2, desc: 'Каждые 25 уничтоженных врагов — +1 жизнь' },
-    sk_berserker:   { type: 'passive', branch: 'combat',   tier: 2, ico: '😤', name: 'БЕРСЕРК',      cost: 3, req: 'sk_vamp',      desc: 'Урон растёт с потерей жизней: до +60% на последней' },
-    sk_executioner: { type: 'passive', branch: 'combat',   tier: 3, ico: '⚔️', name: 'ПАЛАЧ',        cost: 3, req: 'sk_berserker', desc: 'Двойной урон по врагам с прочностью ниже 25%' },
-    sk_regen:       { type: 'passive', branch: 'survival', tier: 1, ico: '💚', name: 'РЕГЕНЕРАЦИЯ',  cost: 2, desc: '+1 жизнь каждые 45 с (на последней жизни — каждые 20 с)' },
-    sk_ghost:       { type: 'passive', branch: 'survival', tier: 2, ico: '👻', name: 'ПРИЗРАК',      cost: 3, req: 'sk_regen',     desc: '20% шанс уклониться от попадания' },
-    sk_phoenix:     { type: 'passive', branch: 'survival', tier: 3, ico: '🔥', name: 'ФЕНИКС',       cost: 4, req: 'sk_ghost',     desc: 'Один раз за игру воскрешает с 2 жизнями' },
-    sk_detonator:   { type: 'passive', branch: 'tech',     tier: 1, ico: '💥', name: 'ДЕТОНАТОР',    cost: 2, desc: 'Каждое 5-е уничтожение вызывает взрыв' },
-    sk_ricochet:    { type: 'passive', branch: 'tech',     tier: 2, ico: '🎱', name: 'РИКОШЕТ',      cost: 3, req: 'sk_detonator', desc: 'Снаряды один раз отскакивают от краёв экрана' },
-    sk_conductor:   { type: 'passive', branch: 'tech',     tier: 3, ico: '🌩️', name: 'ПРОВОДНИК',    cost: 3, req: 'sk_ricochet',  desc: 'Молния +2 прыжка; любое попадание с шансом 8% бьёт разрядом' },
-    sk_magnet:      { type: 'passive', branch: 'special',  tier: 1, ico: '🧲', name: 'СУПЕРМАГНИТ',  cost: 2, desc: 'Монеты и кристаллы летят к вам со всего экрана' },
-    sk_doublecoins: { type: 'passive', branch: 'special',  tier: 1, ico: '💎', name: 'АЛЧНОСТЬ',     cost: 2, desc: 'Монеты ×2, но скорость корабля −15%' },
-    sk_sniper:      { type: 'passive', branch: 'special',  tier: 2, ico: '🎯', name: 'СНАЙПЕР',      cost: 3, req: 'sk_ghost',     desc: '+50% урона, −20% темп стрельбы' },
-    sk_overload:    { type: 'passive', branch: 'special',  tier: 2, ico: '💡', name: 'ПЕРЕГРУЗКА',   cost: 3, req: 'sk_detonator', desc: 'После активного навыка — темп стрельбы ×2 на 4 с' },
-    // 3.0: навыки для рогалика — станция, торговец, развилка
-    sk_scavenger:   { type: 'passive', branch: 'special',  tier: 1, ico: '🧰', name: 'МАРОДЁР',      cost: 2, desc: 'На станции на 1 модуль больше, у Торговца всё на 30% дешевле' },
-    sk_daredevil:   { type: 'passive', branch: 'special',  tier: 2, ico: '☠️', name: 'СОРВИГОЛОВА',  cost: 3, req: 'sk_scavenger', desc: 'На опасном пути Развилки монеты ×3 и урон +25%' },
-
-    sk_nova:      { type: 'active', tier: 1, ico: '🌟', name: 'НОВА',        cost: 3, cd: 20, desc: 'Ударная волна уничтожает обычных врагов и пули, боссам −10% прочности' },
-    sk_barrier:   { type: 'active', tier: 1, ico: '🔵', name: 'БАРЬЕР',      cost: 3, cd: 24, dur: 5, desc: 'Полная неуязвимость на 5 секунд' },
-    sk_overclock: { type: 'active', tier: 1, ico: '⚡', name: 'РАЗГОН',      cost: 3, cd: 22, dur: 6, desc: 'Темп стрельбы ×2.5 на 6 секунд' },
-    sk_airstrike: { type: 'active', tier: 2, ico: '✈️', name: 'АВИАУДАР',    cost: 3, cd: 26, req: 'sk_nova', desc: '8 ракет накрывают самых опасных врагов' },
-    sk_timewarp:  { type: 'active', tier: 2, ico: '⏳', name: 'ЗАМЕДЛЕНИЕ',  cost: 4, cd: 30, dur: 5, req: 'sk_barrier', desc: 'Враги и их снаряды замедляются втрое на 5 секунд' },
-    sk_rail:      { type: 'active', tier: 2, ico: '🔮', name: 'РЕЛЬСА',      cost: 3, cd: 32, dur: 2.5, req: 'sk_overclock', desc: 'Сквозной луч: огромный урон, мгновенно ломает щиты' },
-    sk_blackhole: { type: 'active', tier: 3, ico: '🌀', name: 'ЧЁРНАЯ ДЫРА', cost: 5, cd: 40, dur: 3, req: 'sk_timewarp', desc: 'Затягивает врагов и пули, затем взрывается' },
+    // ── НАПАДЕНИЕ ──
+    sk_caliber:     { type: 'passive', branch: 'combat',   tier: 1, col: 0,   ico: '🔩', name: 'КАЛИБР',        cost: 1, max: 3, desc: '+5% урона за ранг' },
+    sk_rapid:       { type: 'passive', branch: 'combat',   tier: 1, col: 1,   ico: '⚙️', name: 'СКОРОСТРЕЛ',    cost: 1, max: 3, desc: '+5% темпа стрельбы за ранг' },
+    sk_precision:   { type: 'passive', branch: 'combat',   tier: 2, col: 0,   ico: '🎯', name: 'МЕТКОСТЬ',      cost: 1, max: 3, req: ['sk_caliber'], desc: '+4% шанс крита за ранг' },
+    sk_rail:        { type: 'active',  branch: 'combat',   tier: 2, col: 1,   ico: '🔮', name: 'РЕЛЬСА',        cost: 2, cd: 30, dur: 2.5, req: ['sk_rapid'], desc: 'Сквозной луч: огромный урон всему на линии, мгновенно ломает щиты' },
+    sk_executioner: { type: 'passive', branch: 'combat',   tier: 3, col: 0,   ico: '⚔️', name: 'ПАЛАЧ',         cost: 2, req: ['sk_precision'], desc: 'Двойной урон по врагам с прочностью ниже 25%' },
+    sk_berserker:   { type: 'passive', branch: 'combat',   tier: 3, col: 1,   ico: '😤', name: 'БЕРСЕРК',       cost: 2, req: ['sk_precision'], desc: 'Урон растёт с потерей жизней: до +60% на последней' },
+    sk_orbital:     { type: 'active',  branch: 'combat',   tier: 4, col: 0.5, ico: '🛰️', name: 'ОРБИТАЛЬНЫЙ УДАР', cost: 3, cd: 26, req: ['sk_executioner', 'sk_berserker'], desc: 'Спутник берёт на прицел 6 самых крепких врагов и бьёт по ним лучами с орбиты' },
+    sk_coolhead:    { type: 'passive', branch: 'combat',   tier: 5, col: 0.5, ico: '❄️', name: 'ХЛАДНОКРОВИЕ',  cost: 3, req: ['sk_executioner', 'sk_berserker'], desc: 'Пока по вам не попадают, урон растёт на 10% каждые 4 с, до +30%' },
+    // ── ЗАЩИТА ──
+    sk_armor:       { type: 'passive', branch: 'survival', tier: 1, col: 0,   ico: '🛡️', name: 'БРОНЯ',         cost: 2, max: 2, desc: '+1 к максимуму жизней за ранг' },
+    sk_regen:       { type: 'passive', branch: 'survival', tier: 1, col: 1,   ico: '💚', name: 'РЕГЕНЕРАЦИЯ',   cost: 2, max: 2, desc: '+1 жизнь каждые 45 с (2 ранг — 35 с); на последней жизни вдвое чаще' },
+    sk_ghost:       { type: 'passive', branch: 'survival', tier: 2, col: 0,   ico: '👻', name: 'ПРИЗРАК',       cost: 1, max: 3, req: ['sk_armor'], desc: '+7% шанс уклониться от попадания за ранг' },
+    sk_barrier:     { type: 'active',  branch: 'survival', tier: 2, col: 1,   ico: '🔵', name: 'БАРЬЕР',        cost: 2, cd: 24, dur: 4, req: ['sk_regen'], desc: 'Неуязвимость на 4 с; пули, задевшие барьер, летят обратно во врагов' },
+    sk_capacitor:   { type: 'passive', branch: 'survival', tier: 3, col: 0,   ico: '🔋', name: 'КОНДЕНСАТОР',   cost: 2, req: ['sk_ghost'], desc: 'Щит восстанавливается каждые 30 с' },
+    sk_phoenix:     { type: 'passive', branch: 'survival', tier: 3, col: 1,   ico: '🔥', name: 'ФЕНИКС',        cost: 3, req: ['sk_ghost'], desc: 'Один раз за забег воскрешает с 2 жизнями' },
+    sk_timewarp:    { type: 'active',  branch: 'survival', tier: 4, col: 0.5, ico: '⏳', name: 'ЗАМЕДЛЕНИЕ',    cost: 3, cd: 30, dur: 5, req: ['sk_capacitor', 'sk_phoenix'], desc: 'Враги и их снаряды замедляются втрое на 5 секунд' },
+    sk_secondwind:  { type: 'passive', branch: 'survival', tier: 5, col: 0.5, ico: '🌬️', name: 'ВТОРОЕ ДЫХАНИЕ', cost: 3, req: ['sk_capacitor', 'sk_phoenix'], desc: 'После попадания неуязвимость вдвое дольше, а пули вокруг гаснут' },
+    // ── ТЕХНИКА ──
+    sk_detonator:   { type: 'passive', branch: 'tech',     tier: 1, col: 0,   ico: '💥', name: 'ДЕТОНАТОР',     cost: 2, desc: 'Каждое 5-е уничтожение вызывает взрыв' },
+    sk_magnet:      { type: 'passive', branch: 'tech',     tier: 1, col: 1,   ico: '🧲', name: 'МАГНИТ',        cost: 1, max: 2, desc: 'Радиус сбора ×1,5; 2 ранг — монеты и кристаллы летят со всего экрана' },
+    sk_ricochet:    { type: 'passive', branch: 'tech',     tier: 2, col: 0,   ico: '🎱', name: 'РИКОШЕТ',       cost: 2, req: ['sk_detonator'], desc: 'Снаряды один раз отскакивают от краёв экрана' },
+    sk_turret:      { type: 'active',  branch: 'tech',     tier: 2, col: 1,   ico: '🛸', name: 'ТУРЕЛЬ',        cost: 2, cd: 25, dur: 8, req: ['sk_magnet'], desc: 'Над кораблём на 8 с встаёт боевой дрон и бьёт ближайших врагов' },
+    sk_conductor:   { type: 'passive', branch: 'tech',     tier: 3, col: 0,   ico: '🌩️', name: 'ПРОВОДНИК',     cost: 2, req: ['sk_ricochet'], desc: 'Молния +2 прыжка; любое попадание с шансом 8% бьёт разрядом' },
+    sk_overload:    { type: 'passive', branch: 'tech',     tier: 3, col: 1,   ico: '💡', name: 'ПЕРЕГРУЗКА',    cost: 2, req: ['sk_ricochet'], desc: 'После активного навыка — темп стрельбы ×2 на 4 с' },
+    sk_blackhole:   { type: 'active',  branch: 'tech',     tier: 4, col: 0.5, ico: '🌀', name: 'ЧЁРНАЯ ДЫРА',   cost: 3, cd: 40, dur: 3, req: ['sk_conductor', 'sk_overload'], desc: 'Затягивает врагов и пули, затем взрывается' },
+    sk_chrono:      { type: 'passive', branch: 'tech',     tier: 5, col: 0.5, ico: '⏱️', name: 'ХРОНОМЕТР',     cost: 2, max: 2, req: ['sk_conductor', 'sk_overload'], desc: 'Навыки и бомба перезаряжаются на 15% быстрее за ранг' },
+    // ── УДАЧА ──
+    sk_greed:       { type: 'passive', branch: 'special',  tier: 1, col: 0,   ico: '💎', name: 'АЛЧНОСТЬ',      cost: 1, max: 3, desc: '+10% монет за ранг' },
+    sk_scavenger:   { type: 'passive', branch: 'special',  tier: 1, col: 1,   ico: '🧰', name: 'МАРОДЁР',       cost: 2, desc: 'На станции на 1 модуль больше, у Торговца всё на 30% дешевле' },
+    sk_lucky:       { type: 'passive', branch: 'special',  tier: 2, col: 0,   ico: '🍀', name: 'ВЕЗУНЧИК',      cost: 1, max: 2, req: ['sk_greed'], desc: 'Бонусы выпадают на 25% чаще за ранг' },
+    sk_emp:         { type: 'active',  branch: 'special',  tier: 2, col: 1,   ico: '📡', name: 'ЭМИ',           cost: 2, cd: 24, req: ['sk_scavenger'], desc: 'Импульс глушит врагов: 3 с не двигаются и не стреляют, щиты ломаются (босса — на 1,5 с)' },
+    sk_daredevil:   { type: 'passive', branch: 'special',  tier: 3, col: 0,   ico: '☠️', name: 'СОРВИГОЛОВА',   cost: 2, req: ['sk_lucky'], desc: 'На опасном пути Развилки монеты ×3 и урон +25%' },
+    sk_vamp:        { type: 'passive', branch: 'special',  tier: 3, col: 1,   ico: '🧛', name: 'ВАМПИР',        cost: 2, req: ['sk_lucky'], desc: 'Каждые 25 уничтоженных врагов — +1 жизнь' },
+    sk_clone:       { type: 'active',  branch: 'special',  tier: 4, col: 0.5, ico: '👥', name: 'ДВОЙНИК',       cost: 3, cd: 30, dur: 7, req: ['sk_daredevil', 'sk_vamp'], desc: 'Голограмма корабля 7 с летит рядом и повторяет все ваши выстрелы' },
+    sk_jackpot:     { type: 'passive', branch: 'special',  tier: 5, col: 0.5, ico: '🎰', name: 'ДЖЕКПОТ',       cost: 3, req: ['sk_daredevil', 'sk_vamp'], desc: 'Элита и мини-боссы роняют ящик с монетами и бонусом' },
   };
-  D.MAX_PASSIVE = 3;
+  D.MAX_PASSIVE = 99; // 3.1: пассивные без лимита — их ограничивают очки
   D.MAX_ACTIVE = 2;
 
   // ── Корабли ──────────────────────────────────────────────────

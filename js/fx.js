@@ -132,6 +132,15 @@
       }
       pts.push([x1, y1]);
       this.beam(pts, color, width, dur);
+      // 3.1: у длинного разряда — одна-две коротких ветки
+      if (d > 70 && this.quality > 0) {
+        for (let k = 0; k < (d > 160 ? 2 : 1); k++) {
+          const i = 1 + Math.floor(Math.random() * (pts.length - 2)), p = pts[i], a = Math.atan2(y1 - y0, x1 - x0) + U.rand(0.5, 1.1) * (Math.random() < 0.5 ? -1 : 1);
+          const L = U.rand(0.15, 0.3) * d, br = [[p[0], p[1]]];
+          for (let j = 1; j <= 3; j++) br.push([p[0] + Math.cos(a) * L * j / 3 + U.rand(-5, 5), p[1] + Math.sin(a) * L * j / 3 + U.rand(-5, 5)]);
+          this.beam(br, color, (width || 3) * 0.5, (dur || 0.14) * 0.8);
+        }
+      }
     },
     text(x, y, str, color, size, dur, vy) {
       if (this.texts.length > 60) { textPool.put(this.texts.shift()); }
@@ -334,10 +343,11 @@
       ctx.lineJoin = 'round';
       for (const b of this.beams) {
         const k = b.life / b.max;
-        for (let pass = 0; pass < 2; pass++) {
-          ctx.globalAlpha = pass ? k : k * 0.45;
-          ctx.strokeStyle = pass ? '#ffffff' : b.color;
-          ctx.lineWidth = pass ? b.w * 0.45 : b.w * 2.4;
+        // три прохода: широкое мягкое свечение, цветное тело, белое ядро
+        for (let pass = 0; pass < 3; pass++) {
+          ctx.globalAlpha = pass === 2 ? k : pass ? k * 0.5 : k * 0.14;
+          ctx.strokeStyle = pass === 2 ? '#ffffff' : b.color;
+          ctx.lineWidth = pass === 2 ? b.w * 0.45 : pass ? b.w * 2.2 : b.w * 6;
           ctx.beginPath();
           for (let i = 0; i < b.pts.length; i++) { const p = b.pts[i]; i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
           ctx.stroke();
