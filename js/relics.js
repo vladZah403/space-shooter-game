@@ -313,6 +313,8 @@
     g.addColorStop(0, '#2a3046'); g.addColorStop(1, '#0d1020');
     c.fillStyle = g; c.shadowColor = col; c.shadowBlur = 24; c.fill();
     c.shadowBlur = 0; c.lineWidth = Math.max(2, s * 0.06); c.strokeStyle = col; c.stroke();
+    // iOS (WebKit) заливает эмодзи текущим fillStyle: с тёмным градиентом фона иконка выходит чёрной
+    c.fillStyle = '#fff';
     c.font = Math.round(s * 0.62) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(D.RELICS[id].ico, 0, s * 0.03);
