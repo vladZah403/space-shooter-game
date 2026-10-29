@@ -634,6 +634,16 @@
     return { R, ang, cx: b.x - Math.cos(ang) * R, cy: b.y - Math.sin(ang) * R, span: Math.asin(Math.min(1, half / R)) };
   }
   // враг задет, если его центр у дуги (с учётом размера); каждого — один раз за волну
+  // полумесяц по геометрии волны: внешняя дуга и внутренняя кривая, сходящиеся на концах
+  function crescent(ctx, w, th) {
+    const a0 = w.ang - w.span, a1 = w.ang + w.span, Ro = w.R + th * 0.35;
+    const ax = w.cx + Math.cos(a0) * Ro, ay = w.cy + Math.sin(a0) * Ro, bx = w.cx + Math.cos(a1) * Ro, by = w.cy + Math.sin(a1) * Ro;
+    const mx = w.cx + Math.cos(w.ang) * (w.R - th * 0.65), my = w.cy + Math.sin(w.ang) * (w.R - th * 0.65);
+    ctx.beginPath();
+    ctx.arc(w.cx, w.cy, Ro, a0, a1);
+    ctx.quadraticCurveTo(2 * mx - (ax + bx) / 2, 2 * my - (ay + by) / 2, ax, ay);
+    ctx.fill();
+  }
   game.waveHits = function (b) {
     const w = waveGeom(b);
     // луч Связки гасит волну
@@ -932,7 +942,7 @@
     // 3.1: цифры урона копятся и всплывают одной суммой раз в DMG_NUM_T с (на поздних волнах было месиво из цифр)
     if (M.s.settings.dmgNums && !o.noText && FX.quality > 0) {
       if (!e.dmgSum) e.dmgT0 = this.t;
-      e.dmgSum = (e.dmgSum || 0) + dmg;
+      e.dmgSum = (e.dmgSum || 0) + (e.hp < 0 ? Math.max(0, dmg + e.hp) : dmg);
       if (crit) e.dmgCrit = true;
     }
     e.hitT = this.t;
@@ -2528,13 +2538,12 @@
       } else if (b.kind === 'wave') {
         // серп: широкое свечение + яркая кромка; заряженная волна белее, к концу полёта гаснет
         const w = waveGeom(b), fade = Math.min(1, b.life / 0.15);
-        ctx.lineCap = 'round';
-        // три слоя: мягкий ореол, неоновое тело, белая кромка
-        for (const [col, a, lw] of [['#3dc8ff', 0.1 + 0.06 * b.ch, 2.6], ['#7ff6ff', 0.45, 1.1], [b.ch > 0.66 ? '#ffffff' : '#e8ffff', 0.9, 0.4]]) {
-          ctx.globalAlpha = a * fade; ctx.strokeStyle = col; ctx.lineWidth = b.r * lw;
-          ctx.beginPath(); ctx.arc(w.cx, w.cy, w.R, w.ang - w.span, w.ang + w.span); ctx.stroke();
+        // 3.1: полумесяц — толстый посередине и острый к концам: мягкий ореол, неоновое тело, белая кромка
+        for (const [col, a, th] of [['#3dc8ff', 0.16 + 0.08 * b.ch, 3.2], ['#7ff6ff', 0.55, 1.5], [b.ch > 0.66 ? '#ffffff' : '#e8ffff', 0.95, 0.6]]) {
+          ctx.globalAlpha = a * fade; ctx.fillStyle = col;
+          crescent(ctx, w, b.r * th);
         }
-        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        ctx.globalAlpha = 1;
       } else if (b.cv || b.sprite) {
         // отскочившие от верха снаряды тают
         if (b.fade) ctx.globalAlpha = U.clamp(b.life / b.fade, 0, 1) * 0.85;
@@ -2707,6 +2716,45 @@
     return c;
   }
 
+  // ── 3.1: лучи без резких краёв ──
+  // профиль поперёк луча: прозрачные края → цвет → белое ядро; рисуется растянутым по длине (кэш по цвету)
+  const beamCache = {};
+  function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  function beamProfile(color) {
+    let c = beamCache[color];
+    if (c) return c;
+    c = document.createElement('canvas'); c.width = 64; c.height = 1;
+    const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 64, 0);
+    g.addColorStop(0, rgba(color, 0)); g.addColorStop(0.18, rgba(color, 0.18)); g.addColorStop(0.36, rgba(color, 0.75));
+    g.addColorStop(0.45, '#ffffff'); g.addColorStop(0.55, '#ffffff');
+    g.addColorStop(0.64, rgba(color, 0.75)); g.addColorStop(0.82, rgba(color, 0.18)); g.addColorStop(1, rgba(color, 0));
+    x.fillStyle = g; x.fillRect(0, 0, 64, 1);
+    return (beamCache[color] = c);
+  }
+  // вертикальный луч между y0 и y1 полушириной w; dir — куда бегут импульсы энергии (−1 вверх, 1 вниз)
+  game.drawBeamV = function (ctx, x, y0, y1, w, color, alpha, dir, src) {
+    const len = y1 - y0, S = G.S, t = this.t;
+    if (len <= 0 || alpha <= 0) return;
+    const ww = w * (1 + 0.07 * Math.sin(t * 47) + 0.04 * Math.sin(t * 83));
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(beamProfile(color), x - ww * 1.6, y0, ww * 3.2, len);
+    // импульсы бегут вдоль луча
+    const step = 64 * S, off = ((t * 520 * S) % step) * (dir || -1);
+    ctx.globalAlpha = alpha * 0.55;
+    const gl = G.glow(color, 64), gs = ww * 2.2;
+    for (let y = (dir > 0 ? y0 : y1) + off; dir > 0 ? y < y1 : y > y0; y += (dir > 0 ? 1 : -1) * step) {
+      ctx.drawImage(gl, x - gs / 2, y - gs * 0.9, gs, gs * 1.8);
+    }
+    // яркий исток
+    if (src !== undefined) {
+      const ss = ww * 5;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(gl, x - ss / 2, src - ss / 2, ss, ss);
+      ctx.drawImage(G.glow('#ffffff', 32), x - ss / 5, src - ss / 5, ss / 2.5, ss / 2.5);
+    }
+    ctx.globalAlpha = 1;
+  };
+
   game.drawOverlays = function (ctx) {
     const p = this.player, S = G.S, ov = this.ov;
     ctx.globalCompositeOperation = 'lighter';
@@ -2722,19 +2770,12 @@
           ctx.globalAlpha = 0.5 + k * 0.5;
           G.draw(ctx, 'fx_super', p.x, p.y - p.w * 0.45 - sw * 0.6, sw);
         }
-        ctx.globalAlpha = k * 0.35;
-        ctx.fillStyle = '#7ffff0';
-        ctx.fillRect(p.x - 1.5 * S, 0, 3 * S, p.y);
+        // прицельная нить: тонкий мягкий луч
+        this.drawBeamV(ctx, p.x, 0, p.y - p.w * 0.5, (1.5 + 2.5 * k) * S, '#7ffff0', 0.25 + 0.35 * k);
       } else {
-        const fade = Math.min(1, (r.charge + r.dur - r.t) * 4);
-        const wv = (20 + Math.sin(this.t * 60) * 3) * S;
-        ctx.globalAlpha = 0.35 * fade;
-        ctx.fillStyle = '#3de0ff'; ctx.fillRect(p.x - wv * 1.6, 0, wv * 3.2, p.y - p.w * 0.3);
-        ctx.globalAlpha = 0.8 * fade;
-        ctx.fillStyle = '#7ffff0'; ctx.fillRect(p.x - wv * 0.6, 0, wv * 1.2, p.y - p.w * 0.3);
-        ctx.globalAlpha = fade;
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(p.x - wv * 0.2, 0, wv * 0.4, p.y - p.w * 0.3);
-        ctx.drawImage(G.glow('#7ffff0', 64), p.x - 50 * S, p.y - p.w * 0.6 - 50 * S, 100 * S, 100 * S);
+        // разгорается за 0,12 с, гаснет за 0,25 с
+        const fade = Math.min(1, (r.t - r.charge) * 8, (r.charge + r.dur - r.t) * 4);
+        this.drawBeamV(ctx, p.x, 0, p.y - p.w * 0.45, 24 * S * (0.6 + 0.4 * fade), '#3de0ff', fade, -1, p.y - p.w * 0.55);
         if (G.frame('fx_charge')) { ctx.globalAlpha = fade * (0.8 + Math.random() * 0.2); G.draw(ctx, 'fx_charge', p.x, p.y - p.w * 0.55 - 26 * S, 34 * S); }
       }
       ctx.globalAlpha = 1;
@@ -2765,16 +2806,16 @@
     // предупреждения о лучах дредноута
     for (const bm of ov.beams) {
       if (bm.t < bm.warn) {
-        const k = bm.t / bm.warn;
-        ctx.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(bm.t * 18));
-        ctx.fillStyle = '#ff3d5a';
-        ctx.fillRect(bm.x - bm.w * 0.5 * k, bm.y0, bm.w * k, G.H - bm.y0);
+        // предупреждение: мерцающая красная полоса сужается к моменту выстрела, по краям — пунктир
+        const k = bm.t / bm.warn, pulse = 0.5 + 0.5 * Math.abs(Math.sin(bm.t * 16));
+        this.drawBeamV(ctx, bm.x, bm.y0, G.H, bm.w * (1.1 - 0.7 * k), '#ff3d5a', (0.12 + 0.18 * k) * pulse, 1);
+        ctx.globalAlpha = 0.35 + 0.4 * k * pulse; ctx.strokeStyle = '#ff6b7d'; ctx.lineWidth = 1.5 * S;
+        ctx.setLineDash([8 * S, 7 * S]); ctx.lineDashOffset = -bm.t * 60 * S;
+        for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(bm.x + sd * bm.w * 0.9, bm.y0); ctx.lineTo(bm.x + sd * bm.w * 0.9, G.H); ctx.stroke(); }
+        ctx.setLineDash([]);
       } else {
         const k = 1 - (bm.t - bm.warn) / bm.dur;
-        ctx.globalAlpha = 0.5 * k; ctx.fillStyle = bm.color;
-        ctx.fillRect(bm.x - bm.w, bm.y0, bm.w * 2, G.H - bm.y0);
-        ctx.globalAlpha = k; ctx.fillStyle = '#ffffff';
-        ctx.fillRect(bm.x - bm.w * 0.35, bm.y0, bm.w * 0.7, G.H - bm.y0);
+        this.drawBeamV(ctx, bm.x, bm.y0, G.H, bm.w * (0.7 + 0.3 * k), bm.color, Math.min(1, k * 1.6), 1, bm.y0);
       }
     }
     // поворотные лазеры
