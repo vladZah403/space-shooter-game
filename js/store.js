@@ -16,6 +16,7 @@
       v: 2, created: Date.now(), updated: 0,
       coins: 0,
       shipXP: 0, shipLvl: 1, spBonus: 0, skills: {},
+      comp: { owned: ['gunner'], sel: 'gunner', lv: { gunner: 1 } },
       prestige: 0,
       weapons: { owned: ['laser'], loadout: ['laser'], ups: {} },
       general: {},
@@ -356,6 +357,22 @@
       }
       if (fresh.length) { store.soon(); fresh.forEach((sk) => SS.emit('skinUnlocked', sk)); }
       return fresh;
+    },
+
+    // ── 4.0: дроны-напарники ──
+    compBuy(id) {
+      const d = D.COMPANIONS[id], c = this.s.comp;
+      if (!d || c.owned.includes(id) || this.s.shipLvl < d.lvl && !SS.DEV || !this.spend(d.price)) return false;
+      c.owned.push(id); c.lv[id] = 1; c.sel = id;
+      store.save();
+      return true;
+    },
+    compUp(id) {
+      const d = D.COMPANIONS[id], c = this.s.comp, lv = c.lv[id] || 1;
+      if (!d || !c.owned.includes(id) || lv >= 5 || !this.spend(d.costs[lv - 1])) return false;
+      c.lv[id] = lv + 1;
+      store.save();
+      return true;
     },
 
     // ── навыки ──

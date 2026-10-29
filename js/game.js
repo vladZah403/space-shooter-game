@@ -110,6 +110,7 @@
     p.bombs = 1 + (D.SHIPS[s.ship.model].stats.bombs || 0) + (pil === 'rex' ? 2 : 0);
     p.wingCd = 0.2;
     if (ch && ch.mods.includes('weapon')) { p.weapons = [ch.weapon]; p.weapon = ch.weapon; }
+    SS.comp.start();
     if (this.run.perks.glass) { p.maxLives = 1; p.lives = 1; }
     if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = withRng(this.run.perkRng, () => this.perkChoices()).find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
     this.buffs = {};
@@ -198,7 +199,7 @@
       wings: ship.wings || md('wings'),
       magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1) * (1 + rl('r_gravlov')),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * this.coinK,
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK,
       luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25) * (1 + rl('r_dice') * 0.5),
       speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (1 + rl('r_afterburner') * 0.12),
       dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
@@ -339,6 +340,7 @@
     if (p.alive && this.state === 'play') this.fireWeapons(dt);
     SS.skills.echo(nb);
     this.updateDrones(dt);
+    SS.comp.update(dt);
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
     SS.foes.update(edt);
@@ -1583,8 +1585,9 @@
       }
       if (b.life <= 0 || b.y > H + 40 || b.y < -80 || b.x < -50 || b.x > FW + 50) { b.dead = true; continue; }
       if (cover.length && hitsCover(b)) { b.dead = true; FX.hit(b.x, b.y, '#d8c3a5'); continue; }
-      // барьер (навык) отражает пули обратно во врагов
+      // барьер (навык) отражает пули обратно во врагов, дрон-Страж их ловит
       if (barrier && SS.skills.reflect(b)) { b.dead = true; continue; }
+      if (SS.comp.block(b)) { b.dead = true; continue; }
       // попадание в игрока (стреловидная проверка — снаряд не «проскакивает»)
       if (p.alive && p.inv <= 0) {
         const rr = pr + b.r * 0.75;
@@ -1676,7 +1679,7 @@
       const mr = big ? st.magnet * 0.6 : st.magnet;
       // монеты и кристаллы сами летят к кораблю через 2.5 с — на телефоне их легко упустить;
       // энергоблоки молнии нужно собрать самому (или магнитом)
-      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr)) || (!big && it.kind !== 'en' && it.age > 2.5))) {
+      if (p.alive && (it.pull || (it.age > 0.35 && (magnetAll || d < mr || SS.comp.pulls(it))) || (!big && it.kind !== 'en' && it.age > 2.5))) {
         it.pull = true;
         const sp = (380 + it.age * 120) * S;
         it.vx = U.damp(it.vx, dx / (d || 1) * sp, 9, dt);
@@ -2673,6 +2676,7 @@
   game.drawPlayer = function (ctx) {
     const p = this.player, s = M.s, S = G.S, run = this.run;
     // дроны
+    SS.comp.draw(ctx);
     for (let i = 0; i < this.drones.length; i++) {
       const d = this.drones[i], name = i ? 'c_gold' : 'c_white', f = G.frame(name);
       if (!f) continue;

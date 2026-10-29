@@ -1092,6 +1092,40 @@
         });
         list.appendChild(card);
       }
+    } else if (tab === 'drones') {
+      // 4.0: дрон-напарник — купить, выбрать, прокачать (до 5 уровня)
+      const c = s.comp;
+      for (const id of D.COMPANION_ORDER) {
+        const d = D.COMPANIONS[id], owned = c.owned.includes(id), sel = c.sel === id, lv = c.lv[id] || 1, lvlOk = s.shipLvl >= d.lvl;
+        const card = document.createElement('button');
+        card.className = 'item-card' + (sel ? ' selected' : '') + (!owned ? ' locked' : '');
+        card.appendChild(spriteCard((x, sz) => {
+          const f = G.frame(d.sprite); if (!f || !G.src(f)) return;
+          const k = sz * 0.62 / Math.max(f[2], f[3]), w = f[2] * k, h = f[3] * k;
+          if (d.hue !== undefined) x.drawImage(G.tinted(d.sprite, { hue: d.hue }), (sz - w) / 2, (sz - h) / 2, w, h);
+          else x.drawImage(G.src(f), f[0], f[1], f[2], f[3], (sz - w) / 2, (sz - h) / 2, w, h);
+        }, 64));
+        card.insertAdjacentHTML('beforeend', '<b>' + d.ico + ' ' + d.name + (owned ? ' · ' + lv : '') + '</b><small>' + d.desc + '</small>' +
+          (owned ? (sel && lv < 5 ? '<span class="price">↑ ' + ic('coin') + U.fmt(d.costs[lv - 1]) + '</span>' : sel ? '<span class="price">МАКС</span>' : '') : lvlOk ? '<span class="price">' + ic('coin') + U.fmt(d.price) + '</span>' : '<span class="req">' + ic('lock') + 'Корабль ур. ' + d.lvl + '</span>'));
+        card.addEventListener('click', () => {
+          if (owned && !sel) { c.sel = id; store.save(); A.play('click'); ui.renderHangar('drones'); return; }
+          if (owned && sel) {
+            if (lv >= 5) { A.play('error'); return; }
+            ui.dialog({ ico: d.ico, title: d.name + ' · УРОВЕНЬ ' + (lv + 1), text: d.desc + '\nСледующий уровень: ' + d.up + '\n\nЦена: ' + U.fmt(d.costs[lv - 1]) + ' монет', ok: 'ПРОКАЧАТЬ', onOk: () => {
+              if (M.compUp(id)) { A.play('levelup'); T.haptic('success'); } else { A.play('error'); ui.toast({ ico: '💸', title: 'НЕ ХВАТАЕТ МОНЕТ', text: 'Нужно ' + U.fmt(d.costs[lv - 1]), info: true }); }
+              ui.renderHangar('drones'); updateWallets();
+            } });
+            return;
+          }
+          if (!lvlOk && !SS.DEV) { A.play('error'); ui.toast({ ico: '🔒', title: 'НУЖЕН УРОВЕНЬ', text: 'Откроется на ' + d.lvl + ' уровне корабля', info: true }); return; }
+          ui.dialog({ ico: d.ico, title: d.name, text: d.desc + '\n\nЦена: ' + U.fmt(d.price) + ' монет', ok: 'КУПИТЬ', onOk: () => {
+            if (M.compBuy(id)) { A.play('buy'); T.haptic('success'); ui.toast({ ico: d.ico, title: 'НОВЫЙ ДРОН', text: d.name, info: true }); }
+            else { A.play('error'); ui.toast({ ico: '💸', title: 'НЕ ХВАТАЕТ МОНЕТ', text: 'Нужно ' + U.fmt(d.price), info: true }); }
+            ui.renderHangar('drones'); updateWallets();
+          } });
+        });
+        list.appendChild(card);
+      }
     } else if (tab === 'skins') {
       for (const sk of D.SKINS) {
         const owned = s.ship.skins.includes(sk.id), sel = s.ship.skin === sk.id;

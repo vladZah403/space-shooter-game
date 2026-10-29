@@ -175,6 +175,7 @@
       SS.skills.init();
       SS.sectors.init();
       SS.map.init();
+      SS.comp.init();
       SS.fx.shakeOn = SS.store.s.settings.shake;
       main.applyQuality();
       prog(0.25, 'Синтез звука…');
