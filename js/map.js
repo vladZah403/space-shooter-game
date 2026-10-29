@@ -136,7 +136,7 @@
       return false;
     }
     if (w.node === 'cache') {
-      const coins = Math.round((30 + w.n * 4) * game.st.coins / game.coinK);
+      const coins = Math.round((20 + w.n * 2.5) * game.st.coins / game.coinK);
       run.coins += coins; M.addCoins(coins);
       FX.text(p.x, p.y - p.w, '📦 +' + coins, '#ffc83d', 16, 1.2);
       A.play('coin', { rate: 0.8 });
@@ -289,13 +289,13 @@
         if (mods.length) { const m = U.pick(mods); run.mods[m.id] = (run.mods[m.id] || 0) + 1; run.parts = game.shipParts(run.mods); game.refreshStats(); say(m.ico, 'Аномалия подарила модуль: ' + m.name); }
       } else { p.lives = Math.max(1, p.lives - 1); FX.flash('#b06bff', 0.3); SS.emit('playerHit'); say('🌀', 'Аномалия задела корабль: −1 жизнь'); }
     } else if (ev === 'distress') {
-      if (card === 'help') { run.coins += 150; M.addCoins(150); say('🤝', 'Экипаж спасён: +150 монет'); }
+      if (card === 'help') { run.coins += 100; M.addCoins(100); say('🤝', 'Экипаж спасён: +100 монет'); }
       else { const id = rollRelics(1)[0]; if (id) MP.grant(id); run.nextDanger = true; say('⚠️', 'Погоня! Следующая волна элитная'); }
     } else if (ev === 'station') {
       if (card === 'fix') game.heal(1, '🏚️ РЕМОНТ');
-      else { p.bombs = Math.min(9, p.bombs + 1); run.coins += 80; M.addCoins(80); say('💣', '+1 бомба и 80 монет'); }
+      else { p.bombs = Math.min(9, p.bombs + 1); run.coins += 50; M.addCoins(50); say('💣', '+1 бомба и 50 монет'); }
     } else if (ev === 'slot' && card === 'play') {
-      if (Math.random() < 0.5) { run.coins += 300; M.addCoins(300); A.play('coin', { rate: 1.3 }); say('🎰', 'Джекпот! +300 монет'); }
+      if (Math.random() < 0.5) { run.coins += 250; M.addCoins(250); A.play('coin', { rate: 1.3 }); say('🎰', 'Джекпот! +250 монет'); }
       else say('🎰', 'Не повезло');
     }
     game.hudDirty = true;

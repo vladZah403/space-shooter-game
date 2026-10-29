@@ -204,7 +204,7 @@
       wings: ship.wings || md('wings'),
       magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1) * (1 + rl('r_gravlov')),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK,
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK * D.ECON.coins,
       luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25) * (1 + rl('r_dice') * 0.5),
       speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (1 + rl('r_afterburner') * 0.12),
       dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
@@ -1052,7 +1052,7 @@
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
     this.addScore(pts);
     // монеты и кристаллы
-    let coins = e.coins * (e.elite && this.relic('r_hunteye') ? 2 : 1) * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? (this.skill('sk_daredevil') ? 3 : D.DANGER.coins) : 1);
+    let coins = e.coins * (e.elite && this.relic('r_hunteye') ? 2 : 1) * this.st.coins * (1 + this.wave.n * D.ECON.waveGrowth) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? (this.skill('sk_daredevil') ? 3 : D.DANGER.coins) : 1);
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
@@ -1655,7 +1655,7 @@
   };
   // ящик Конвоя (3.1): цена растёт с волной
   game.dropCrate = function (x, y, val) {
-    const it = pick('crate', x, y, val || Math.round((12 + this.wave.n * 2) * this.st.coins));
+    const it = pick('crate', x, y, val || Math.round((8 + this.wave.n * 1.2) * this.st.coins));
     it.vx *= 0.3; it.vy = -50 * G.S;
     return it;
   };
@@ -2075,7 +2075,7 @@
     if (!run.bossDamaged) M.unlock('no_damage_boss');
     const pts = Math.round(6000 * (this.wave.n / 5) * this.diff.score);
     this.addScore(pts);
-    this.dropCoins(boss.x, boss.y, Math.round((60 + this.wave.n * 8) * this.st.coins * this.diff.count));
+    this.dropCoins(boss.x, boss.y, Math.round((60 + this.wave.n * 8) * this.st.coins * this.diff.count * D.ECON.boss));
     this.dropXp(boss.x, boss.y, 18 + this.wave.n);
     this.dropPowerup(boss.x - 30 * S, boss.y, 'heal');
     this.dropPowerup(boss.x + 30 * S, boss.y);

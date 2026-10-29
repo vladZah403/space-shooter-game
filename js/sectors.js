@@ -59,7 +59,7 @@
       m.st.clouds.push({ x: e.x, y: e.y, r: 64 * S * (e.w / (48 * S)), t: 0, dur: 5, tick: 0 });
       A.play('mine', { rate: 0.5, vol: 0.4 });
     } else if (e.type === 'satellite') {
-      if (Math.random() < 0.6) game.dropPowerup(e.x, e.y); else game.dropCoins(e.x, e.y, 8);
+      if (Math.random() < 0.6) game.dropPowerup(e.x, e.y); else game.dropCoins(e.x, e.y, 5);
       FX.text(e.x, e.y - e.r, 'ГРУЗ!', '#7fe7ff', 13, 0.8, -50);
     }
   };

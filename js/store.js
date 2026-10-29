@@ -700,7 +700,7 @@
       // опыт корабля: за врагов, волны и боссов
       // опыт за врагов и очки нормирован на число врагов и множитель очков, затем умножен на опыт сложности
       const dk = D.DIFFS[run.diff] || D.DIFFS.normal;
-      const xp = Math.round((run.kills / dk.count + run.wave * 12 + run.bosses * 120 + run.score / (400 * dk.score * dk.count)) * dk.xp);
+      const xp = Math.round((run.kills / dk.count + run.wave * 12 + run.bosses * 120 + run.score / (400 * dk.score * dk.count)) * dk.xp * D.ECON.xp);
       const lvlBefore = s.shipLvl, xpBefore = s.shipXP;
       const res = this.addShipXP(xp);
 
