@@ -1063,7 +1063,8 @@
     }
     // прочность растёт вместе с прочностью обычных врагов; первые два босса — разминка
     const ramp = num === 1 ? 0.92 : num === 2 ? 1.6 : 2 + (num - 3) * 0.2;
-    const hp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3) * (num === 1 ? D.BOSS_HP_FIRST : D.BOSS_HP);
+    // в босс-раше улучшений за мелочь почти нет — боссы там слабее
+    const hp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3) * (num === 1 ? D.BOSS_HP_FIRST : D.BOSS_HP) * (game.mode === 'rush' ? 0.55 : 1);
     const w = Math.min(G.FW * bdef.wf, bdef.wmax * S);
     const asp = G.aspect(sprite);
     const h = w * asp;

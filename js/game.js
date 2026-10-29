@@ -122,8 +122,10 @@
     G.bg.warp = 0.6;
     this.state = 'play';
     this.hudDirty = true;
-    // в босс-раше первый босс выходит после выбора стартового модуля (chooseModule)
-    if (this.mode !== 'rush') this.nextWave();
+    // в босс-раше первый босс выходит после выбора стартового модуля (chooseModule); до него — пустая «волна 0»,
+    // чтобы всё, что смотрит на номер волны (бомба, навыки, дроны), не спотыкалось
+    if (this.mode === 'rush') this.wave = { n: 0, boss: false, budget: 0, spent: 0, spawnT: 0, intro: 999, done: true, cleared: true, clearT: 0, miniDone: true, startT: this.t };
+    else this.nextWave();
     SS.emit('runStart');
     // стартовый модуль корабля — первый выбор забега
     this.after(this.mode === 'rush' ? 0.2 : 0.7, () => this.offerModules('start'));
@@ -1866,7 +1868,7 @@
     this.state = 'play';
     this.hudDirty = true;
     if (kind === 'station') this.after(0.4, () => this.jumpScene());
-    if (kind === 'start' && this.mode === 'rush' && !this.wave) this.after(0.4, () => this.nextWave());
+    if (kind === 'start' && this.mode === 'rush' && this.wave && this.wave.n === 0) this.after(0.4, () => this.nextWave());
   };
   game.rerollCost = function () { return 40 + this.run.rerolls * 40; };
   game.rerollPerks = function () {
@@ -1913,7 +1915,7 @@
   game.nextWave = function () {
     // босс-раш: волны 5, 10, 15… — только боссы; выживание: боссов нет, волны идут без пауз
     const rush = this.mode === 'rush', surv = this.mode === 'survival';
-    const n = this.wave ? this.wave.n + (rush ? 5 : 1) : rush ? 5 : 1;
+    const n = this.wave ? this.wave.n + (rush ? 5 : 1) : 1;
     // 4.0: перед обычной волной — выбор узла на карте сектора (map.js); после выбора снова сюда
     if (this.mode === 'normal' && SS.map.need(n)) { SS.map.offer(n); return; }
     const isBoss = n % 5 === 0 && !surv;
