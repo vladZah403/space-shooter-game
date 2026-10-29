@@ -337,6 +337,7 @@
     this.updateEBullets(edt);
     this.collide();
     this.processBlasts();
+    this.flushDmgNums();
     this.updatePickups(dt);
     this.updateWaves(dt);
     if (this.scene) this.updateScene(dt);
@@ -928,13 +929,25 @@
       const other = this.nearestOther(e, 140 * G.S);
       if (other) { FX.lightning(e.x, e.y, other.x, other.y, '#fff36b', 2 * G.S, 0.12); this.damageEnemy(other, dmg * 0.5, { src: 'lightning' }); }
     }
+    // 3.1: цифры урона копятся и всплывают одной суммой раз в DMG_NUM_T с (на поздних волнах было месиво из цифр)
     if (M.s.settings.dmgNums && !o.noText && FX.quality > 0) {
-      const n = Math.round(dmg);
-      if (n > 0) FX.text(e.x + U.rand(-10, 10) * G.S, e.y - e.r * 0.4, crit ? n + '!' : String(n), crit ? '#ffd23d' : '#ffffff', crit ? 16 : 11, crit ? 0.7 : 0.45, -70);
+      if (!e.dmgSum) e.dmgT0 = this.t;
+      e.dmgSum = (e.dmgSum || 0) + dmg;
+      if (crit) e.dmgCrit = true;
     }
+    e.hitT = this.t;
     if (!e.boss && Math.random() < 0.25) A.play('hit');
     if (e.hp <= 0) SS.enemies.kill(e, o.src);
     return dmg;
+  };
+  const DMG_NUM_T = 0.35;
+  game.flushDmgNums = function () {
+    for (const e of this.enemies) {
+      if (!e.dmgSum || (e.alive && this.t - e.dmgT0 < DMG_NUM_T)) continue;
+      const n = Math.round(e.dmgSum), crit = e.dmgCrit;
+      e.dmgSum = 0; e.dmgCrit = false;
+      if (n > 0) FX.text(e.x + U.rand(-8, 8) * G.S, e.y - (e.ry || e.r) * 0.5, crit ? n + '!' : String(n), crit ? '#ffd23d' : '#ffffff', crit ? 15 : 11, crit ? 0.65 : 0.45, -70);
+    }
   };
   game.nearestOther = function (e, range) {
     let best = null, bd = range;
@@ -1864,7 +1877,9 @@
     if (!w.done) {
       w.spawnT -= dt;
       const tn = this.threatWave();
-      const cap = Math.min(26 * Math.max(1, this.diff.count), (7 + tn * 0.7) * this.diff.count);
+      // 3.1: на экране не больше ~16 врагов (на высоких сложностях чуть больше) — иначе поздние волны превращались в кашу
+      const ck = Math.sqrt(Math.max(1, this.diff.count));
+      const cap = Math.min(16 * ck, (6 + tn * 0.45) * ck);
       if (w.spawnT <= 0 && alive < cap) withRng(this.run.waveRng, () => {
         const cost = SS.enemies.spawnGroup(tn, w.budget - w.spent);
         w.spent += cost;

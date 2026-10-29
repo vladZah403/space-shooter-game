@@ -938,6 +938,27 @@
   // ════════════════════════════════════════════════════════════
   // ОБНОВЛЕНИЕ
   // ════════════════════════════════════════════════════════════
+  // 3.1: зависшие наверху враги расходятся в стороны, а не лежат друг на друге
+  const NO_SEP = { swarm: 1, formation: 1, kamikaze: 1, dive: 1, diver: 1, flank: 1, sweep: 1, link: 1, egg: 1, thief: 1, drift: 1, bomber: 1, flyby: 1 };
+  function separate(dt) {
+    const es = game.enemies, S = G.S;
+    for (let i = 0; i < es.length; i++) {
+      const a = es[i];
+      if (!a.alive || a.boss || a.mini || a.st !== 1 || NO_SEP[a.ai]) continue;
+      for (let j = i + 1; j < es.length; j++) {
+        const b = es[j];
+        if (!b.alive || b.boss || b.mini || b.st !== 1 || NO_SEP[b.ai]) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, min = (a.w + b.w) * 0.42;
+        if (Math.abs(dx) >= min || Math.abs(dy) >= (a.h + b.h) * 0.4) continue;
+        const push = (min - Math.abs(dx)) * Math.min(1, dt * 3) * 0.5, sd = dx === 0 ? (i % 2 ? 1 : -1) : Math.sign(dx);
+        a.x = U.clamp(a.x - sd * push, a.w * 0.5, G.FW - a.w * 0.5);
+        b.x = U.clamp(b.x + sd * push, b.w * 0.5, G.FW - b.w * 0.5);
+        // с края не уйти — расходимся по высоте
+        if (Math.abs(dx) < 4 * S && a.ty) { a.ty = Math.max(a.ty - 20 * S * dt, minY(a)); b.ty = Math.min((b.ty || b.y) + 20 * S * dt, G.H * 0.5); }
+      }
+    }
+  }
+
   E.updateAll = function (edt, dt) {
     const H = G.H;
     for (const e of game.enemies) {
@@ -954,6 +975,7 @@
       if (!e.horiz) e.bank = U.damp(e.bank, U.clamp((e.x - e.lastX) / Math.max(edt2, 0.001) * 0.0012, -0.35, 0.35), 8, dt);
       if (e.y > H + e.h + 20 || e.y < -H) { e.alive = false; e.leaving = true; }
     }
+    separate(dt);
     for (let i = E.corpses.length - 1; i >= 0; i--) {
       const c = E.corpses[i];
       c.t += dt;
@@ -1675,14 +1697,17 @@
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
       }
-      // полоса прочности
-      if (e.hp < e.maxHp && e.alpha > 0.5 && (e.mini || e.maxHp > 60 || e.elite)) {
-        const bw = e.mini ? Math.min(e.w * 0.8, 120 * S) : Math.max(26 * S, e.w * 0.6), bh = e.mini ? 5 * S : 3 * S;
+      // полоса прочности: у мини-боссов и элиты всегда, у остальных — 1,5 с после попадания и гаснет (3.1: меньше мусора на экране)
+      const barA = e.mini || e.elite ? 1 : U.clamp((1.5 - (game.t - (e.hitT || -9))) / 0.4, 0, 1);
+      if (e.hp < e.maxHp && e.alpha > 0.5 && barA > 0 && (e.mini || e.maxHp > 60 || e.elite)) {
+        const bw = e.mini ? Math.min(e.w * 0.8, 120 * S) : Math.max(24 * S, e.w * 0.5), bh = e.mini ? 5 * S : 2.5 * S;
         const bx = e.x - bw / 2, by = Math.max(e.y - e.h * 0.55 - 6 * S, (SS.ui ? SS.ui.topInset() : 120) - 32);
+        ctx.globalAlpha = barA;
         ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
         const k = Math.max(0, e.hp / e.maxHp);
         ctx.fillStyle = e.mini ? '#ff5c4d' : k > 0.5 ? '#3dffa2' : k > 0.25 ? '#ffc83d' : '#ff4d5e';
         ctx.fillRect(bx, by, bw * k, bh);
+        ctx.globalAlpha = 1;
       }
     }
     ctx.globalAlpha = 1;
