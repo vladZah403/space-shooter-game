@@ -4,7 +4,7 @@
 'use strict';
 
 window.SS = window.SS || {};
-SS.VERSION = '3.0.0';
+SS.VERSION = '3.1.0';
 
 (function () {
   const TAU = Math.PI * 2;
