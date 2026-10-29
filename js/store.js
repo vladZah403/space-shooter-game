@@ -38,11 +38,13 @@
     };
   }
 
-  // аккуратное слияние: новые поля из defaults дополняют старое сохранение
+  // аккуратное слияние: новые поля из defaults дополняют старое сохранение.
+  // Идём по ключам сохранения, а не defaults: поля, которых нет в defaults (comp.lv.guard, stats.modes,
+  // settings.mode, daily.ch.tiers, foeSeen…), иначе терялись при каждой загрузке
   function merge(base, data) {
     if (!data || typeof data !== 'object') return base;
-    for (const k of Object.keys(base)) {
-      if (!(k in data)) continue;
+    for (const k of Object.keys(data)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       const bv = base[k], dv = data[k];
       if (bv && typeof bv === 'object' && !Array.isArray(bv) && dv && typeof dv === 'object' && !Array.isArray(dv)) {
         base[k] = merge(bv, dv);
@@ -60,6 +62,8 @@
     s: defaults(),
     _timer: null,
     _cloudTimer: null,
+    _loadedAt: 0,        // метка updated локального сохранения на момент запуска (0 — свежий профиль)
+    cloudReady: false,   // писать в облако можно только после того, как его прочли (main.js)
 
     load() {
       let raw = null;
@@ -72,6 +76,7 @@
         this.migrateV1();
       }
       this.sanitize();
+      this._loadedAt = this.s.updated || 0;
       return this.s;
     },
 
@@ -112,7 +117,7 @@
       this._timer = setTimeout(() => this.save(), ms || 600);
     },
     scheduleCloud() {
-      if (!SS.tg || !SS.tg.cloudAvailable()) return;
+      if (!SS.tg || !SS.tg.cloudAvailable() || !this.cloudReady) return;
       clearTimeout(this._cloudTimer);
       this._cloudTimer = setTimeout(() => SS.tg.cloudSave(JSON.stringify(this.s), this.s.updated), 2500);
     },
@@ -149,7 +154,9 @@
       try {
         const data = JSON.parse(json);
         if (!data || data.v !== 2) return false;
-        if ((data.updated || 0) <= (this.s.updated || 0)) return false;
+        // сравниваем с сохранением на момент запуска: пока облако грузилось, меню уже успело
+        // сохранить свежий профиль с меткой «сейчас» — с ней облако всегда казалось бы старее
+        if ((data.updated || 0) <= this._loadedAt) return false;
         this.s = merge(defaults(), data);
         this.patchNotes(data);
         this.sanitize();

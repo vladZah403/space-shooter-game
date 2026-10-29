@@ -197,11 +197,14 @@
       document.getElementById('fps').hidden = !s.settings.fps;
       SS.on('audioUnlocked', () => main.setMusic(main.musicMode));
       // облачное сохранение Telegram — если там прогресс новее, берём его
+      // писать в облако — только после чтения: иначе свежий профиль (новый телефон, очищенный кэш) затрёт облачный.
+      // Облако не прочиталось (сеть, таймаут) — пустой профиль его не трогает до следующего запуска
       SS.tg.cloudLoad().then((res) => {
+        SS.store.cloudReady = !!res || SS.store._loadedAt > 0;
         if (res && res.json && SS.store.adoptCloud(res.json)) {
           SS.ui.toast({ ico: '☁️', title: 'ОБЛАКО', text: 'Прогресс загружен из Telegram', info: true });
           if (SS.game.state === 'idle') SS.ui.renderMenu();
-        } else if (SS.tg.cloudAvailable()) SS.store.scheduleCloud();
+        } else SS.store.scheduleCloud();
       });
       prog(1, 'Готово');
       main._last = performance.now();

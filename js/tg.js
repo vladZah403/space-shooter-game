@@ -84,13 +84,30 @@
     cloudAvailable() { return !!(wa && wa.CloudStorage && ver('6.9') && this.hasInitData); },
     cloudSave(json, ts) {
       if (!this.cloudAvailable()) return;
+      // запись ещё идёт — запомним последнюю версию и запишем её следом (зависшую запись ждём не дольше 15 с)
+      if (this._cloudBusy && Date.now() - this._cloudBusy < 15000) { this._cloudNext = [json, ts]; return; }
       const cs = wa.CloudStorage;
       const parts = [];
       for (let i = 0; i < json.length; i += CLOUD_CHUNK) parts.push(json.slice(i, i + CLOUD_CHUNK));
       if (parts.length > 60) return; // защита от переполнения
-      let pending = parts.length;
-      const done = () => { if (--pending === 0) { try { cs.setItem('ss2_meta', JSON.stringify({ n: parts.length, t: ts }), () => {}); } catch (e) {} } };
-      parts.forEach((p, i) => { try { cs.setItem('ss2_c' + i, p, done); } catch (e) { done(); } });
+      // два набора ключей по очереди: куски пишутся в тот, на который ss2_meta сейчас НЕ указывает,
+      // а meta переключается, только когда записались все — оборванная запись не портит прошлую копию
+      const slot = this._cloudSlot === 'a' ? 'b' : 'a';
+      let pending = parts.length, failed = false;
+      this._cloudBusy = Date.now();
+      const finish = () => {
+        this._cloudBusy = 0;
+        const next = this._cloudNext;
+        this._cloudNext = null;
+        if (next) this.cloudSave(next[0], next[1]);
+      };
+      const done = (err) => {
+        if (err) failed = true;
+        if (--pending) return;
+        if (failed) return finish();
+        try { cs.setItem('ss2_meta', JSON.stringify({ n: parts.length, t: ts, s: slot }), (e) => { if (!e) this._cloudSlot = slot; finish(); }); } catch (e) { finish(); }
+      };
+      parts.forEach((p, i) => { try { cs.setItem('ss2_' + slot + i, p, done); } catch (e) { done(e); } });
     },
     cloudLoad() {
       return new Promise((resolve) => {
@@ -99,11 +116,15 @@
         const timer = setTimeout(() => resolve(null), 4000);
         try {
           cs.getItem('ss2_meta', (err, raw) => {
-            if (err || !raw) { clearTimeout(timer); return resolve(null); }
+            if (err) { clearTimeout(timer); return resolve(null); }
+            // облако прочитано, но там пусто — это не ошибка: в него можно писать
+            if (!raw) { clearTimeout(timer); return resolve({ json: null }); }
             let meta;
             try { meta = JSON.parse(raw); } catch (e) { clearTimeout(timer); return resolve(null); }
+            // набор ключей, где лежит последняя целая копия (старые сохранения — ss2_c0, ss2_c1…)
+            this._cloudSlot = meta.s || 'c';
             const keys = [];
-            for (let i = 0; i < meta.n; i++) keys.push('ss2_c' + i);
+            for (let i = 0; i < meta.n; i++) keys.push('ss2_' + this._cloudSlot + i);
             cs.getItems(keys, (err2, vals) => {
               clearTimeout(timer);
               if (err2 || !vals) return resolve(null);
