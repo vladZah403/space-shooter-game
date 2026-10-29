@@ -344,8 +344,8 @@
     const k = M.overpowerK(ui._diffSel, power);
     const easy = k < 1 ? '<br><b style="color:#ffc83d">Вы намного сильнее этой сложности — монеты ×' + fmtMul(d.coins * k) + ' вместо ×' + fmtMul(d.coins) + '</b>' : '';
     const md = D.MODES[store.s.settings.mode];
-    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc + weak + easy + (md && store.s.settings.mode !== 'normal' ? '<br><b>' + md.ico + ' ' + md.name + '</b>: ' + md.desc + '. Свои рекорды, в рейтинг не идут.' : '');
-    if (md && store.s.settings.mode !== 'normal') $('#btnDiffGo span').textContent += ' • ' + md.name;
+    $('#diffDesc2').innerHTML = '<b style="color:' + d.color + '">' + d.name + '</b>: ' + d.desc + weak + easy + (md && store.s.settings.mode !== 'normal' ? '<br>' + md.ico + ' ' + md.desc + '.' : '');
+
   }
   ui.showDiff = function () {
     const s = store.s;

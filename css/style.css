@@ -907,3 +907,31 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 /* геймдизайн: эволюции, причина гибели */
 .perk-evo{margin-top:5px;font-size:12px;font-weight:700;color:#ff9ff3;letter-spacing:.2px}
 .go-cause{text-align:center;color:#ff8fa3;font-size:13px;font-weight:600;margin-top:4px;min-height:16px}
+
+/* ═══════════════════════════════════════════════════════════════
+   4.0.1 — окна влезают в экран телефона: безопасные зоны (чёлка, полоска «домой»),
+   высота окна по экрану, список внутри прокручивается, строки компактнее
+   ═══════════════════════════════════════════════════════════════ */
+.screen.overlay{padding:calc(var(--sat) + 10px) 10px calc(var(--sab) + 10px)}
+.modal{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px)}
+.diff-modal{padding:14px 12px 12px;gap:7px;max-height:calc(100dvh - var(--sat) - var(--sab) - 20px)}
+.diff-modal .modal-title{font-size:17px;letter-spacing:2.5px;min-height:34px}
+.diff-modal .modal-x{top:8px;right:8px;width:34px;height:34px}
+.diff-lives{font-size:12px;margin-top:-6px}
+.diff-list{flex:1 1 auto;min-height:0;max-height:none;gap:5px}
+.diff-row{padding:7px 10px 7px 14px;border-radius:12px}
+.dr-main{gap:2px}
+.diff-name{font-size:12px;letter-spacing:1.2px;gap:6px}
+.diff-meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap;font-size:11px;gap:8px}
+.diff-rew{font-size:12px}
+.diff-rew small{font-size:10.5px}
+.diff-desc2{font-size:12px;line-height:1.2;min-height:0;flex-shrink:0}
+.mode-row{margin:2px 0 4px;flex-shrink:0}
+.mode-btn{padding:5px 4px;font-size:9px;flex-direction:row;justify-content:center;gap:5px}
+.mode-btn span{font-size:15px}
+.diff-modal .btn.big{height:50px;font-size:14px;letter-spacing:1.5px;flex-shrink:0;white-space:nowrap}
+.diff-modal .btn.big span{overflow:hidden;text-overflow:ellipsis}
+.modal{overflow-y:auto;scrollbar-width:none}
+.modal::-webkit-scrollbar{display:none}
+.perk-wrap,.map-wrap{max-height:calc(100dvh - var(--sat) - var(--sab) - 20px);overflow-y:auto;scrollbar-width:none}
+.map-box{height:min(46dvh,360px)}
