@@ -458,11 +458,28 @@ body.cinema .banner{visibility:hidden}
 .hud-boss-bar::before,.hud-boss-bar::after{content:'';position:absolute;top:0;bottom:0;width:2px;background:rgba(12,0,6,.9);z-index:1}
 .hud-boss-bar::before{left:33.33%}
 .hud-boss-bar::after{left:66.66%}
-.hud-buffs{position:absolute;left:calc(max(var(--sal), (100vw - var(--fw,100vw)) / 2) + 12px);top:calc(var(--sat) + 92px);display:flex;flex-direction:column;gap:5px}
+/* 4.2: значки бонусов — в ряд, иконка в кольце-таймере (--k — доля оставшегося времени), рядом короткая метка */
+.hud-buffs{position:absolute;left:calc(max(var(--sal), (100vw - var(--fw,100vw)) / 2) + 12px);top:calc(var(--sat) + 92px);display:flex;flex-wrap:wrap;gap:6px;max-width:calc(min(100vw, var(--fw,100vw)) - 150px)}
 .hud-boss:not([hidden]) ~ .hud-buffs{top:calc(var(--sat) + 122px)}
-.buff{display:flex;align-items:center;gap:5px;height:24px;padding:0 8px 0 5px;border-radius:12px;background:rgba(8,12,30,.66);border:1px solid color-mix(in srgb,var(--bc,#fff) 45%,transparent);
-  font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--bc,#fff);animation:fadeIn .2s}
-.buff svg{font-size:13px}
+.buff{display:flex;align-items:center;gap:4px;height:30px;border-radius:15px;font-family:var(--font-h);font-size:10px;font-weight:700;color:var(--bc,#fff);animation:fadeIn .2s}
+.buff.tag{padding-right:8px;background:rgba(8,12,30,.66)}
+.buff i{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:15px;
+  background:radial-gradient(closest-side,rgba(8,12,30,.9) 80%,transparent 82%),conic-gradient(var(--bc,#fff) calc(var(--k,1) * 360deg),rgba(255,255,255,.14) 0)}
+.buff svg{font-size:15px}
+/* 4.2: прокручиваемое окно или список, ниже есть ещё — затемнение снизу и «ещё ↓» внизу экрана (ui.js — scrollHint) */
+.more{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 48px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 48px),transparent)}
+.screen.more-below::after{content:'ещё ↓';position:absolute;left:50%;bottom:calc(var(--sab) + 10px);z-index:5;padding:4px 12px;border-radius:12px;pointer-events:none;
+  background:rgba(8,12,30,.85);border:1px solid var(--line2);font-family:var(--font-h);font-size:10px;letter-spacing:1.5px;color:var(--cyan);animation:moreBob 1.2s ease-in-out infinite}
+@keyframes moreBob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,4px)}}
+/* пауза: что сейчас действует; если окну не хватает высоты — оно прокручивается, а кнопки не сплющиваются */
+#scr-pause .modal > *{flex-shrink:0}
+.pause-fx{display:flex;flex-direction:column;gap:6px;margin:0 0 6px}
+.pause-fx:empty{display:none}
+.pfx{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:rgba(8,12,30,.5);border:1px solid color-mix(in srgb,var(--bc) 40%,transparent);text-align:left}
+.pfx i{font-style:normal;font-size:20px;width:26px;text-align:center;color:var(--bc);flex-shrink:0}
+.pfx i svg{font-size:20px}
+.pfx b{display:block;font-family:var(--font-h);font-size:11px;letter-spacing:1px;color:var(--bc)}
+.pfx small{display:block;font-size:13px;color:#cfd8f5;line-height:1.25}
 .hud-combo{position:absolute;right:calc(max(var(--sar), (100vw - var(--fw,100vw)) / 2) + 12px);top:calc(var(--sat) + 92px);display:flex;flex-direction:column;align-items:flex-end;opacity:0;transform:translateX(16px);transition:opacity .25s,transform .25s}
 .hud-boss:not([hidden]) ~ .hud-combo{top:calc(var(--sat) + 122px)}
 .hud-combo.show{opacity:1;transform:none}
@@ -757,11 +774,14 @@ body.cinema .banner{visibility:hidden}
   .perk-ico{background:rgba(0,0,0,.35);border-color:var(--line2)}
 }
 
-/* во время боя уведомления ниже верхней панели и компактнее */
-body.in-game #toasts{top:calc(var(--sat) + 100px)}
-body.in-game .toast{padding:7px 12px;border-radius:12px}
+/* во время боя уведомления ниже верхней панели, значков бонусов и комбо (4.2) и компактнее */
+body.in-game #toasts{top:calc(var(--sat) + 140px)}
+body.in-game.boss-on #toasts{top:calc(var(--sat) + 170px)}
+body.in-game .toast{padding:7px 12px;border-radius:12px;max-width:330px}
 body.in-game .toast .t-ico,body.in-game .toast .t-ico svg{font-size:20px}
 body.in-game .toast .t-text{font-size:13px}
+/* 4.2: подсказка при первой встрече с механикой — обычный текст в несколько строк */
+.toast.hint .t-text,body.in-game .toast.hint .t-text{font-weight:500;font-size:13px;line-height:1.3}
 body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-direction:column-reverse}
 
 /* ═══════════════════════════════════════════════════════════════

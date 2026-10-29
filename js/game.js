@@ -181,6 +181,14 @@
   game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
   // 4.0: реликвия забега (map.js)
   game.relic = function (id) { return !!(this.run && this.run.relics && this.run.relics[id]); };
+  // 4.2: подсказка при первой встрече с механикой — одна за всю игру (store.s.hints)
+  game.hintOnce = function (id, title, text) {
+    const h = M.s.hints || (M.s.hints = {});
+    if (h[id]) return;
+    h[id] = 1;
+    SS.store.soon();
+    SS.emit('toast', { ico: 'info', title, text, info: true, hint: true, dur: 6500 });
+  };
   // 4.2: аномалия сектора: без id — какая действует (или null), с id — действует ли эта
   game.anomaly = function (id) { const a = this.run && this.run.anomaly; return id ? a === id : a || null; };
   // нет бонусов: испытание «Без бонусов» или аномалия «Радиотишина»
@@ -268,7 +276,8 @@
     // короткое касание пропускает кат-сцену (ведение пальцем — нет)
     if (this.state === 'cutscene') { if (quick) this.skipScene(); return; }
     if (this.state !== 'play') return;
-    if (quick) {
+    // двойной тап — бомба (можно выключить в настройках: «Бомба двойным тапом»)
+    if (quick && M.s.settings.dblBomb !== false) {
       if (now - pt.lastTap < 320 && Math.hypot(e.clientX - pt.lastTapX, e.clientY - pt.lastTapY) < 60) { this.useBomb(); pt.lastTap = 0; }
       else { pt.lastTap = now; pt.lastTapX = e.clientX; pt.lastTapY = e.clientY; }
     }
@@ -1947,6 +1956,7 @@
           if (this.run !== run || D.ANOMALIES[run.anomaly] !== def) return;
           SS.emit('toast', { ico: def.ico, title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
           A.play('skill', { rate: 0.7 });
+          this.hintOnce('anomaly', 'ПОДСКАЗКА', 'Аномалия меняет правила сектора до босса: сложнее, зато монет и опыта больше. Подробности — на паузе');
         });
       }
     }

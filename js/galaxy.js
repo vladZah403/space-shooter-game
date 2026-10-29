@@ -402,14 +402,14 @@
   }
   function info(n) {
     const el = $('#mapInfo');
-    if (!n) { el.innerHTML = '<div class="mi-hint">Выберите светящийся узел · тап по любому — подробности</div>'; el.style.removeProperty('--nc'); return; }
+    if (!n) { el.innerHTML = '<div class="mi-hint">Тап по узлу — подробности · по светящемуся ещё раз — летим</div>'; el.style.removeProperty('--nc'); return; }
     if (n.boss) {
       el.style.setProperty('--nc', n.def.color || '#ff3d5a');
       el.innerHTML = '<div class="mi-name">БОСС: ' + n.def.name + '</div><div class="mi-desc">' + U.escape(n.def.title || '') + '. После боя — трофейный сундук и станция</div>';
       return;
     }
     el.style.setProperty('--nc', n.def.color);
-    const tag = n.can ? '<span class="mi-tag ok">МОЖНО ЛЕТЕТЬ</span>' : n.done ? '<span class="mi-tag">ПРОЙДЕН</span>' : n.c < st.d.step ? '<span class="mi-tag">ПОЗАДИ</span>' : st.open.has(key(n.c, n.r)) ? '<span class="mi-tag">ДАЛЬШЕ ПО ПУТИ</span>' : '<span class="mi-tag no">НЕТ ПУТИ</span>';
+    const tag = n.can ? '<span class="mi-tag ok">ТАП ЕЩЁ РАЗ — ЛЕТИМ</span>' : n.done ? '<span class="mi-tag">ПРОЙДЕН</span>' : n.c < st.d.step ? '<span class="mi-tag">ПОЗАДИ</span>' : st.open.has(key(n.c, n.r)) ? '<span class="mi-tag">ДАЛЬШЕ ПО ПУТИ</span>' : '<span class="mi-tag no">НЕТ ПУТИ</span>';
     const more = n.can && st.reach ? '<div class="mi-more">Отсюда дальше: ' + routeText(st.reach, n) + '</div>' : '';
     el.innerHTML = '<div class="mi-name">' + n.def.name + tag + '</div><div class="mi-desc">' + n.def.desc + '</div>' + more;
   }

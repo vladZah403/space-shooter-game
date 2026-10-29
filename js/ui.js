@@ -187,7 +187,25 @@
 
   // холст закрыт экраном меню (непрозрачный), окном с размытием или итогами — main.js его тогда не перерисовывает
   function syncCover() { ui.covered = !!document.querySelector('.screen.show.sub, .screen.show.overlay, #scr-gameover.show'); }
-  ui.show = function (sel) { const el = $(sel); if (el) { el.classList.add('show'); syncCover(); } };
+  ui.show = function (sel) { const el = $(sel); if (el) { el.classList.add('show'); syncCover(); scrollHints(el); } };
+  // 4.2: у прокручиваемых окон и списков, пока ниже есть ещё — затемнение снизу и «ещё ↓» (класс more-below у экрана)
+  const SCROLLERS = '.perk-wrap, .modal, .sub-body';
+  function scrollHint(sc) {
+    const more = sc.scrollHeight - sc.clientHeight - sc.scrollTop > 8;
+    sc.classList.toggle('more', more);
+    const scr = sc.closest('.screen');
+    if (scr) scr.classList.toggle('more-below', !!scr.querySelector('.more'));
+  }
+  function scrollHints(scr) {
+    // содержимое иногда дорисовывается сразу после показа — проверяем ещё раз чуть позже
+    const run = () => scr.querySelectorAll(SCROLLERS).forEach(scrollHint);
+    requestAnimationFrame(run);
+    setTimeout(run, 350);
+  }
+  document.addEventListener('scroll', (e) => { if (e.target.matches && e.target.matches(SCROLLERS)) scrollHint(e.target); }, true);
+  window.addEventListener('resize', () => document.querySelectorAll('.screen.show').forEach(scrollHints));
+  // вкладки и кнопки перерисовывают списки — после нажатия проверяем заново
+  document.addEventListener('click', () => setTimeout(() => document.querySelectorAll('.screen.show ' + SCROLLERS.split(', ').join(', .screen.show ')).forEach(scrollHint), 60), true);
   ui.hide = function (sel) { const el = $(sel); if (el) { el.classList.remove('show'); syncCover(); } };
   ui.isShown = function (sel) { const el = $(sel); return !!(el && el.classList.contains('show')); };
 
@@ -529,6 +547,11 @@
   }
 
   // вызывается каждый кадр — меняет DOM только при изменении значений
+  // значки бонусов в HUD (4.2): цвет, иконка, k — заполнение кольца 0..20, tag — короткая метка (+25%, ×2)
+  const BUFF_ICONS = { power: 'fire', spread: 'bolt', multi: 'plus', rapid: 'bolt', magnet: 'magnet', freeze: 'snow' };
+  const ring = (left, full) => Math.round(U.clamp(left / (full || left || 1), 0, 1) * 20);
+  const buffChip = (col, ico, k, tag) => '<div class="buff' + (tag ? ' tag' : '') + '" style="--bc:' + col + ';--k:' + k / 20 + '"><i>' + ico + '</i>' + (tag ? '<b>' + tag + '</b>' : '') + '</div>';
+
   ui.updateHud = function () {
     const g = game, p = g.player, run = g.run, c = ui.hudCache, el = ui.hudEls;
     if (!p || !run || !el) return;
@@ -565,7 +588,7 @@
     // босс
     const boss = g.boss;
     const bossOn = !!(boss && boss.alive);
-    if (c.bossOn !== bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; c.bossPh = 0; }
+    if (c.bossOn !== bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; c.bossPh = 0; document.body.classList.toggle('boss-on', bossOn); }
     if (bossOn) {
       // 3.1: номер фазы рядом с именем (полоса поделена на три части)
       if (c.bossPh !== boss.phase) { c.bossPh = boss.phase; el.bossName.textContent = boss.bdef.name + (boss.phase > 1 ? ' · ФАЗА ' + boss.phase : ''); }
@@ -587,27 +610,22 @@
       if (c.ct !== ct) { c.ct = ct; el.comboTimer.style.transform = 'scaleX(' + ct + ')'; }
       if (c.fever !== run.fever) { c.fever = run.fever; el.combo.classList.toggle('fever', run.fever); }
     }
-    // бонусы
+    // бонусы — 4.2: компактные значки в ряд, иконка в кольце-таймере (k — доля оставшегося времени, 0..20);
+    // названия и описания — на паузе (ui.showPause)
     const perfect = run.waveDamage === 0 && g.wave && !g.wave.cleared && g.state === 'play';
-    let buffKey = perfect ? 'P' : '';
-    for (const k in g.buffs) buffKey += k + Math.ceil(g.buffs[k]);
-    for (const id in run.skillFx) if (run.skillFx[id] > 0) buffKey += id + Math.ceil(run.skillFx[id]);
-    if (run.overload > 0) buffKey += 'ol' + Math.ceil(run.overload);
     const wev = SS.events.active(), an = g.anomaly();
-    if (wev) buffKey += 'ev' + wev.id;
-    if (an) buffKey += 'an' + an;
+    let buffKey = (perfect ? 'P' : '') + (wev ? 'ev' + wev.id : '') + (an ? 'an' + an : '') + (run.overload > 0 ? 'ol' : '');
+    for (const k in g.buffs) buffKey += k + ring(g.buffs[k], D.POWERUPS[k].dur);
+    for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) buffKey += id + ring(run.skillFx[id], D.SKILLS[id].dur);
     if (c.buffs !== buffKey) {
       c.buffs = buffKey;
-      const icons = { power: 'fire', spread: 'bolt', multi: 'plus', rapid: 'bolt', magnet: 'magnet', freeze: 'snow' };
-      // 4.2: аномалия сектора и её прибавка к наградам
       const ad = an && D.ANOMALIES[an];
-      let h = ad ? '<div class="buff" style="--bc:' + ad.color + '">' + ad.ico + ' ' + ad.name + ' +' + Math.round(ad.bonus * 100) + '%</div>' : '';
-      if (wev) h += '<div class="buff" style="--bc:' + wev.color + '">' + wev.ico + ' ' + wev.name + '</div>';
-      if (perfect) h += '<div class="buff" style="--bc:#3dffa2">' + ic('star') + 'БЕЗ УРОНА ×2</div>';
-      for (const k of Object.keys(g.buffs)) { const def = D.POWERUPS[k]; h += '<div class="buff" style="--bc:' + def.color + '">' + ic(icons[k] || 'star') + Math.ceil(g.buffs[k]) + 'с</div>'; }
-      // 3.1: сколько ещё работают активные навыки
-      for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) h += '<div class="buff" style="--bc:#3de0ff">' + D.SKILLS[id].ico + ' ' + D.SKILLS[id].name + ' ' + Math.ceil(run.skillFx[id]) + 'с</div>';
-      if (run.overload > 0) h += '<div class="buff" style="--bc:#ffc83d">' + ic('bolt') + 'ПЕРЕГРУЗКА</div>';
+      let h = ad ? buffChip(ad.color, ad.ico, 20, '+' + Math.round(ad.bonus * 100) + '%') : '';
+      if (wev) h += buffChip(wev.color, wev.ico, 20);
+      if (perfect) h += buffChip('#3dffa2', ic('star'), 20, '×2');
+      for (const k of Object.keys(g.buffs)) h += buffChip(D.POWERUPS[k].color, ic(BUFF_ICONS[k] || 'star'), ring(g.buffs[k], D.POWERUPS[k].dur));
+      for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) h += buffChip('#3de0ff', D.SKILLS[id].ico, ring(run.skillFx[id], D.SKILLS[id].dur));
+      if (run.overload > 0) h += buffChip('#ffc83d', ic('bolt'), 20);
       el.buffs.innerHTML = h;
     }
     // оружие
@@ -685,7 +703,7 @@
     while (ui._toastQ.length && box.querySelectorAll('.toast:not(.out)').length < 2) {
       const t = ui._toastQ.shift();
       const el = document.createElement('div');
-      el.className = 'toast' + (t.info ? ' info' : '');
+      el.className = 'toast' + (t.info ? ' info' : '') + (t.hint ? ' hint' : '');
       el.innerHTML = '<div class="t-ico">' + (t.ico && t.ico.length > 3 ? ic(t.ico) : U.escape(t.ico || '🏆')) + '</div><div><div class="t-title">' + U.escape(t.title || '') + '</div><div class="t-text">' + U.escape(t.text || '') + '</div></div>' + (t.rew ? '<div class="t-rew">' + U.escape(t.rew) + ' ' + ic('coin') + '</div>' : '');
       box.appendChild(el);
       setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 320); }, t.dur || 2400);
@@ -717,6 +735,14 @@
       '<div class="pi-cell"><small>Счёт</small><b>' + U.fmtShort(run.score) + '</b></div>' +
       '<div class="pi-cell"><small>Волна</small><b>' + (g.wave ? g.wave.n : 1) + '</b></div>' +
       '<div class="pi-cell"><small>Монеты</small><b>' + U.fmt(run.coins) + '</b></div>';
+    // 4.2: что сейчас действует — подробности к значкам из HUD
+    const fx = [], an = g.anomaly(), wev = SS.events.active();
+    if (an) { const d = D.ANOMALIES[an]; fx.push([d.color, d.ico, 'Аномалия: ' + d.name, d.desc + ' · награды +' + Math.round(d.bonus * 100) + '%']); }
+    if (wev) fx.push([wev.color, wev.ico, wev.name, wev.desc]);
+    if (run.waveDamage === 0 && g.wave && !g.wave.cleared) fx.push(['#3dffa2', ic('star'), 'Без урона', 'волна без попаданий — бонус ×2']);
+    for (const k of Object.keys(g.buffs)) fx.push([D.POWERUPS[k].color, ic(BUFF_ICONS[k] || 'star'), D.POWERUPS[k].name, 'ещё ' + Math.ceil(g.buffs[k]) + ' с']);
+    for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) fx.push(['#3de0ff', D.SKILLS[id].ico, D.SKILLS[id].name, 'ещё ' + Math.ceil(run.skillFx[id]) + ' с']);
+    $('#pauseFx').innerHTML = fx.map((f) => '<div class="pfx" style="--bc:' + f[0] + '"><i>' + f[1] + '</i><div><b>' + U.escape(f[2]) + '</b><small>' + U.escape(f[3]) + '</small></div></div>').join('');
     $('#pauseBuild').innerHTML = buildHtml(run);
     syncPauseToggles();
     ui.show('#scr-pause');
@@ -1516,6 +1542,7 @@
       '<div class="set-row"><label>' + ic('play') + 'Заставка при запуске</label><button class="btn sm" id="btnIntro" style="margin-left:auto">СМОТРЕТЬ</button>' + sw('intro') + '</div></div>' +
       '<div class="set-title">УПРАВЛЕНИЕ</div><div class="set-group">' +
       range('sens', 0.6, 2.4, 0.05, [ic('ship') + 'Чувствительность', (v) => '×' + (+v).toFixed(2)]) +
+      '<div class="set-row"><label>' + ic('bomb') + 'Бомба двойным тапом</label>' + sw('dblBomb') + '</div>' +
       '<div class="set-row"><label>' + ic('vibe') + 'Вибрация</label>' + sw('vibro') + '</div></div>' +
       '<div class="set-title">ПРОГРЕСС</div><div class="set-group">' +
       '<div class="set-row"><label>' + ic('user') + 'Облачное сохранение</label><span class="val" style="min-width:0">' + cloud + '</span></div>' +

@@ -111,7 +111,10 @@
     run.escort = null;
     if (w.node === 'elite') { w.danger = true; w.budget *= D.DANGER.count; }
     if (w.node === 'cache') w.budget *= 0.8;
-    if (w.node === 'escort') run.escort = { x: G.FW / 2, y: G.H * 0.66, hp: ESCORT.hp, t: 0, cd: 2.5, flash: 0 };
+    if (w.node === 'escort') {
+      run.escort = { x: G.FW / 2, y: G.H * 0.66, hp: ESCORT.hp, t: 0, cd: 2.5, flash: 0 };
+      game.after(w.intro + 0.8, () => game.hintOnce('escort', 'ПОДСКАЗКА', 'Враги бьют по Торговцу огненными шарами — сбивайте их выстрелами. Довезёте живым — скидка в лавке и сундук'));
+    }
   };
 
   // ── награда узла после волны; true — показано окно, волна начнётся после выбора ──
