@@ -177,7 +177,7 @@
   // санитарный корабль: если корабль ранен, иногда в начале волны пролетает сверху вниз и сбрасывает аптечку
   F.onWave = function (w) {
     const run = game.run, p = game.player;
-    if (w.boss || w.n < 4 || run.noDrops || p.lives >= p.maxLives || w.n - (run.lastMed || -99) < 4 || Math.random() > 0.3) return;
+    if (w.boss || w.n < 4 || game.noDrops() || p.lives >= p.maxLives || w.n - (run.lastMed || -99) < 4 || Math.random() > 0.3) return;
     run.lastMed = w.n;
     F.med = { t: -U.rand(4, 8), x: U.rand(0.25, 0.75) * G.FW, y: -70 * G.S, dropped: false };
   };

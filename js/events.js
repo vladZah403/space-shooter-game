@@ -35,7 +35,7 @@
       // k: 0..3 — номер волны в секторе; бой с боссом проходит без механики
       this.mech = sec.mech && !w.boss ? { id: sec.mech, wave: w, k: Math.min(3, (w.n - 1) % 5), cd: 0.6 } : null;
       if (w.boss) return;
-      const always = !!(ch && ch.mods.includes('events'));
+      const always = !!(ch && ch.mods.includes('events')) || game.anomaly('unstable');
       if (w.n < (always ? 3 : D.EVENT_WAVE)) return;
       if (!always && (run.lastEvent >= w.n - 1 || Math.random() > D.EVENT_CHANCE)) return;
       const pool = D.EVENTS.filter((d) => d.id !== run.lastEventId && !(sec.noEvents && sec.noEvents.includes(d.id)));

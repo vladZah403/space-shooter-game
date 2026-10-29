@@ -86,6 +86,7 @@
       lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '', energy: 1, arc: 0, focus: { uid: 0, n: 0, t: 0 },
       mods: {}, repairT: 0, emergT: 0, pilot: D.PILOTS[s.pilot] && M.pilotUnlocked(s.pilot) ? s.pilot : 'kai',
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
+      anomaly: null, lastAnomaly: '', anomalies: 0,
     };
     // рогалик: порядок секторов и боссов свой в каждом забеге; первыми всегда Орбита Земли и Страж
     const rnd = ch ? U.seeded(U.hashStr('order:' + ch.date)) : Math.random;
@@ -180,6 +181,10 @@
   game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
   // 4.0: реликвия забега (map.js)
   game.relic = function (id) { return !!(this.run && this.run.relics && this.run.relics[id]); };
+  // 4.2: аномалия сектора: без id — какая действует (или null), с id — действует ли эта
+  game.anomaly = function (id) { const a = this.run && this.run.anomaly; return id ? a === id : a || null; };
+  // нет бонусов: испытание «Без бонусов» или аномалия «Радиотишина»
+  game.noDrops = function () { return !!(this.run && (this.run.noDrops || this.run.anomaly === 'silence')); };
   // сектор и босс по номеру в забеге (с учётом перемешанного порядка)
   game.sectorIdx = function (k) { const o = this.run && this.run.sectorOrder; return o ? o[k % o.length] : k % D.SECTORS.length; };
   game.sectorDef = function (k) { return D.SECTORS[this.sectorIdx(k)]; };
@@ -191,13 +196,15 @@
     const ship = D.SHIPS[s.ship.model].stats;
     const pres = M.prestigeBonus();
     const S = G.S;
+    // 4.2: пока действует аномалия сектора, монет и опыта больше
+    const an = this.anomaly(), anK = an ? 1 + D.ANOMALIES[an].bonus : 1;
     let shieldRegen = md('shieldcore') ? 20 : sk('sk_capacitor') ? 30 : 0;
     if (pk('shieldgen')) { const v = [30, 22, 15][pk('shieldgen') - 1]; shieldRegen = shieldRegen ? Math.min(shieldRegen, v) : v; }
     if (ship.shieldRegen) shieldRegen = shieldRegen ? Math.min(shieldRegen, ship.shieldRegen) : ship.shieldRegen;
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + rl('r_lens') * 0.12 + rl('r_glassblade') * 0.4 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
+      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + rl('r_lens') * 0.12 + rl('r_glassblade') * 0.4 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.noDrops() ? 0.3 : 0),
       rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05) * (1 + rl('r_coolant') * 0.12),
       crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0) + sk('sk_precision') * 0.04 + rl('r_scope') * 0.06,
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5 + rl('r_scope') * 0.5,
@@ -206,7 +213,7 @@
       wings: ship.wings || md('wings'),
       magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1) * (1 + rl('r_gravlov')),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK * D.ECON.coins,
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK * D.ECON.coins * anK,
       luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25) * (1 + rl('r_dice') * 0.5),
       speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (1 + rl('r_afterburner') * 0.12),
       dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
@@ -216,7 +223,7 @@
       invMul: (pl('nox') ? 2 : 1) * (sk('sk_secondwind') ? 2 : 1),
       bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35 + rl('r_trophy') * 0.3,
       eliteDmg: 1 + md('hunter') * 0.35 + rl('r_hunteye') * 0.3,
-      xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1) * (1 + rl('r_neuro') * 0.25),
+      xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1) * (1 + rl('r_neuro') * 0.25) * anK,
       shieldRegen,
       cryo: pk('cryo') * 0.12 + rl('r_frost') * 0.1,
       nova: pk('nova'),
@@ -1667,7 +1674,7 @@
     return it;
   };
   game.dropPowerup = function (x, y, type) {
-    if (!type && this.run.noDrops) return null;
+    if (!type && this.noDrops()) return null;
     if (!type) {
       const p = this.player;
       const keys = Object.keys(D.POWERUPS).filter((k) => !(k === 'heal' && p.lives >= p.maxLives) && !(k === 'shield' && p.shield));
@@ -1919,6 +1926,29 @@
   // ════════════════════════════════════════════════════════════
   // ВОЛНЫ
   // ════════════════════════════════════════════════════════════
+  // 4.2: аномалия сектора — бросаем на первой волне сектора (со второго), на волне босса она гаснет.
+  // Игрок её не выбирает; в испытании дня и босс-раше аномалий нет (там свои правила)
+  game.rollAnomaly = function (n, isBoss) {
+    const run = this.run, was = run.anomaly, A0 = D.ANOMALY;
+    if (isBoss) run.anomaly = null;
+    else if ((n - 1) % 5 === 0) {
+      run.anomaly = null;
+      const sector = Math.floor((n - 1) / 5);
+      if (this.mode !== 'rush' && !run.challenge && sector >= A0.from && Math.random() < Math.min(A0.max, A0.chance + (sector - A0.from) * A0.step)) {
+        const ids = Object.keys(D.ANOMALIES).filter((id) => id !== run.lastAnomaly);
+        run.anomaly = run.lastAnomaly = ids[Math.floor(Math.random() * ids.length)];
+        run.anomalies++;
+        const def = D.ANOMALIES[run.anomaly];
+        // после баннера волны, чтобы не налезать на него
+        this.after(this.wave.intro + 0.6, () => {
+          if (this.run !== run || D.ANOMALIES[run.anomaly] !== def) return;
+          SS.emit('toast', { ico: def.ico, title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
+          A.play('skill', { rate: 0.7 });
+        });
+      }
+    }
+    if (run.anomaly !== was) this.refreshStats();
+  };
   game.nextWave = function () {
     // босс-раш: волны 5, 10, 15… — только боссы; выживание: боссов нет, волны идут без пауз
     const rush = this.mode === 'rush', surv = this.mode === 'survival';
@@ -1939,6 +1969,8 @@
       G.bg.setSector(this.sectorIdx(sector));
       G.bg.warp = 1;
     }
+    this.rollAnomaly(n, isBoss);
+    if (this.anomaly('swarm')) this.wave.budget *= 1.3;
     // баннер сектора — только если его карточку не показали в прыжке
     const newSector = n > 1 && (n - 1) % 5 === 0 && this.run.cardSector !== sector;
     // Развилка: опасный путь — больше врагов и элиты, монеты ×2

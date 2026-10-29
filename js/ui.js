@@ -593,12 +593,16 @@
     for (const k in g.buffs) buffKey += k + Math.ceil(g.buffs[k]);
     for (const id in run.skillFx) if (run.skillFx[id] > 0) buffKey += id + Math.ceil(run.skillFx[id]);
     if (run.overload > 0) buffKey += 'ol' + Math.ceil(run.overload);
-    const wev = SS.events.active();
+    const wev = SS.events.active(), an = g.anomaly();
     if (wev) buffKey += 'ev' + wev.id;
+    if (an) buffKey += 'an' + an;
     if (c.buffs !== buffKey) {
       c.buffs = buffKey;
       const icons = { power: 'fire', spread: 'bolt', multi: 'plus', rapid: 'bolt', magnet: 'magnet', freeze: 'snow' };
-      let h = wev ? '<div class="buff" style="--bc:' + wev.color + '">' + wev.ico + ' ' + wev.name + '</div>' : '';
+      // 4.2: аномалия сектора и её прибавка к наградам
+      const ad = an && D.ANOMALIES[an];
+      let h = ad ? '<div class="buff" style="--bc:' + ad.color + '">' + ad.ico + ' ' + ad.name + ' +' + Math.round(ad.bonus * 100) + '%</div>' : '';
+      if (wev) h += '<div class="buff" style="--bc:' + wev.color + '">' + wev.ico + ' ' + wev.name + '</div>';
       if (perfect) h += '<div class="buff" style="--bc:#3dffa2">' + ic('star') + 'БЕЗ УРОНА ×2</div>';
       for (const k of Object.keys(g.buffs)) { const def = D.POWERUPS[k]; h += '<div class="buff" style="--bc:' + def.color + '">' + ic(icons[k] || 'star') + Math.ceil(g.buffs[k]) + 'с</div>'; }
       // 3.1: сколько ещё работают активные навыки

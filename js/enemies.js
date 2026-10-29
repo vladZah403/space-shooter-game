@@ -67,7 +67,9 @@
     const def = D.ENEMIES[type];
     if (!def) return null;
     const S = G.S, wn = game.wave ? game.wave.n : 1, diff = game.diff;
-    const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < diff.elite + Math.max(0, wn - 15) * 0.004 + (game.wave && game.wave.danger ? D.DANGER.elite : 0));
+    // 4.2: аномалия «Сигнал флагмана» — элитные втрое чаще (не больше 40%)
+    const eliteP = diff.elite + Math.max(0, wn - 15) * 0.004 + (game.wave && game.wave.danger ? D.DANGER.elite : 0);
+    const elite = !!o.elite || (!def.mini && !o.noElite && !o.child && Math.random() < (game.anomaly('flagship') ? Math.min(0.4, eliteP * 3) : eliteP));
     // в дальних секторах флот противника обновляется — новые облики кораблей
     const sprite = o.sprite || (def.alt && wn > 10 && Math.random() < 0.6 ? def.alt : def.sprite);
     const scale = (elite ? 1.12 : 1) * (o.scale || 1);
@@ -85,7 +87,7 @@
       cv: null, age: 0, phase: Math.random() * U.TAU, st: 0, t: 0, n: 0,
       fireT: U.rand(0.9, 1.8), fireT2: U.rand(1.6, 2.8), flash: 0, frozen: 0, alpha: 1, bank: 0, lastX: 0, leaving: false, barrier: 0,
       shield: def.shield ? def.shield * E.hpScale() : 0, shieldMax: def.shield ? def.shield * E.hpScale() : 0, shieldHitT: 0, shieldRegenWait: 0,
-      spd: def.spd * S * diff.spd * (1 + Math.min(wn, 30) * 0.01) * (elite ? 1.08 : 1),
+      spd: def.spd * S * diff.spd * (1 + Math.min(wn, 30) * 0.01) * (elite ? 1.08 : 1) * (game.anomaly('ionwind') ? 1.25 : 1),
       ty: 0, baseX: 0, amp: 0, dir: 0, face: 1, spinAng: undefined,
     };
     if (def.mini) setHitbox(e, sprite);

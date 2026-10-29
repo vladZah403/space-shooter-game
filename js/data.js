@@ -732,6 +732,17 @@
   ];
   D.CHALLENGE_TIERS = [{ wave: 10, coins: 400 }, { wave: 20, coins: 700 }, { wave: 30, coins: 1200 }];
 
+  // 4.2: аномалии сектора — случайное правило на обычные волны сектора (до босса); пока действует,
+  // монеты и опыт выше на bonus. Со сектора from (0 — первый) с шансом chance (+step за сектор, не выше max)
+  D.ANOMALIES = {
+    ionwind:  { name: 'ИОННЫЙ ВЕТЕР',      ico: '💨', color: '#7fd8ff', desc: 'враги быстрее на 25%',          bonus: 0.25 },
+    flagship: { name: 'СИГНАЛ ФЛАГМАНА',   ico: '📡', color: '#ffc83d', desc: 'элитные враги втрое чаще',      bonus: 0.3 },
+    silence:  { name: 'РАДИОТИШИНА',       ico: '📵', color: '#b08cff', desc: 'бонусы не выпадают, урон +30%', bonus: 0.25 },
+    unstable: { name: 'НЕСТАБИЛЬНАЯ ЗОНА', ico: '🌀', color: '#ff6bd6', desc: 'особое событие на каждой волне', bonus: 0.2 },
+    swarm:    { name: 'РОЙ',               ico: '🐝', color: '#ff8a3d', desc: 'врагов на 30% больше',          bonus: 0.3 },
+  };
+  D.ANOMALY = { from: 1, chance: 0.4, step: 0.05, max: 0.7 };
+
   // Цена воскрешения за монеты (один раз за забег)
   D.reviveCost = (wave) => Math.round(150 + wave * 35 + wave * wave * 2.5);
   // Опыт корабля: сколько нужно до следующего уровня
