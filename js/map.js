@@ -221,48 +221,18 @@
     shop:   { cap: 'УЗЕЛ КАРТЫ', name: 'ТОРГОВЕЦ', sub: 'Лавка пристыковалась — заглянем', color: '#ffc83d' },
     cache:  { cap: 'УЗЕЛ КАРТЫ', name: 'ТАЙНИК', sub: 'Контейнер с добычей', color: '#b06bff' },
     repair: { cap: 'УЗЕЛ КАРТЫ', name: 'РЕМОНТ', sub: 'Ремонтный корабль чинит обшивку', color: '#3dffa2' },
-    elite:  { cap: 'ТРЕВОГА', name: 'ЭЛИТНЫЙ ПАТРУЛЬ', sub: 'Врагов больше — награда: реликвия', color: '#ff3d5a' },
+    elite:  { cap: 'ТРЕВОГА', name: 'ЭЛИТНЫЙ ПАТРУЛЬ', sub: 'Врагов больше — награда: сундук', color: '#ff3d5a' },
   };
   MP.visit = function (node, ev, onEnd) {
     if (game.state !== 'play') { onEnd(); return; }
     const v = node === 'event' ? { cap: 'СОБЫТИЕ', name: ev.title, sub: ev.sub, color: '#7fe7ff' } : VISIT[node];
-    game.startScene({ kind: 'visit', node, ev, color: v.color, v, end: 2.4, cardT: 0.35, onEnd, done: false });
+    game.startScene({ kind: 'visit', node, ev, color: v.color, v, end: node === 'shop' ? 2.7 : 2.4, cardT: 0.35, onEnd, done: false });
     A.play(node === 'elite' ? 'warning' : 'teleport', { rate: node === 'elite' ? 1 : 0.8, vol: 0.6 });
   };
-  MP.updateVisit = function (sc) {
-    const p = game.player, S = G.S;
-    if (!sc.card && sc.t >= sc.cardT) sc.card = { cap: sc.v.cap, name: sc.v.name, sub: sc.v.sub, at: sc.t, y: 0.58 };
-    // ремонт и тайник отдают награду прямо в сцене — видно, откуда она
-    if (!sc.done && sc.t >= 1.5) {
-      sc.done = true;
-      if (sc.node === 'repair') { FX.ring(p.x, p.y, p.w * 0.3, p.w * 1.6, '#3dffa2', 0.5, 4); FX.sparks(p.x, p.y, '#3dffa2', 14, 200); }
-      if (sc.node === 'cache') { FX.explode(G.FW / 2, G.H * 0.42, 1, '#ffc83d'); FX.ring(G.FW / 2, G.H * 0.42, 10 * S, 90 * S, '#ffc83d', 0.4, 4); }
-      if (sc.node === 'elite') FX.vignette('#ff2a48', 1.2, 0.6, true);
-    }
-    if (sc.node === 'elite' && Math.random() < 0.1) FX.shake(0.05);
-    if (sc.node === 'chest') {
-      const col = D.CHESTS[sc.tier].color, cy = G.H * 0.36;
-      // приземление: удар, искры; потом крышка рвётся открыться; в конце — в трюм
-      if (!sc.landed && sc.t >= 0.6) {
-        sc.landed = true;
-        FX.ring(G.FW / 2, cy + 20 * S, 10 * S, 110 * S, col, 0.45, 4);
-        FX.sparks(G.FW / 2, cy + 24 * S, col, 16, 260);
-        FX.shake(0.18);
-        A.play('mine', { rate: 0.6, vol: 0.45 });
-      }
-      if (sc.landed && sc.t < 1.6 && Math.random() < 0.25) FX.sparks(G.FW / 2 + U.rand(-40, 40) * S, cy + U.rand(-30, 20) * S, col, 1, 60);
-      if (!sc.gone && sc.t >= 1.6) { sc.gone = true; A.play('coin', { rate: 0.7, vol: 0.7 }); }
-    }
-  };
-  // падение с отскоком
-  function bounceOut(k) {
-    const n = 7.5625, d = 2.75;
-    if (k < 1 / d) return n * k * k;
-    if (k < 2 / d) return n * (k -= 1.5 / d) * k + 0.75;
-    if (k < 2.5 / d) return n * (k -= 2.25 / d) * k + 0.9375;
-    return n * (k -= 2.625 / d) * k + 0.984375;
-  }
-  // вращающиеся лучи за наградой
+  // анимации сцен — scenes.js
+  MP.updateVisit = function (sc) { SS.scenes.update(sc); };
+  MP.drawVisit = function (ctx, sc) { SS.scenes.draw(ctx, sc); };
+  // вращающиеся лучи за наградой (сундук в бою и при открытии)
   function rays(ctx, x, y, r, col, t, a, n) {
     n = n || 10;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -275,69 +245,6 @@
     ctx.restore();
   }
   MP.rays = rays;
-  // актёр сцены в координатах поля
-  MP.drawVisit = function (ctx, sc) {
-    const S = G.S, t = sc.t, p = game.player, k = Math.min(1, t / 0.9), ease = 1 - Math.pow(1 - k, 3);
-    const cx = G.FW / 2;
-    ctx.save();
-    if (sc.node === 'shop') {
-      const y = U.lerp(-120 * S, G.H * 0.36, ease) + Math.sin(t * 2) * 4 * S;
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4;
-      ctx.drawImage(G.soft('#ffc83d', 64), cx - 110 * S, y - 110 * S, 220 * S, 220 * S);
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-      G.draw(ctx, 'p_merchant', cx, y, 130 * S);
-    } else if (sc.node === 'repair') {
-      const y = U.lerp(-100 * S, p.y - p.w * 1.5, ease) + Math.sin(t * 3) * 3 * S;
-      G.draw(ctx, 'p_medship', cx, y, 60 * S, Math.PI);
-      if (t > 0.9) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 20); ctx.strokeStyle = '#3dffa2'; ctx.lineWidth = 3 * S; ctx.beginPath(); ctx.moveTo(cx, y + 25 * S); ctx.lineTo(p.x, p.y - p.w * 0.3); ctx.stroke(); }
-    } else if (sc.node === 'cache') {
-      const y = U.lerp(-60 * S, G.H * 0.42, ease);
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.2 * Math.sin(t * 8);
-      ctx.drawImage(G.soft('#ffc83d', 64), cx - 60 * S, y - 60 * S, 120 * S, 120 * S);
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = sc.done ? Math.max(0, 1 - (t - 1.5) * 3) : 1;
-      G.draw(ctx, 'p_crate', cx, y, 64 * S, Math.sin(t * 3) * 0.1);
-    } else if (sc.node === 'elite') {
-      // строй элиты проходит по верху экрана
-      for (let i = 0; i < 3; i++) {
-        const y = U.lerp(-80 * S, G.H * 0.22, ease) - Math.abs(i - 1) * 30 * S;
-        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5;
-        ctx.drawImage(G.soft('#ff3d5a', 64), cx + (i - 1) * 80 * S - 40 * S, y - 40 * S, 80 * S, 80 * S);
-        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-        G.draw(ctx, 'e_heavyfighter', cx + (i - 1) * 80 * S, y, 58 * S, Math.PI);
-      }
-    } else if (sc.node === 'chest') {
-      const col = D.CHESTS[sc.tier].color;
-      let x = cx, y = U.lerp(-90 * S, G.H * 0.36, bounceOut(Math.min(1, t / 0.6))), w = 96 * S, a = 1;
-      // улетает в трюм — к счётчику сундуков вверху справа
-      if (t > 1.6) { const q = U.clamp((t - 1.6) / 0.55, 0, 1), e = q * q; x = U.lerp(cx, G.FW - 34 * S, e); y = U.lerp(G.H * 0.36, 34 * S, e); w *= 1 - 0.75 * e; a = 1 - q * 0.7; }
-      ctx.globalCompositeOperation = 'lighter';
-      rays(ctx, x, y, w * 1.7, col, t, 0.3 * a * Math.min(1, t * 2));
-      ctx.globalAlpha = 0.5 * a; ctx.drawImage(G.soft(col, 64), x - w, y - w, w * 2, w * 2);
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = a;
-      // крышка подпрыгивает рывками — сундук «просится» открыться
-      const jolt = t > 0.75 && t < 1.55 && Math.sin(t * 9) > 0.2 ? Math.abs(Math.sin(t * 40)) : 0;
-      const m = G.drawChest(ctx, sc.tier, x + (jolt ? (Math.random() - 0.5) * 3 * S : 0), y, w, 0, jolt);
-      if (jolt > 0.1) {
-        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = jolt * 0.9 * a;
-        ctx.drawImage(G.glow(col, 64), x - w * 0.55, m.mouth - w * 0.1, w * 1.1, w * 0.2);
-      }
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    } else if (sc.node === 'event') {
-      const id = sc.ev.id, y = G.H * 0.36, a = Math.min(1, t * 2);
-      ctx.globalAlpha = a;
-      if (id === 'anomaly' && G.frame('fx_vortex')) { ctx.globalCompositeOperation = 'lighter'; G.draw(ctx, 'fx_vortex', cx, y, 180 * S, t * 2); }
-      else if (id === 'wreck' || id === 'distress') {
-        G.draw(ctx, 'e_cargo', cx + Math.sin(t * 0.7) * 10 * S, y, 110 * S, 2.4 + t * 0.15);
-        if (id === 'distress' && Math.sin(t * 10) > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(G.glow('#ff3d5a', 64), cx - 40 * S, y - 40 * S, 80 * S, 80 * S); }
-      } else if (id === 'black') G.draw(ctx, 'p_merchant_s', cx, y + Math.sin(t * 2) * 4 * S, 100 * S);
-      else if (id === 'station') G.draw(ctx, 'p_merchant', cx, y, 140 * S, 0.3);
-      else {
-        ctx.font = Math.round(80 * S) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(sc.ev.ico, cx, y + Math.sin(t * 3) * 5 * S);
-      }
-    }
-    ctx.restore();
-  };
 
   // ── событие на карте: исход выбора ──
   MP.resolve = function (ev, card) {

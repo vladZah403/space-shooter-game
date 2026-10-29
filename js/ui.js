@@ -739,7 +739,7 @@
   }
 
   // длинный заголовок («Стартовый модуль») мельче — иначе на узком экране он ломается на две строки
-  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; $('#btnPerkShip').hidden = true; }
+  function setPerkTitle(text) { const el = $('#perkTitle'); el.textContent = text; el.classList.toggle('long', text.length > 12); $('#perkArt').hidden = true; SS.scenes.portrait($('#perkArt'), false); $('#btnPerkShip').hidden = true; }
 
   // ════════════════════════════════════════════════════════════
   // СХЕМА КОРАБЛЯ (3.1): модули забега по отсекам. Картинка — tools/make_cutaway.py,
@@ -818,6 +818,9 @@
   function setPerkArt(name) {
     const cv = $('#perkArt'), G = SS.gfx, f = name && G.frame(name), img = f && G.src(f);
     if (!img) return;
+    // 4.1: торговец — живой портрет с репликой (scenes.js)
+    if (name === 'p_merchant') { SS.scenes.portrait(cv, true); return; }
+    cv.style.width = ''; cv.style.height = '';
     const h = 92 * 2, w = Math.round(h * f[2] / f[3]);
     cv.width = w; cv.height = h;
     const x = cv.getContext('2d');

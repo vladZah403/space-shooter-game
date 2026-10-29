@@ -175,6 +175,7 @@
       SS.skills.init();
       SS.sectors.init();
       SS.map.init();
+      SS.scenes.init();
       SS.comp.init();
       SS.fx.shakeOn = SS.store.s.settings.shake;
       main.applyQuality();

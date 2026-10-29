@@ -313,6 +313,7 @@
     const p = this.player, run = this.run, st = this.st;
     this.t += dt;
     run.time += dt;
+    SS.scenes.tick(dt);
     const slow = this.enemySlow();
     const edt = dt * slow;
 
@@ -2065,8 +2066,11 @@
     this.offer = null; this.offerKind = null;
     this.state = 'play';
     this.player.inv = Math.max(this.player.inv, 0.8);
-    if (offer.after === 'station') this.after(0.4, () => this.offerModules('station'));
-    else this.after(0.4, () => this.nextWave());
+    // 4.1: торговец прощается и улетает, пока начинается волна
+    if (offer.art === 'p_merchant') SS.scenes.leave('merchant', !!card.price || k === 'deal');
+    const wait = offer.art === 'p_merchant' ? 1.5 : 0.4;
+    if (offer.after === 'station') this.after(wait, () => this.offerModules('station'));
+    else this.after(wait, () => this.nextWave());
     return true;
   };
 
@@ -2492,6 +2496,7 @@
     SS.skills.drawFront(ctx);
     this.drawEBullets(ctx);
     if (this.scene && this.scene.kind === 'visit') SS.map.drawVisit(ctx, this.scene);
+    SS.scenes.drawActors(ctx);
     SS.events.draw(ctx);
     this.drawOverlays(ctx);
     FX.drawFront(ctx);

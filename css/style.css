@@ -1018,3 +1018,6 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .ca-row small{font-size:12px;color:var(--muted)}
 .chest-btns{width:100%;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
 @media (max-height:680px){.chest-cv{min-height:180px}.rslot{width:50px;height:50px;font-size:26px}.relic-grid{gap:5px}.rcell{font-size:21px}}
+.perk-say{position:relative;margin:-2px 0 6px;padding:5px 12px;border-radius:10px;background:rgba(255,250,235,.95);color:#1b1430;font-weight:700;font-size:14px;min-height:28px;min-width:60px;text-align:center}
+.perk-say::before{content:'';position:absolute;left:50%;top:-6px;margin-left:-6px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(255,250,235,.95)}
+.perk-say.pop{animation:popIn .25s both}
