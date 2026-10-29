@@ -761,6 +761,13 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .tile b{font-size:9.5px;letter-spacing:.6px}
 .tile small{font-size:11px}
 .t-orange{--tc:var(--orange)}.t-blue{--tc:var(--blue)}
+/* 4.0: второстепенное — строка небольших значков под плитками */
+.menu-bar{display:flex;justify-content:space-between;gap:6px;margin-top:8px}
+.mb-btn{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 6px;border-radius:14px;background:rgba(10,16,40,.45);border:1px solid rgba(255,255,255,.06);color:var(--dim);font-size:10.5px;font-weight:600;transition:transform .12s}
+.mb-btn svg{font-size:19px;color:var(--tc,var(--cyan));opacity:.85}
+.mb-btn:active{transform:scale(.94)}
+.mb-btn .badge{top:4px;right:10px;width:8px;height:8px}
+.mb-count{position:absolute;top:4px;left:7px;font-size:8.5px;color:var(--dim);font-weight:700}
 .play-sub{text-align:center;font-size:12.5px;color:var(--dim);min-height:16px}
 .play-sub b{font-weight:700}
 @media (max-width:370px){.tile b{font-size:8.4px;letter-spacing:.2px}.tile small{font-size:10px}.tile svg{font-size:22px}}

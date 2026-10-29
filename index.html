@@ -152,16 +152,19 @@
       <div class="play-sub" id="playSub"></div>
     </div>
 
+    <!-- 4.0: главное — четыре крупные плитки, остальное — строка значков -->
     <nav class="menu-grid">
       <button class="tile t-cyan" data-go="hangar"><svg><use href="#i-ship"/></svg><b>АНГАР</b><small>Корабли</small><i class="badge" id="badgeHangar" hidden></i></button>
       <button class="tile t-gold" data-go="arsenal"><svg><use href="#i-swords"/></svg><b>АРСЕНАЛ</b><small>Оружие</small><i class="badge" id="badgeArsenal" hidden></i></button>
-      <button class="tile t-violet" data-go="skills"><svg><use href="#i-atom"/></svg><b>НАВЫКИ</b><small>Умения</small><i class="badge" id="badgeSkills" hidden></i></button>
+      <button class="tile t-violet" data-go="skills"><svg><use href="#i-atom"/></svg><b>НАВЫКИ</b><small>Древо</small><i class="badge" id="badgeSkills" hidden></i></button>
       <button class="tile t-orange" data-go="missions"><svg><use href="#i-target"/></svg><b>ЗАДАНИЯ</b><small id="missionCount">0 / 3</small><i class="badge" id="badgeMissions" hidden></i></button>
-      <button class="tile t-pink" data-go="leaders"><svg><use href="#i-trophy"/></svg><b>РЕЙТИНГ</b><small>Пилоты</small></button>
-      <button class="tile t-green" data-go="achievements"><svg><use href="#i-medal"/></svg><b>НАГРАДЫ</b><small id="achCount">0 / 0</small><i class="badge" id="badgeAch" hidden></i></button>
-      <button class="tile t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><b>НАСТРОЙКИ</b><small>Звук</small></button>
-      <button class="tile t-blue" data-go="suggest"><svg><use href="#i-mail"/></svg><b>ИДЕЯ</b><small>Написать</small></button>
-      <button class="tile t-cyan" data-go="codex"><svg><use href="#i-list"/></svg><b>СПРАВОЧНИК</b><small id="codexCount">Враги</small></button>
+    </nav>
+    <nav class="menu-bar">
+      <button class="mb-btn t-pink" data-go="leaders"><svg><use href="#i-trophy"/></svg><span>Рейтинг</span></button>
+      <button class="mb-btn t-green" data-go="achievements"><svg><use href="#i-medal"/></svg><span>Награды</span><small class="mb-count" id="achCount">0 / 0</small><i class="badge" id="badgeAch" hidden></i></button>
+      <button class="mb-btn t-cyan" data-go="codex"><svg><use href="#i-list"/></svg><span>Справочник</span></button>
+      <button class="mb-btn t-blue" data-go="suggest"><svg><use href="#i-mail"/></svg><span>Идея</span></button>
+      <button class="mb-btn t-gray" data-go="settings"><svg><use href="#i-gear"/></svg><span>Настройки</span></button>
     </nav>
 
     <footer class="menu-foot">
