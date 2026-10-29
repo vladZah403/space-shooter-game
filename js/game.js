@@ -77,9 +77,9 @@
     const S = G.S;
     this.run = {
       score: 0, coins: 0, kills: 0, bosses: 0, bossIds: [], combo: 0, comboT: 0, maxCombo: 0,
-      level: 1, xp: 0, pendingPerks: 0, perks: {}, perkCount: 0, rerolls: 0,
+      level: 1, xp: 0, pendingPerks: 0, perks: {}, perkCount: 0, rerolls: 0, relics: {}, map: null, mapNode: null, mapStep: 0,
       time: 0, shots: 0, hits: 0, pickups: 0, reviveUsed: false, phoenixUsed: false,
-      waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, evo: {}, lastHit: '',
+      waveDamage: 0, bossDamage: 0, oneHpT: 0, killsForVamp: 0, critsForVamp: 0, detCount: 0, bloodKills: 0, evo: {}, lastHit: '',
       skillCd: {}, skillFx: {}, overload: 0, regenT: 0, shieldRegenT: 0, fever: false,
       lastAchCheck: 0, sector: 0, lastEvent: 0, lastEventId: '', energy: 1, arc: 0, focus: { uid: 0, n: 0, t: 0 },
       mods: {}, repairT: 0, emergT: 0, pilot: D.PILOTS[s.pilot] && M.pilotUnlocked(s.pilot) ? s.pilot : 'kai',
@@ -170,6 +170,8 @@
   game.skillLv = function (id) { return +M.s.skills[id] || 0; };
 
   game.mod = function (id) { return (this.run && this.run.mods[id]) || 0; };
+  // 4.0: реликвия забега (map.js)
+  game.relic = function (id) { return !!(this.run && this.run.relics && this.run.relics[id]); };
   // сектор и босс по номеру в забеге (с учётом перемешанного порядка)
   game.sectorIdx = function (k) { const o = this.run && this.run.sectorOrder; return o ? o[k % o.length] : k % D.SECTORS.length; };
   game.sectorDef = function (k) { return D.SECTORS[this.sectorIdx(k)]; };
@@ -177,6 +179,7 @@
   game.computeStats = function () {
     const s = M.s, md = (id) => this.mod(id), pk = (id) => this.perk(id), sk = (id) => this.skillLv(id);
     const pl = (id) => !!(this.run && this.run.pilot === id);
+    const rl = (id) => (this.relic(id) ? 1 : 0);
     const ship = D.SHIPS[s.ship.model].stats;
     const pres = M.prestigeBonus();
     const S = G.S;
@@ -186,28 +189,28 @@
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
-      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05),
-      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0) + sk('sk_precision') * 0.04,
-      critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5,
+      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + rl('r_lens') * 0.12 + rl('r_glassblade') * 0.4 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.run && this.run.noDrops ? 0.3 : 0),
+      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05) * (1 + rl('r_coolant') * 0.12),
+      crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0) + sk('sk_precision') * 0.04 + rl('r_scope') * 0.06,
+      critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5 + rl('r_scope') * 0.5,
       pierce: pk('pierce'),
-      multi: pk('multi') + (ship.multi || 0),
+      multi: pk('multi') + (ship.multi || 0) + rl('r_twins'),
       wings: ship.wings || md('wings'),
-      magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1),
+      magnet: sk('sk_magnet') >= 2 ? 9999 : 120 * S * (md('salvage') ? 1.5 : 1) * (1 + pk('magnet') * 0.5) * (1 + (ship.magnet || 0)) * (sk('sk_magnet') ? 1.5 : 1) * (1 + rl('r_gravlov')),
       // монет за врага меньше там, где врагов больше: доход за волну равен множителю сложности
-      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * this.coinK,
-      luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25),
-      speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15),
-      dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
-      cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1) * (1 - sk('sk_chrono') * 0.15),
-      bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0) + (pl('rex') ? 0.5 : 0),
+      coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * this.coinK,
+      luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25) * (1 + rl('r_dice') * 0.5),
+      speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (1 + rl('r_afterburner') * 0.12),
+      dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
+      cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1) * (1 - sk('sk_chrono') * 0.15) * (1 - rl('r_hourglass') * 0.25),
+      bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0) + (pl('rex') ? 0.5 : 0) + rl('r_arsenal') * 0.4,
       bombCd: pl('rex') ? 0.5 : 1,
       invMul: (pl('nox') ? 2 : 1) * (sk('sk_secondwind') ? 2 : 1),
-      bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35,
-      eliteDmg: 1 + md('hunter') * 0.35,
-      xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1),
+      bossDmg: 1 + pk('titan') * 0.25 + md('hunter') * 0.35 + rl('r_trophy') * 0.3,
+      eliteDmg: 1 + md('hunter') * 0.35 + rl('r_hunteye') * 0.3,
+      xp: (1 + md('scanner') * 0.35) * (pl('kai') ? 1.2 : 1) * (1 + rl('r_neuro') * 0.25),
       shieldRegen,
-      cryo: pk('cryo') * 0.12,
+      cryo: pk('cryo') * 0.12 + rl('r_frost') * 0.1,
       nova: pk('nova'),
     };
   };
@@ -398,6 +401,10 @@
       run.emergT += dt;
       if (run.emergT >= 12) { run.emergT = 0; p.shield = true; this.shieldFx(); this.hudDirty = true; }
     } else run.emergT = 0;
+    if (this.relic('r_nano') && p.alive && p.lives < p.maxLives) {
+      run.nanoT = (run.nanoT || 0) + dt;
+      if (run.nanoT >= 50) { run.nanoT = 0; this.heal(1, '🦠 НАНОРОБОТЫ'); }
+    }
     if (this.skill('sk_regen') && p.alive && p.lives < p.maxLives) {
       run.regenT += dt;
       const rt = this.skillLv('sk_regen') >= 2 ? 35 : 45;
@@ -423,6 +430,7 @@
     if (this.wave && this.wave.danger && this.skill('sk_daredevil')) d *= 1.25;
     // хладнокровие: +10% урона за каждые 4 с без попаданий, до +30%
     if (this.skill('sk_coolhead')) d *= 1 + Math.min(3, Math.floor((this.run.time - (this.run.hitAt || 0)) / 4)) * 0.1;
+    if (this.relic('r_redstar') && this.player.lives <= 1) d *= 1.5;
     if (this.skill('sk_berserker')) {
       const p = this.player;
       const lost = p.maxLives > 1 ? (p.maxLives - p.lives) / (p.maxLives - 1) : 0;
@@ -525,6 +533,11 @@
     const spread = this.buffs.spread > 0;
     const nose = p.y - p.w * 0.42;
     this.run.shots++;
+    // реликвия «Счётчик залпов»: каждый 10-й выстрел — ещё и самонаводящаяся ракета
+    if (this.relic('r_salvo') && this.run.shots % 10 === 0) {
+      const rb = D.WEAPONS.rocket.base;
+      shot({ x: p.x, y: nose, vx: 0, vy: -260 * S, dmg: rb.dmg * dmgMul * 0.6, aoe: rb.aoe * dmgMul * 0.6, aoeR: rb.radius * S, r: 7 * S, kind: 'rocket', sprite: 'fx_rocket', w: 13 * S, homing: 6.5, acc: 900 * S, maxSpd: rb.speed * S, wid: 'salvo', life: 2.4 });
+    }
 
     if (wid === 'laser') {
       const lvl = wl(wid, 'dmg');
@@ -681,7 +694,7 @@
 
   // ── дроны-напарники (улучшение забега) ──
   game.syncDrones = function () {
-    const n = this.perk('drone');
+    const n = this.perk('drone') + (this.relic('r_buddy') ? 1 : 0);
     while (this.drones.length < n) this.drones.push({ x: this.player.x, y: this.player.y, cd: 0.3 * this.drones.length, side: this.drones.length ? 1 : -1 });
     this.drones.length = n;
   };
@@ -708,7 +721,7 @@
   // ════════════════════════════════════════════════════════════
   game.updateBullets = function (dt) {
     const FW = G.FW, H = G.H, S = G.S;
-    const ric = this.skill('sk_ricochet') || this.perk('ricochet') > 0;
+    const ric = this.skill('sk_ricochet') || this.perk('ricochet') > 0 || this.relic('r_reflector');
     for (const b of this.bullets) {
       if (b.dead) continue;
       b.age += dt; b.life -= dt;
@@ -917,6 +930,11 @@
     let crit = false;
     if (o.crit && Math.random() < this.st.crit) {
       dmg *= this.st.critMul; crit = true;
+      // реликвия «Искровой разрядник»: крит бьёт молнией в соседа
+      if (this.relic('r_sparker') && Math.random() < 0.5) {
+        const other = this.nearestOther(e, 150 * G.S);
+        if (other) { FX.lightning(e.x, e.y, other.x, other.y, '#fff36b', 2 * G.S, 0.14); this.after(0, () => this.damageEnemy(other, dmg * 0.4, { src: 'lightning' })); }
+      }
       if (this.perk('vamp') && ++this.run.critsForVamp >= 30) { this.run.critsForVamp = 0; this.heal(1, '🩸 +1 ЖИЗНЬ'); }
       if (Math.abs(this.t - (this.critFxT || -1)) > 0.08) {
         this.critFxT = this.t;
@@ -1011,7 +1029,7 @@
     run.kills++;
     M.onKill();
     run.combo++;
-    run.comboT = 2.6;
+    run.comboT = this.relic('r_combo') ? 5.2 : 2.6;
     if (run.combo > run.maxCombo) run.maxCombo = run.combo;
     if (run.combo % 10 === 0) M.onCombo(run.combo);
     if (run.combo >= 50 && !run.fever) this.setFever(true);
@@ -1027,7 +1045,7 @@
     const pts = Math.round(e.score * waveMul * this.diff.score * comboMul * (e.elite ? 2 : 1));
     this.addScore(pts);
     // монеты и кристаллы
-    let coins = e.coins * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? (this.skill('sk_daredevil') ? 3 : D.DANGER.coins) : 1);
+    let coins = e.coins * (e.elite && this.relic('r_hunteye') ? 2 : 1) * this.st.coins * (1 + this.wave.n * 0.025) * (run.fever ? 1.5 : 1) * (e.elite ? 3 : 1) * (e.mini ? this.diff.count : 1) * (this.wave.danger ? (this.skill('sk_daredevil') ? 3 : D.DANGER.coins) : 1);
     coins = Math.floor(coins) + (Math.random() < coins % 1 ? 1 : 0);
     this.dropCoins(e.x, e.y, coins);
     this.dropXp(e.x, e.y, e.xp * (e.elite ? 2 : 1));
@@ -1041,6 +1059,9 @@
     if (e.mini) this.dropPowerup(e.x + 20 * S, e.y);
     // навыки и улучшения
     if ((e.elite || e.mini) && this.skill('sk_jackpot')) this.dropCrate(e.x, e.y);
+    // реликвии: кровавый камень лечит, нестабильный реактор взрывает убитых
+    if (this.relic('r_bloodstone') && ++run.bloodKills >= 20) { run.bloodKills = 0; this.heal(1, '🩸 КАМЕНЬ'); }
+    if (this.relic('r_volatile') && !e.def.prop) this.blast(e.x, e.y, 70 * S, e.maxHp * 0.25 + 10, '#ff6a2a', 'volatile');
     if (this.skill('sk_vamp')) { run.killsForVamp++; if (run.killsForVamp >= 25) { run.killsForVamp = 0; this.heal(1, '🧛 ВАМПИР'); } }
     if (this.skill('sk_detonator')) { run.detCount++; if (run.detCount % 5 === 0) this.blast(e.x, e.y, 80 * S, 40 * this.dmgMul(), '#ff9f3d', 'det'); }
     if (this.st.nova > 0) this.blast(e.x, e.y, (46 + this.st.nova * 14) * S, 12 * this.st.nova * this.dmgMul(), '#ffb03d', 'nova');
@@ -1083,6 +1104,7 @@
       run.shieldRegenT = 0;
       FX.ring(p.x, p.y, p.w * 0.6, p.w * 1.4, '#7fe7ff', 0.4, 4);
       FX.sprite('fx_sh_break', p.x, p.y, { w0: p.w * 1.3, w1: p.w * 2.3, dur: 0.45, hold: 0.3, rot: U.rand(-0.4, 0.4) });
+      if (this.relic('r_shieldburst')) this.blast(p.x, p.y, 120 * G.S, 60 * this.dmgMul() * (1 + this.wave.n * 0.05), '#7fe7ff', 'shieldburst');
       FX.sparks(p.x, p.y, '#7fe7ff', 18, 320);
       A.play('shieldHit');
       SS.tg.haptic('medium');
@@ -1148,6 +1170,17 @@
 
   game.playerDown = function () {
     const p = this.player, run = this.run;
+    // реликвия «Перо феникса»: воскрешение с 1 жизнью (раньше навыка — навык останется на потом)
+    if (this.relic('r_feather') && !run.featherUsed) {
+      run.featherUsed = true;
+      p.lives = 1; p.inv = 3;
+      this.clearBulletsAround(p.x, p.y, 9999);
+      FX.flash('#ffd9a0', 0.5);
+      FX.text(p.x, p.y - p.w, 'ПЕРО ФЕНИКСА!', '#ffc83d', 18, 1.3);
+      A.play('revive');
+      this.hudDirty = true;
+      return;
+    }
     // навык «Феникс»
     if (this.skill('sk_phoenix') && !run.phoenixUsed) {
       run.phoenixUsed = true;
@@ -1871,6 +1904,8 @@
   // ════════════════════════════════════════════════════════════
   game.nextWave = function () {
     const n = this.wave ? this.wave.n + 1 : 1;
+    // 4.0: перед обычной волной — выбор узла на карте сектора (map.js); после выбора снова сюда
+    if (SS.map.need(n)) { SS.map.offer(n); return; }
     const isBoss = n % 5 === 0;
     const sector = Math.floor((n - 1) / 5);
     const tn = n + (this.diff.waveOffset || 0);
@@ -1887,6 +1922,8 @@
     const newSector = n > 1 && (n - 1) % 5 === 0 && this.run.cardSector !== sector;
     // Развилка: опасный путь — больше врагов и элиты, монеты ×2
     if (this.run.nextDanger) { this.run.nextDanger = false; this.wave.danger = true; this.wave.budget *= D.DANGER.count; }
+    SS.map.apply(this.wave);
+    if (this.relic('r_shieldgen') && this.player.alive && !this.player.shield) { this.player.shield = true; this.shieldFx(); }
     SS.emit('waveStart', { n, boss: isBoss, sector, sectorName: this.sectorDef(sector).name, newSector, danger: this.wave.danger });
     SS.events.roll(this.wave);
     SS.foes.onWave(this.wave);
@@ -1947,8 +1984,9 @@
     for (const it of this.pickups) if (it.kind !== 'pu' && it.kind !== 'crate') it.pull = true;
     SS.emit('waveClear', { n: w.n, bonus, perfect });
     // после босса — станция и прыжок в следующий сектор; после обычной волны иногда событие
-    if (w.boss) this.after(0.8, () => { if (this.wave === w) this.offerModules('station'); });
-    else this.after(1.2, () => { if (this.wave === w && !this.waveEvent(w)) this.nextWave(); });
+    // 4.0: после босса — трофей (реликвия), потом станция; после обычной волны — награда узла карты
+    if (w.boss) this.after(0.8, () => { if (this.wave === w && !SS.map.relicOffer('ТРОФЕЙ', 'Босс повержен — выберите реликвию', 'station')) this.offerModules('station'); });
+    else this.after(1.2, () => { if (this.wave === w && !SS.map.reward(w)) this.nextWave(); });
   };
 
   // ── События между волнами (3.0): Развилка и Торговец. true — событие показано, волна начнётся после выбора ──
@@ -1977,7 +2015,7 @@
     ] };
   };
   game.merchantOffer = function () {
-    const n = this.wave.n, p = this.player, cards = [], cut = this.skill('sk_scavenger') ? 0.7 : 1;
+    const n = this.wave.n, p = this.player, cards = [], cut = (this.skill('sk_scavenger') ? 0.7 : 1) * (this.relic('r_chart') ? 0.75 : 1);
     const mods = this.moduleChoices();
     if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
     const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
@@ -1998,6 +2036,8 @@
     if (k === 'danger') this.run.nextDanger = true;
     if (k === 'mod') { this.offerKind = 'module-buy'; this.state = 'perk'; this.chooseModule(v); }
     if (k === 'perk') { this.grantPerk(v, true); A.play('perk'); }
+    if (k === 'relic') SS.map.grant(v);
+    if (k === 'ev') SS.map.resolve(v, id.split(':')[2]);
     if (k === 'deal') {
       const p = this.player;
       p.lives = Math.max(1, p.lives - 1); this.grantPerk(v, true);
@@ -2007,7 +2047,8 @@
     this.offer = null; this.offerKind = null;
     this.state = 'play';
     this.player.inv = Math.max(this.player.inv, 0.8);
-    this.after(0.4, () => this.nextWave());
+    if (offer.after === 'station') this.after(0.4, () => this.offerModules('station'));
+    else this.after(0.4, () => this.nextWave());
     return true;
   };
 

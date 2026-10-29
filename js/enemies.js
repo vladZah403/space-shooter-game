@@ -58,7 +58,7 @@
   E.hpScale = function () {
     const w = game.wave ? game.wave.n : 1;
     // после 30-й волны прочность растёт круче: туда доходят только сильные сборки
-    return game.diff.hp * (1 + (w - 1) * 0.14) * (1 + Math.max(0, w - 20) * 0.05) * (1 + Math.max(0, w - 30) * 0.06);
+    return game.diff.hp * (1 + (w - 1) * 0.14) * (1 + Math.max(0, w - 20) * 0.05) * (1 + Math.max(0, w - 30) * 0.06) * (game.relic('r_cursedcoin') ? 1.15 : 1);
   };
 
   // o: x, y, scale, hpMul, tint, child, noElite, elite, idx, amp, side, larva, sprite

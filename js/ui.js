@@ -96,6 +96,11 @@
     $('#btnPauseShip').addEventListener('click', () => { A.play('click'); ui.showShip(); });
     $('#btnPerkShip').addEventListener('click', () => { A.play('click'); ui.showShip(ui._modOffer); });
     $('#btnShipClose').addEventListener('click', () => ui.closeShip());
+    $('#btnMapGo').addEventListener('click', () => {
+      const m = ui._mapSel;
+      if (!m || !SS.map.choose(m.step, m.r)) { A.play('error'); return; }
+      ui.hide('#scr-map'); T.haptic('success');
+    });
 
     // диалог
     $('#dlgCancel').addEventListener('click', () => { A.play('back'); ui.hide('#scr-dialog'); });
@@ -130,6 +135,7 @@
     SS.on('perkOffer', (ch) => ui.showPerks(ch));
     SS.on('moduleOffer', (ch, kind) => ui.showModules(ch, kind));
     SS.on('eventOffer', (offer) => ui.showEvent(offer));
+    SS.on('mapOffer', (d) => ui.showMap(d));
     SS.on('reviveOffer', (cost) => ui.showRevive(cost));
     SS.on('runEnd', (sum) => { if (sum) ui.showGameOver(sum); });
     SS.on('paused', (on) => { if (on) ui.showPause(); else ui.hide('#scr-pause'); });
@@ -672,10 +678,12 @@
     const chip = (ico, n, title, cls) => '<span class="rb-chip ' + cls + '" title="' + U.escape(title) + '">' + ico + (n > 1 ? '<b>' + n + '</b>' : '') + '</span>';
     const mods = D.MODULES.filter((m) => run.mods[m.id]).map((m) => chip(m.ico, run.mods[m.id], m.name, 'mod')).join('');
     const perks = D.PERKS.filter((p) => run.perks[p.id] && !p.filler).map((p) => chip(p.ico, run.perks[p.id], p.name, 'perk')).join('');
+    const relics = Object.keys(run.relics || {}).filter((id) => D.RELICS[id]).map((id) => chip(D.RELICS[id].ico, 1, D.RELICS[id].name + ': ' + D.RELICS[id].desc, 'relic')).join('');
     return '<div class="rb-head"><span class="rb-pilot" style="color:' + pil.color + '">' + pil.ico + ' ' + pil.name + '</span><small>СБОРКА ЗАБЕГА</small></div>' +
       (mods ? '<div class="rb-row"><small>Модули</small>' + mods + '</div>' : '') +
       (perks ? '<div class="rb-row"><small>Улучшения</small>' + perks + '</div>' : '') +
-      (!mods && !perks ? '<div class="rb-empty">Пока пусто — модули на станциях, улучшения за кристаллы</div>' : '');
+      (relics ? '<div class="rb-row"><small>Реликвии</small>' + relics + '</div>' : '') +
+      (!mods && !perks && !relics ? '<div class="rb-empty">Пока пусто — модули на станциях, улучшения за кристаллы</div>' : '');
   }
 
   ui.showPause = function () {
@@ -854,6 +862,47 @@
     });
     ui.show('#scr-perk');
     setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
+  };
+
+  // ════════════════════════════════════════════════════════════
+  // КАРТА СЕКТОРА (4.0): снизу вверх 4 шага по 3 ряда и босс; доступные узлы мигают
+  // ════════════════════════════════════════════════════════════
+  ui.showMap = function (d) {
+    const box = $('#mapBox'), map = d.map, sec = game.sectorDef(map.sector);
+    $('#mapTitle').textContent = 'МАРШРУТ';
+    $('#mapSub').textContent = 'Сектор ' + (map.sector + 1) + ' · ' + sec.name + ' · волна ' + d.n;
+    const X = (r) => 18 + r * 32, Y = (c) => 86 - c * 19;   // в процентах
+    let h = '<svg viewBox="0 0 100 100" preserveAspectRatio="none">';
+    for (const k in map.links) {
+      const [c, r] = k.split(':').map(Number);
+      for (const q of map.links[k]) {
+        const walk = map.path.includes(k) && map.path.includes((c + 1) + ':' + q);
+        const can = map.at && map.at.c === c && map.at.r === r && d.choices.includes(q) && c + 1 === d.step;
+        h += '<path vector-effect="non-scaling-stroke" class="' + (walk ? 'walk' : can ? 'can' : '') + '" d="M' + X(r) + ' ' + Y(c) + ' L' + X(q) + ' ' + Y(c + 1) + '"/>';
+      }
+    }
+    for (let r = 0; r < 3; r++) if (map.cols[3][r]) h += '<path vector-effect="non-scaling-stroke" d="M' + X(r) + ' ' + Y(3) + ' L50 9"/>';
+    h += '</svg>';
+    map.cols.forEach((col, c) => col.forEach((n, r) => {
+      if (!n) return;
+      const nd = D.MAP_NODES[n.t], done = map.path.includes(c + ':' + r), can = c === d.step && d.choices.includes(r);
+      h += '<button class="map-node' + (done ? ' done' : '') + (can ? ' can' : '') + '" data-c="' + c + '" data-r="' + r + '" style="left:' + X(r) + '%;top:' + Y(c) + '%;--nc:' + nd.color + '">' + nd.ico + '</button>';
+    }));
+    h += '<div class="map-node boss" style="left:50%;top:9%">👑</div>';
+    box.innerHTML = h;
+    ui._mapSel = null;
+    $('#btnMapGo').disabled = true;
+    $('#mapInfo').innerHTML = 'Выберите мигающий узел';
+    $$('#mapBox .map-node.can').forEach((b) => b.addEventListener('click', () => {
+      const c = +b.dataset.c, r = +b.dataset.r, nd = D.MAP_NODES[map.cols[c][r].t];
+      $$('#mapBox .map-node').forEach((x) => x.classList.remove('sel'));
+      b.classList.add('sel');
+      ui._mapSel = { step: c, r };
+      $('#btnMapGo').disabled = false;
+      $('#mapInfo').innerHTML = '<b style="color:' + nd.color + '">' + nd.ico + ' ' + nd.name + '</b><br>' + nd.desc;
+      A.play('click');
+    }));
+    ui.show('#scr-map');
   };
 
   // события между волнами: Развилка, Торговец (карточки с ценой; не хватает монет — карточка гаснет)

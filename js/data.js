@@ -159,6 +159,80 @@
   // опасный путь Развилки: врагов ×danger.count, элиты +danger.elite к шансу, монеты ×danger.coins
   D.DANGER = { count: 1.4, elite: 0.15, coins: 2 };
 
+  // ── 4.0: карта сектора — перед каждой волной выбор узла (map.js) ──
+  // w — вес при генерации; first — может стоять первым шагом сектора
+  D.MAP_NODES = {
+    fight:  { ico: '⚔️', name: 'БОЙ',      color: '#3de0ff', w: 40, first: true,  desc: 'Обычная волна' },
+    elite:  { ico: '💀', name: 'ЭЛИТА',    color: '#ff4d6d', w: 16, first: false, desc: 'Врагов больше, элита чаще — награда: реликвия' },
+    shop:   { ico: '🛒', name: 'ТОРГОВЕЦ', color: '#ffc83d', w: 10, first: true,  desc: 'После волны — лавка: модули, улучшения, реликвии' },
+    repair: { ico: '🔧', name: 'РЕМОНТ',   color: '#3dffa2', w: 10, first: false, desc: 'После волны — +2 жизни (или щит, если здоровы)' },
+    cache:  { ico: '📦', name: 'ТАЙНИК',   color: '#b06bff', w: 12, first: true,  desc: 'Волна полегче, после — монеты и шанс реликвии' },
+    event:  { ico: '❓', name: 'СОБЫТИЕ',  color: '#7fe7ff', w: 12, first: true,  desc: 'После волны — встреча с выбором' },
+  };
+
+  // ── 4.0: реликвии — редкие предметы забега, меняют правила (map.js, эффекты — в game.js) ──
+  D.RELIC_RARITY = {
+    common:    { name: 'ОБЫЧНАЯ',     color: '#aab4d8', w: 50 },
+    rare:      { name: 'РЕДКАЯ',      color: '#3de0ff', w: 30 },
+    epic:      { name: 'ЭПИЧЕСКАЯ',   color: '#b06bff', w: 14 },
+    legendary: { name: 'ЛЕГЕНДАРНАЯ', color: '#ffc83d', w: 3 },
+    cursed:    { name: 'ПРОКЛЯТАЯ',   color: '#ff3d5a', w: 6 },
+  };
+  D.RELICS = {
+    r_lens:        { rar: 'common',    ico: '🔍', name: 'ФОКУСИРУЮЩАЯ ЛИНЗА', desc: '+12% урона' },
+    r_coolant:     { rar: 'common',    ico: '🧊', name: 'ХЛАДАГЕНТ',          desc: '+12% темп стрельбы' },
+    r_scope:       { rar: 'common',    ico: '🔭', name: 'ПРИЦЕЛ ВЕТЕРАНА',    desc: '+6% шанс крита, крит сильнее на ×0,5' },
+    r_kevlar:      { rar: 'common',    ico: '🧥', name: 'КЕВЛАРОВАЯ ОБШИВКА', desc: '+1 к максимуму жизней и +1 жизнь' },
+    r_gravlov:     { rar: 'common',    ico: '🧲', name: 'ГРАВИЛОВ',           desc: 'Радиус сбора ×2' },
+    r_purse:       { rar: 'common',    ico: '👛', name: 'ПИРАТСКИЙ КОШЕЛЬ',   desc: '+25% монет' },
+    r_afterburner: { rar: 'common',    ico: '🚀', name: 'ФОРСАЖНАЯ КАМЕРА',   desc: '+12% скорость корабля, +5% уклонение' },
+    r_arsenal:     { rar: 'common',    ico: '💣', name: 'ЗАПАСНОЙ АРСЕНАЛ',   desc: '+2 бомбы сейчас, урон бомб +40%' },
+    r_neuro:       { rar: 'common',    ico: '🧠', name: 'НЕЙРОЧИП',           desc: '+25% опыта забега' },
+    r_combo:       { rar: 'common',    ico: '🔥', name: 'ТАЛИСМАН КОМБО',     desc: 'Комбо держится вдвое дольше' },
+    r_hourglass:   { rar: 'rare',      ico: '⏳', name: 'ПЕСОЧНЫЕ ЧАСЫ',      desc: 'Навыки и бомба перезаряжаются на 25% быстрее' },
+    r_dice:        { rar: 'rare',      ico: '🎲', name: 'СЧАСТЛИВЫЙ КУБИК',   desc: 'Бонусы выпадают на 50% чаще' },
+    r_trophy:      { rar: 'rare',      ico: '🏆', name: 'ТРОФЕЙ ОХОТНИКА',    desc: '+30% урона по боссам и мини-боссам' },
+    r_hunteye:     { rar: 'rare',      ico: '👁️', name: 'ГЛАЗ ОХОТНИКА',      desc: '+30% урона по элите, из элиты монеты ×2' },
+    r_reflector:   { rar: 'rare',      ico: '🪞', name: 'ОТРАЖАТЕЛЬ',         desc: 'Снаряды один раз отскакивают от краёв экрана' },
+    r_salvo:       { rar: 'rare',      ico: '🎯', name: 'СЧЁТЧИК ЗАЛПОВ',     desc: 'Каждый 10-й выстрел — ещё и самонаводящаяся ракета' },
+    r_shieldburst: { rar: 'rare',      ico: '💥', name: 'ВЗРЫВНОЙ ЩИТ',       desc: 'Когда щит ломается, вокруг корабля взрыв' },
+    r_sparker:     { rar: 'rare',      ico: '🌩️', name: 'ИСКРОВОЙ РАЗРЯДНИК', desc: 'Криты бьют молнией в ближайшего врага' },
+    r_frost:       { rar: 'rare',      ico: '❄️', name: 'ЛЕДЯНОЕ ЯДРО',       desc: '10% шанс заморозить врага при попадании' },
+    r_redstar:     { rar: 'rare',      ico: '⭐', name: 'КРАСНАЯ ЗВЕЗДА',     desc: 'На последней жизни урон ×1,5' },
+    r_volatile:    { rar: 'rare',      ico: '☢️', name: 'НЕСТАБИЛЬНЫЙ РЕАКТОР', desc: 'Уничтоженный враг взрывается и ранит соседей' },
+    r_chart:       { rar: 'rare',      ico: '🗺️', name: 'ЗВЁЗДНАЯ КАРТА',     desc: 'Торговцы на 25% дешевле, реликвии — выбор из 4' },
+    r_bloodstone:  { rar: 'epic',      ico: '🩸', name: 'КРОВАВЫЙ КАМЕНЬ',    desc: 'Каждые 20 уничтоженных врагов — +1 жизнь' },
+    r_feather:     { rar: 'epic',      ico: '🪶', name: 'ПЕРО ФЕНИКСА',       desc: 'Один раз — воскрешение с 1 жизнью' },
+    r_buddy:       { rar: 'epic',      ico: '🛸', name: 'МАЛЕНЬКИЙ ПОМОЩНИК', desc: '+1 дрон-напарник' },
+    r_nano:        { rar: 'epic',      ico: '🦠', name: 'НАНОРОБОТЫ',         desc: '+1 жизнь каждые 50 с' },
+    r_shieldgen:   { rar: 'epic',      ico: '🔰', name: 'ГЕНЕРАТОР ЩИТА',     desc: 'Щит в начале каждой волны' },
+    r_twins:       { rar: 'legendary', ico: '👯', name: 'БЛИЗНЕЦЫ',           desc: '+1 снаряд к каждому выстрелу' },
+    r_cursedcoin:  { rar: 'cursed',    ico: '🪙', name: 'ПРОКЛЯТАЯ МОНЕТА',   desc: 'Монеты ×2, но враги на 15% крепче' },
+    r_glassblade:  { rar: 'cursed',    ico: '🔪', name: 'СТЕКЛЯННЫЙ КЛИНОК',  desc: 'Урон +40%, но максимум жизней −2' },
+  };
+
+  // ── 4.0: события на карте — выбор с риском (map.js) ──
+  D.MAP_EVENTS = [
+    { id: 'wreck',  ico: '🛰️', title: 'ДРЕЙФУЮЩИЙ КОРАБЛЬ', sub: 'Сигнала нет. Внутри может быть что угодно', cards: [
+      { id: 'search', ico: '🔦', name: 'ОБЫСКАТЬ', desc: '60% — реликвия, 40% — засада: следующая волна элитная', rar: 'rare' },
+      { id: 'pass',   ico: '👋', name: 'ПРОЛЕТЕТЬ МИМО', desc: 'Не рисковать', rar: 'common' } ] },
+    { id: 'black',  ico: '🕶️', title: 'ЧЁРНЫЙ РЫНОК', sub: 'Тут платят не монетами', cards: [
+      { id: 'blood',  ico: '🩸', name: 'ОТДАТЬ ЖИЗНЬ', desc: '−1 жизнь, взамен — редкая реликвия или лучше', rar: 'epic' },
+      { id: 'pass',   ico: '👋', name: 'УЙТИ', desc: 'Сделка не нужна', rar: 'common' } ] },
+    { id: 'anomaly', ico: '🌀', title: 'АНОМАЛИЯ', sub: 'Пространство здесь искривлено', cards: [
+      { id: 'enter',  ico: '🎲', name: 'ВОЙТИ', desc: '50% — случайный модуль корабля, 50% — −1 жизнь', rar: 'rare' },
+      { id: 'pass',   ico: '↪️', name: 'ОБЛЕТЕТЬ', desc: 'Не рисковать', rar: 'common' } ] },
+    { id: 'distress', ico: '🆘', title: 'СИГНАЛ БЕДСТВИЯ', sub: 'Подбитый грузовик просит помощи', cards: [
+      { id: 'help',   ico: '🤝', name: 'ПОМОЧЬ ЭКИПАЖУ', desc: '+150 монет за спасение', rar: 'common' },
+      { id: 'loot',   ico: '📦', name: 'ЗАБРАТЬ ГРУЗ', desc: 'Реликвия, но следующая волна элитная', rar: 'rare' } ] },
+    { id: 'station', ico: '🏚️', title: 'ЗАБРОШЕННАЯ СТАНЦИЯ', sub: 'Кто-то оставил запасы', cards: [
+      { id: 'fix',    ico: '❤️', name: 'РЕМОНТ', desc: '+1 жизнь', rar: 'common' },
+      { id: 'stock',  ico: '💣', name: 'СКЛАД', desc: '+1 бомба и 80 монет', rar: 'common' } ] },
+    { id: 'slot',   ico: '🎰', title: 'ИГРАЛЬНЫЙ АВТОМАТ', sub: 'Мигает и зовёт сыграть', cards: [
+      { id: 'play',   ico: '🎰', name: 'СЫГРАТЬ', desc: 'Ставка 100 монет: 50% — выигрыш 300', rar: 'rare', price: 100 },
+      { id: 'pass',   ico: '👋', name: 'УЙТИ', desc: 'Сберечь монеты', rar: 'common' } ] },
+  ];
+
   // ── Прокачка корабля до 3.0 (вкладка «Корабль» в арсенале). Больше не продаётся: по этим ценам
   //    при первом запуске 3.0 вложенные монеты возвращаются (store.patchNotes) ──
   D.GENERAL = [
