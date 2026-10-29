@@ -31,7 +31,7 @@
       pilot: 'kai',
       bossSeen: [],   // боссы, чью полную кат-сцену уже показали
       notes: [],
-      patch: 30,
+      patch: 31,
     };
   }
 
@@ -127,7 +127,9 @@
         if (refund > 0) this.s.coins += refund;
         if (data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v30')) this.s.notes.push({ type: 'v30', coins: refund });
       }
-      this.s.patch = 30;
+      // 3.1: новое древо навыков — старые навыки, которых больше нет, сняты, очки вернулись сами
+      if (data && data.patch >= 30 && !(data.patch >= 31) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v31')) this.s.notes.push({ type: 'v31' });
+      this.s.patch = 31;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
