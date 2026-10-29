@@ -34,7 +34,7 @@
       notes: [],
       // 4.1: коллекция реликвий { id: 1 }, взятые в забег, и закрытые сундуки ['bronze', ...] — открываются после забега
       relics: {}, relicLoadout: [], chests: [],
-      patch: 41,
+      patch: 42,
     };
   }
 
@@ -147,7 +147,9 @@
         this.s.notes.push({ type: 'v41' });
         this.s.chests.push('silver');
       }
-      this.s.patch = 41;
+      // 4.2: аномалии сектора и эскорт
+      if (data && data.patch >= 41 && !(data.patch >= 42) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v42')) this.s.notes.push({ type: 'v42' });
+      this.s.patch = 42;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
