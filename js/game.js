@@ -507,7 +507,7 @@
     b.pierce = o.pierce || 0; b.hit.length = 0; b.life = b.life0 = o.life || 2.4; b.age = 0; b.w1 = o.w1 || 0; b.ch = o.ch || 0;
     b.homing = o.homing || 0; b.aoe = o.aoe || 0; b.aoeR = o.aoeR || 0; b.acc = o.acc || 0; b.maxSpd = o.maxSpd || 0;
     b.bounced = false; b.fade = 0; b.tick = 0; b.tickT = o.tickT || 0; b.pull = o.pull || 0; b.burst = o.burst || 0; b.burstR = o.burstR || 0;
-    b.rot = 0; b.wid = o.wid || ''; b.dead = false; b.target = null;
+    b.rot = 0; b.wid = o.wid || ''; b.dead = false; b.target = null; b.prism = false; b.tpT = 0;
     game.bullets.push(b);
     return b;
   }
@@ -620,7 +620,7 @@
       let best = null, bd = Infinity;
       const R = j === 0 ? firstRange : range;
       for (const e of this.enemies) {
-        if (!e.alive || !e.hittable || e.def.cloak || hit.includes(e)) continue;
+        if (!e.alive || !e.hittable || e.def.cloak || e.fog || hit.includes(e)) continue;
         let d = Math.hypot(e.x - cx, e.y - cy);
         if (j === 0 && e.y > cy + 20) d *= 2.2; // предпочитаем цели впереди
         if (alt && j === 0 && cur === null && Math.random() < 0.5) d *= 1.4;
@@ -846,6 +846,15 @@
         this.run.hits++;
         if (b.kind === 'rocket') { this.damageEnemy(e, b.dmg, { crit: true, src: 'rocket', heavy: true }); this.rocketBlast(b, e); b.dead = true; break; }
         if (b.kind === 'plasma') { this.damageEnemy(e, b.dmg * plasmaK(b), { crit: true, src: 'plasma', heavy: true }); this.plasmaBlast(b, e); b.dead = true; break; }
+        // Кристальный пояс (3.1): кристалл преломляет выстрел веером из трёх
+        if (e.def.prism && !b.prism && (b.kind === 'laser' || b.kind === 'pellet' || b.kind === 'drone')) {
+          const sp = Math.hypot(b.vx, b.vy), a0 = Math.atan2(b.vy, b.vx);
+          for (const da of [-0.38, 0.38]) {
+            const nb = shot({ x: b.x, y: b.y, vx: Math.cos(a0 + da) * sp, vy: Math.sin(a0 + da) * sp, dmg: b.dmg * 0.7, r: b.r, kind: b.kind, sprite: b.sprite, cv: b.cv, w: b.w, wid: b.wid, life: 1.2 });
+            nb.prism = true; nb.hit.push(e.uid);
+          }
+          FX.hit(b.x, b.y, '#bfffee');
+        }
         // Зеркало отражает лазер в игрока
         if (e.def.reflect && e.def.reflect === b.wid) { SS.foes.reflect(b, e); b.dead = true; break; }
         // дробь в упор бьёт сильнее; лазер — «фокус» по одной цели
@@ -1375,6 +1384,11 @@
     // вертикальные лучи (дредноут, ионный, инквизитор) ранят один раз
     for (const bm of ov.beams) {
       if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(p.x, p.y, this.boss ? this.boss.bdef.name + ', луч' : 'Луч'); }
+      // столпы света Цитадели бьют и по врагам
+      if (bm.foes && bm.t >= bm.warn && !bm.foesDone) {
+        bm.foesDone = true;
+        for (const e of this.enemies) if (e.alive && e.hittable && !e.def.prop && Math.abs(e.x - bm.x) < bm.w * 0.75 + e.r && e.y > bm.y0) this.damageEnemy(e, e.boss || e.mini ? e.maxHp * 0.02 : e.maxHp * 0.5 + 30, { src: 'pillar' });
+      }
     }
     // поворотные лазеры: прикреплены к владельцу, могут следить за игроком
     const edt = dt * this.enemySlow();
@@ -1450,7 +1464,7 @@
     b.maxSpd = (o && o.maxSpd) || 0;
     b.redirT = (o && o.redir) || 0; b.redirSpd = (o && o.redirSpd) || 0; b.redone = false;
     b.burst = (o && o.burst) || null; b.bounce = (o && o.bounce) || 0; b.ebc = null;
-    b.sine = (o && o.sine) || null;
+    b.sine = (o && o.sine) || null; b.tpT = 0;
     this.ebullets.push(b);
     return b;
   };
@@ -2403,10 +2417,12 @@
     ctx.translate(G.FX + FX.shakeX, FX.shakeY);
     FX.drawBack(ctx);
     this.drawPickups(ctx);
+    SS.events.drawBack(ctx);
     SS.foes.drawBack(ctx);
     SS.skills.drawBack(ctx);
     SS.enemies.drawAll(ctx);
     SS.foes.drawFront(ctx);
+    SS.events.drawMid(ctx);
     this.drawBullets(ctx);
     this.drawPlayer(ctx);
     SS.skills.drawFront(ctx);

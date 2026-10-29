@@ -100,7 +100,7 @@
   }
 
   // невидимую цель не находят молния, ракеты и дроны
-  F.hidden = function (e) { return !!e.def.cloak && e.alpha < 0.6; };
+  F.hidden = function (e) { return !!e.def.cloak && e.alpha < 0.6 || !!e.fog; };
 
   // Зеркало: лазер отражается в игрока (не чаще ~3 раз в секунду, остальное просто гаснет)
   F.reflect = function (b, e) {
@@ -201,6 +201,7 @@
   // ГИБЕЛЬ
   // ════════════════════════════════════════════════════════════
   F.onKill = function (e) {
+    if (e.def.prop) SS.sectors.onKill(e);
     // Вор возвращает добычу, монеты — вдвойне
     if (e.loot && e.loot.length) {
       let coins = 0;

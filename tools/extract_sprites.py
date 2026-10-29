@@ -244,6 +244,15 @@ SPRITES = {
     'astr_l':   ((1110, 662, 1207, 754), 'solid', 11, {'max': 128}),
     'astr_xl1': ((1239, 657, 1326, 749), 'solid', 11, {'max': 128}),
     'astr_xl2': ((1363, 630, 1499, 759), 'solid', 11, {'max': 128}),
+    # 3.1: ледяные (Ледяные луны) и ядовитые (Изумрудные поля)
+    'asti_m1':  ((146, 470, 239, 562), 'solid', 11, {'max': 96}),
+    'asti_m2':  ((241, 460, 318, 562), 'solid', 11, {'max': 96}),
+    'asti_l':   ((335, 432, 453, 564), 'solid', 11, {'max': 128}),
+    'asti_xl':  ((598, 426, 739, 564), 'solid', 11, {'max': 128}),
+    'astp_m':   ((906, 465, 986, 562), 'solid', 11, {'max': 96}),
+    'astp_l1':  ((1097, 427, 1215, 564), 'solid', 11, {'max': 128}),
+    'astp_l2':  ((1232, 426, 1345, 564), 'solid', 11, {'max': 128}),
+    'astp_xl':  ((1374, 426, 1504, 564), 'solid', 11, {'max': 128}),
 
     # ── лист 12: враги 3.1 (у Связки нарезан один корабль — луч между парой рисует игра) ──
     'e_medic':     ((36, 76, 262, 336), 'glow', 12, {'max': 180}),
@@ -305,6 +314,7 @@ SPRITES = {
 LATE = {n for n in SPRITES if n.startswith('b_') or n.startswith('fx_scr_')} | {'e_destroyer', 'e_cruiser_h', 'fx_superblast', 'fx_superex'}
 # 3.1: лист 13 нужен не раньше 3-й волны (торговец, конвой, медкорабль) или дальних секторов (улей, красный гигант)
 LATE |= {n for n in SPRITES if len(SPRITES[n]) > 2 and SPRITES[n][2] == 13 and not n.startswith('en_')}
+LATE |= {n for n in SPRITES if n.startswith('asti_') or n.startswith('astp_')}
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
 NOZZLES = {

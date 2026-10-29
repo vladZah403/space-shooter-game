@@ -205,6 +205,8 @@
       const m = this.mech;
       if (m.wave !== game.wave) { this.mech = null; return; }
       if (game.state !== 'play' || !game.player.alive) return;
+      // 3.1: механики остальных секторов — в sectors.js
+      if (SS.sectors.has(m.id)) { SS.sectors.update(m, dt); return; }
       m.cd -= dt;
       if (m.cd <= 0) this['mech_' + m.id](m);
     },
@@ -251,6 +253,10 @@
       const scale = U.rand(0.8, 1.2) + k * 0.06;
       SS.enemies.spawn('lava_rock', { sprite: 'astl_' + U.randi(1, 5), noElite: true, scale, hpMul: scale * scale });
     },
+
+    // механика сектора: под врагами и поверх них (облака туманности)
+    drawBack(ctx) { if (this.mech && SS.sectors.has(this.mech.id)) SS.sectors.drawBack(ctx, this.mech); },
+    drawMid(ctx) { if (this.mech && SS.sectors.has(this.mech.id)) SS.sectors.drawMid(ctx, this.mech); },
 
     // ── отрисовка (координаты поля) ──
     draw(ctx) {
