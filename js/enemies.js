@@ -1445,6 +1445,7 @@
     FX.text(G.FW / 2, G.H * 0.42, 'ФАЗА ' + n, b.bdef.color, 26, 1.9, -18);
     FX.flash(b.bdef.color, 0.2);
     A.play('bossRoar', { rate: 0.8 });
+    game.hitstop(0.06);
     SS.emit('bossPhase', b);
   }
   function phaseFx(b, dt) {

@@ -17,7 +17,7 @@
   const game = {
     state: 'idle',          // idle | play | cutscene | pause | perk | dying | revive | over
     diffId: 'normal', diff: D.DIFFS.normal,
-    t: 0, timeScale: 1, slowT: 0,
+    t: 0, timeScale: 1, slowT: 0, stopT: 0,
     player: null,
     bullets: [], ebullets: [], enemies: [], pickups: [], drones: [],
     boss: null, wave: null, run: null, st: null,
@@ -120,7 +120,7 @@
     if (ch && ch.mods.includes('perks')) for (let i = 0; i < 3; i++) { const pk = withRng(this.run.perkRng, () => this.perkChoices()).find((x) => !x.filler && x.id !== 'glass'); if (pk) this.grantPerk(pk.id, true); }
     this.buffs = {};
     this.wave = null;
-    this.t = 0; this.timeScale = 1; this.slowT = 0;
+    this.t = 0; this.timeScale = 1; this.slowT = 0; this.stopT = 0;
     G.bg.setSector(0, true);
     G.bg.warp = 0.6;
     this.state = 'play';
@@ -311,6 +311,8 @@
   // ════════════════════════════════════════════════════════════
   game.frame = function (rdt) {
     if (this.state === 'play' || this.state === 'dying' || this.state === 'cutscene') {
+      // хитстоп: мир замирает на пару кадров (кадр при этом рисуется)
+      if (this.stopT > 0) { this.stopT -= rdt; return; }
       if (this.slowT > 0) { this.slowT -= rdt; this.timeScale = U.lerp(this.timeScale, 0.3, 0.2); }
       else this.timeScale = U.lerp(this.timeScale, 1, Math.min(1, rdt * 6));
       const dt = Math.min(rdt, 1 / 30) * this.timeScale;
@@ -324,6 +326,9 @@
       G.bg.update(rdt, this.state === 'over' ? 0.4 : 0.05);
     }
   };
+
+  // 4.2.2: короткий стоп-кадр — убийство элиты, смена фазы босса; не копится, берётся самый длинный
+  game.hitstop = function (sec) { this.stopT = Math.max(this.stopT, sec); };
 
   game.update = function (dt, rdt) {
     const p = this.player, run = this.run, st = this.st;
@@ -1090,6 +1095,7 @@
     if (e.mini) this.dropPowerup(e.x + 20 * S, e.y);
     // навыки и улучшения
     if ((e.elite || e.mini) && this.skill('sk_jackpot')) this.dropCrate(e.x, e.y);
+    if (e.elite) this.hitstop(0.04);
     // реликвии: кровавый камень лечит, нестабильный реактор взрывает убитых
     if (this.relic('r_bloodstone') && ++run.bloodKills >= 20) { run.bloodKills = 0; this.heal(1, '🩸 КАМЕНЬ'); }
     if (this.relic('r_volatile') && !e.def.prop) this.blast(e.x, e.y, 70 * S, e.maxHp * 0.25 + 10, '#ff6a2a', 'volatile');
