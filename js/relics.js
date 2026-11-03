@@ -105,13 +105,14 @@
     const el = $('#goChests'), list = store.s.chests;
     if (!list.length) { el.hidden = true; el.innerHTML = ''; return; }
     el.hidden = false;
-    const d0 = delay || 0;
+    // больше трёх значков на узком экране сжимают подпись в столбик — остальные числом «+N»
+    const d0 = delay || 0, MAX = 3;
     // два слоя анимации: въезд справа, потом обычное подпрыгивание
-    const shown = list.slice(0, 5).map((t, i) => {
+    const shown = list.slice(0, MAX).map((t, i) => {
       const d = d0 + 0.2 + i * 0.16;
       return G.chestImg(t, 'gc-ico" style="animation-delay:' + d.toFixed(2) + 's,' + (d + 0.45).toFixed(2) + 's');
     }).join('');
-    el.innerHTML = '<div class="gc-row">' + shown + (list.length > 5 ? '<b>+' + (list.length - 5) + '</b>' : '') + '</div>' +
+    el.innerHTML = '<div class="gc-row">' + shown + (list.length > MAX ? '<b>+' + (list.length - MAX) + '</b>' : '') + '</div>' +
       '<div class="gc-txt"><b>' + (got ? 'СУНДУКИ ЗА ЗАБЕГ: ' + got : 'СУНДУКИ ЖДУТ') + '</b><small>Внутри — реликвии в коллекцию</small></div>' +
       '<button class="btn primary" id="btnOpenChests">ОТКРЫТЬ</button>';
     $('#btnOpenChests').addEventListener('click', () => { A.play('click'); T.haptic('medium'); RL.openChests(); });

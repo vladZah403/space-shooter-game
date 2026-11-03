@@ -1006,7 +1006,9 @@
     $('#goRecord').hidden = !sum.isRecord;
     $('#goRecord').classList.remove('on');
     $('.go-score-card').classList.remove('rec-flash');
-    $('#goBest').textContent = U.fmt(s.stats.bestScore);
+    // у Босс-раша и Выживания свои рекорды (store.finishRun)
+    const md = sum.mode && sum.mode !== 'normal' && s.stats.modes && s.stats.modes[sum.mode];
+    $('#goBest').textContent = U.fmt(md ? md.best : s.stats.bestScore);
     const STATS = [
       ['skull', 'Враги', sum.kills, U.fmt], ['crown', 'Боссы', sum.bosses, U.fmt], ['bolt', 'Комбо', sum.maxCombo, (n) => '×' + Math.floor(n)],
       ['chart', 'Уровень', sum.level, U.fmt], ['target', 'Точность', sum.accuracy, (n) => Math.floor(n) + '%'], ['retry', 'Время', sum.time, U.fmtTime],

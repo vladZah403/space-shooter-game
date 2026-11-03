@@ -985,16 +985,17 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .hud-chests.bump{animation:bump .4s ease}
 .rb-chip.chest{border-color:rgba(224,150,90,.45);background:rgba(224,150,90,.1);padding:4px}
 /* итоги */
-.go-chests{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(255,200,61,.14),rgba(176,107,255,.12));border:1px solid rgba(255,200,61,.45);box-shadow:0 0 18px rgba(255,200,61,.18);animation:popIn .35s .3s both}
+.go-chests{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(255,200,61,.14),rgba(176,107,255,.12));border:1px solid rgba(255,200,61,.45);box-shadow:0 0 18px rgba(255,200,61,.18);animation:popIn .35s .3s both}
 .gc-row{display:flex;align-items:flex-end;gap:2px;flex-shrink:0}
 .gc-row b{font-family:var(--font-h);font-size:12px;color:var(--gold);margin-left:3px}
 .gc-ico{width:34px!important;animation:gcIn .45s cubic-bezier(.2,1.3,.4,1) both,gcHop 1.6s ease-in-out infinite}
 @keyframes gcIn{from{opacity:0;transform:translateX(60px) rotate(18deg) scale(.6)}to{opacity:1;transform:none}}
 @keyframes gcHop{0%,70%,100%{transform:none}78%{transform:translateY(-5px) rotate(-6deg)}86%{transform:translateY(0) rotate(4deg)}}
-.gc-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+/* подпись — строкой сверху, под ней сундуки и кнопка: рядом с ними на узком экране она сжималась в столбик */
+.gc-txt{flex:1 1 100%;order:-1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .gc-txt b{font-family:var(--font-h);font-size:11px;letter-spacing:1px;color:var(--gold)}
 .gc-txt small{font-size:12px;color:var(--muted);line-height:1.15}
-.go-chests .btn{height:40px;padding:0 14px;font-size:12px;flex-shrink:0}
+.go-chests .btn{height:40px;padding:0 14px;font-size:12px;flex-shrink:0;margin-left:auto}
 /* строка реликвий в выборе сложности */
 .relic-row{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:12px;background:rgba(10,16,40,.6);border:1px solid rgba(255,200,61,.3);flex-shrink:0}
 .relic-row small{font-family:var(--font-h);font-size:9px;letter-spacing:1px;color:var(--gold)}
