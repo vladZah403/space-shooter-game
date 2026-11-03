@@ -435,6 +435,25 @@
       run.emergT += dt;
       if (run.emergT >= 12) { run.emergT = 0; p.shield = true; this.shieldFx(); this.hudDirty = true; }
     } else run.emergT = 0;
+    // реликвия «Око бури»: каждые 8 с молния в самого крепкого врага на экране
+    if (this.relic('r_stormeye') && p.alive && this.state === 'play') {
+      run.stormT = (run.stormT || 0) + dt;
+      if (run.stormT >= 8) {
+        let best = null;
+        for (const e of this.enemies) if (e.alive && e.hittable && e.y > 0 && e.y < G.H * 0.9 && !SS.foes.hidden(e) && (!best || e.hp > best.hp)) best = e;
+        if (best) {
+          run.stormT = 0;
+          const wn = this.wave ? this.wave.n : 1;
+          FX.lightning(best.x + U.rand(-30, 30) * G.S, -10, best.x, best.y, '#fff36b', 3 * G.S, 0.3);
+          FX.sprite('fx_bolt', best.x, best.y, { w0: 30 * G.S, w1: 52 * G.S, dur: 0.25, hold: 0.3, hue: 52 });
+          FX.flash('#fff6c0', 0.12);
+          A.play('zap', { rate: 0.7 });
+          // не меньше заметной доли прочности: у обычных врагов — четверть, у боссов — 3%
+          const dmg = Math.max(120 * this.dmgMul() * (1 + wn * 0.06), best.maxHp * (best.boss ? 0.03 : 0.25));
+          this.damageEnemy(best, dmg, { src: 'lightning', heavy: true });
+        }
+      }
+    }
     if (this.relic('r_nano') && p.alive && p.lives < p.maxLives) {
       run.nanoT = (run.nanoT || 0) + dt;
       if (run.nanoT >= 50) { run.nanoT = 0; this.heal(1, '🦠 НАНОРОБОТЫ'); }
@@ -462,6 +481,7 @@
   game.dmgMul = function (wid) {
     let d = this.st.dmg + (wid ? wl(wid, 'dmg') * 0.12 : 0);
     if (this.perk('investor')) d += Math.min(0.4, this.run.coins / 5000);
+    if (this.relic('r_crown')) d += this.run.bosses * 0.1;
     if (this.buffs.power > 0) d *= 1.6;
     if (this.wave && this.wave.danger && this.skill('sk_daredevil')) d *= 1.25;
     // хладнокровие: +10% урона за каждые 4 с без попаданий, до +30%
@@ -1238,6 +1258,14 @@
     FX.shake(0.55);
     A.play('playerHit');
     SS.tg.haptic('heavy');
+    // реликвия «Хронометр»: на последней жизни враги замедляются на 3 с (раз в волну) — как навык «Замедление»
+    if (p.lives === 1 && this.relic('r_chrono') && this.wave && !this.wave.chrono) {
+      this.wave.chrono = true;
+      run.skillFx.sk_timewarp = Math.max(run.skillFx.sk_timewarp || 0, 3);
+      FX.flash('#3d6bff', 0.25);
+      FX.text(p.x, p.y - p.w * 0.9, '🕰️ ХРОНОМЕТР', '#9fc8ff', 14, 1.2);
+      A.play('teleport', { rate: 0.5 });
+    }
     SS.emit('playerHit', p.lives);
     this.hudDirty = true;
     if (p.lives <= 0) this.playerDown();
@@ -1394,6 +1422,11 @@
       if (before && !e.alive) killed++;
     }
     if (killed >= 10) M.unlock('bomb_chain');
+    // реликвия «Ядро сингулярности»: после бомбы — чёрная дыра на 4 с (та же, что у навыка)
+    if (this.relic('r_singularity')) {
+      this.ov.hole = { x: G.FW / 2, y: G.H * 0.32, t: 0, dur: 4, tick: 0 };
+      A.play('dark', { rate: 0.6 });
+    }
     this.hudDirty = true;
   };
 
@@ -2221,6 +2254,11 @@
     this.dropXp(boss.x, boss.y, 18 + this.wave.n);
     this.dropPowerup(boss.x - 30 * S, boss.y, 'heal');
     this.dropPowerup(boss.x + 30 * S, boss.y);
+    // реликвия «Сердце звезды»: +1 к максимуму жизней и +1 жизнь (со «Стеклянной пушкой» — только лечение)
+    if (this.relic('r_starheart') && this.player.alive) {
+      if (!this.perk('glass')) this.player.maxLives++;
+      this.heal(1, '🌟 СЕРДЦЕ ЗВЕЗДЫ');
+    }
     this.slowT = 1.0;
     for (const b of this.ebullets) b.dead = true;
     SS.emit('bossDefeated', { def: boss.bdef, pts });
