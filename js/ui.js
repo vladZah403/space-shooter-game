@@ -867,6 +867,16 @@
     x.drawImage(img, f[0], f[1], f[2], f[3], 0, 0, w, h);
     cv.hidden = false;
   }
+  // защита от случайного нажатия пальцем, который вёл корабль: карточки «спят», пока палец на экране, 480 мс,
+  // а если экрана никто не касается — 150 мс. game.pointer к этому моменту уже сброшен, поэтому пальцы считаем тут
+  const fingers = new Set();
+  document.addEventListener('pointerdown', (e) => fingers.add(e.pointerId), { capture: true, passive: true });
+  ['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, (e) => fingers.delete(e.pointerId), { capture: true, passive: true }));
+  window.addEventListener('blur', () => fingers.clear());
+  function unlockCards(ms) {
+    if (ms === undefined) ms = fingers.size ? 480 : 150;
+    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), ms);
+  }
   ui.showPerks = function (choices, reroll) {
     const box = $('#perkCards');
     setPerkTitle('УРОВЕНЬ ' + game.run.level);
@@ -896,8 +906,7 @@
     $('#btnPerkReroll').disabled = store.s.coins < cost && !SS.DEV;
     ui.show('#scr-perk');
     fitPerkRar();
-    // защита от случайного нажатия пальцем, который вёл корабль
-    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), reroll ? 120 : 480);
+    unlockCards(reroll ? 120 : undefined);
   };
 
   // модули корабля: та же раскладка карточек, но без перебора и со своим заголовком
@@ -925,7 +934,7 @@
     });
     ui.show('#scr-perk');
     fitPerkRar();
-    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
+    unlockCards();
   };
 
   // ════════════════════════════════════════════════════════════
@@ -959,7 +968,7 @@
     }
     ui.show('#scr-perk');
     fitPerkRar();
-    setTimeout(() => $$('#perkCards .perk-card').forEach((x) => x.classList.remove('wait')), 480);
+    unlockCards();
   };
 
   ui.showRevive = function (cost) {
