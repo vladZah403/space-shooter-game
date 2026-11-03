@@ -2203,7 +2203,7 @@
     this.run.shopCut = 0;
     const n = this.wave.n, p = this.player, cards = [], cut = (this.skill('sk_scavenger') ? 0.7 : 1) * (this.relic('r_chart') ? 0.75 : 1) * disc;
     const mods = this.moduleChoices();
-    if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
+    if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: G.icon('md_' + mods[0].id, mods[0].ico), name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
     const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
     const pk = perks.length ? U.pick(perks) : null;
     if (pk) cards.push({ id: 'perk:' + pk.id, ico: G.icon('pk_' + pk.id, pk.ico), name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) * cut / 10) * 10 });

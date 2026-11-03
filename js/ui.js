@@ -718,9 +718,9 @@
     if (!run) return '';
     const pil = D.PILOTS[run.pilot] || D.PILOTS.kai;
     const chip = (ico, n, title, cls) => '<span class="rb-chip ' + cls + '" title="' + U.escape(title) + '">' + ico + (n > 1 ? '<b>' + n + '</b>' : '') + '</span>';
-    const mods = D.MODULES.filter((m) => run.mods[m.id]).map((m) => chip(m.ico, run.mods[m.id], m.name, 'mod')).join('');
+    const mods = D.MODULES.filter((m) => run.mods[m.id]).map((m) => chip(G.icon('md_' + m.id, m.ico), run.mods[m.id], m.name, 'mod')).join('');
     const perks = D.PERKS.filter((p) => run.perks[p.id] && !p.filler).map((p) => chip(G.icon('pk_' + p.id, p.ico), run.perks[p.id], p.name, 'perk')).join('');
-    const relics = Object.keys(run.relics || {}).filter((id) => D.RELICS[id]).map((id) => chip(D.RELICS[id].ico, 1, D.RELICS[id].name + ': ' + D.RELICS[id].desc, 'relic')).join('');
+    const relics = Object.keys(run.relics || {}).filter((id) => D.RELICS[id]).map((id) => chip(G.icon(id, D.RELICS[id].ico), 1, D.RELICS[id].name + ': ' + D.RELICS[id].desc, 'relic')).join('');
     return '<div class="rb-head"><span class="rb-pilot" style="color:' + pil.color + '">' + pil.ico + ' ' + pil.name + '</span><small>СБОРКА ЗАБЕГА</small></div>' +
       (mods ? '<div class="rb-row"><small>Модули</small>' + mods + '</div>' : '') +
       (perks ? '<div class="rb-row"><small>Улучшения</small>' + perks + '</div>' : '') +
@@ -825,8 +825,8 @@
             const m = D.MODULES.find((x) => x.id === id), lv = run.mods[id] || 0;
             if (!m) continue;
             const off = offer && offer.includes(id);
-            if (lv) h += '<p>' + m.ico + ' <b>' + m.name + (m.max > 1 ? ' ' + lv + '/' + m.max : '') + '</b> — ' + U.escape(m.desc) + '</p>';
-            else h += '<p class="' + (off ? 'offer' : '') + '">' + m.ico + ' ' + m.name + (off ? ' — предлагают сейчас' : ' — свободно') + '</p>';
+            if (lv) h += '<p>' + G.icon('md_' + m.id, m.ico) + ' <b>' + m.name + (m.max > 1 ? ' ' + lv + '/' + m.max : '') + '</b> — ' + U.escape(m.desc) + '</p>';
+            else h += '<p class="' + (off ? 'offer' : '') + '">' + G.icon('md_' + m.id, m.ico) + ' ' + m.name + (off ? ' — предлагают сейчас' : ' — свободно') + '</p>';
           }
         }
         h += '</div>';
@@ -923,7 +923,7 @@
       const b = document.createElement('button');
       b.className = 'perk-card module wait';
       b.style.setProperty('--pc', rar.color);
-      b.innerHTML = '<div class="perk-ico">' + m.ico + '</div><div class="perk-info"><div class="perk-name">' + m.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + m.desc + '</div></div><div class="perk-rar">' + rar.name + '</div>';
+      b.innerHTML = '<div class="perk-ico">' + G.icon('md_' + m.id, m.ico) + '</div><div class="perk-info"><div class="perk-name">' + m.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + m.desc + '</div></div><div class="perk-rar">' + rar.name + '</div>';
       b.addEventListener('click', () => {
         if (b.classList.contains('wait')) return;
         ui.hide('#scr-perk');

@@ -9,6 +9,8 @@
 (function () {
   const U = SS.util, D = SS.data, $ = U.$, $$ = U.$$, ic = U.icon;
   let G, A, M, T, ui, store;
+  // нарисованный значок реликвии (кадр атласа с именем реликвии), пока не догрузился — эмодзи
+  const rico = (id) => G.icon(id, D.RELICS[id].ico);
 
   const RL = {};
   SS.relicsUi = RL;
@@ -49,7 +51,7 @@
     let h = '<small>В ЗАБЕГ</small>';
     for (let i = 0; i < D.RELIC_SLOTS.length; i++) {
       const id = lo[i];
-      if (id) h += '<button class="rslot full" data-id="' + id + '" style="--rc:' + rc(id) + '"><span>' + D.RELICS[id].ico + '</span></button>';
+      if (id) h += '<button class="rslot full" data-id="' + id + '" style="--rc:' + rc(id) + '"><span>' + rico(id) + '</span></button>';
       else if (i < slots) h += '<div class="rslot empty"><span>+</span></div>';
       else h += '<div class="rslot locked">' + ic('lock') + '<small>ур. ' + D.RELIC_SLOTS[i] + '</small></div>';
     }
@@ -59,7 +61,7 @@
     const ids = Object.keys(D.RELICS).sort((a, b) => order.indexOf(D.RELICS[a].rar) - order.indexOf(D.RELICS[b].rar));
     $('#relicGrid').innerHTML = ids.map((id) => {
       const own = !!s.relics[id], on = lo.includes(id);
-      return '<button class="rcell' + (own ? '' : ' unknown') + (on ? ' on' : '') + (id === RL.sel ? ' sel' : '') + '" data-id="' + id + '" style="--rc:' + rc(id) + '">' + (own ? D.RELICS[id].ico : '?') + '</button>';
+      return '<button class="rcell' + (own ? '' : ' unknown') + (on ? ' on' : '') + (id === RL.sel ? ' sel' : '') + '" data-id="' + id + '" style="--rc:' + rc(id) + '">' + (own ? rico(id) : '?') + '</button>';
     }).join('');
     RL.renderDetail();
     const n = M.relicCount(), total = Object.keys(D.RELICS).length, next = D.RELIC_SLOTS[slots];
@@ -72,7 +74,7 @@
     if (!id) { el.innerHTML = '<div class="rd-empty">Нажмите на реликвию: найденная встанет в слот или уйдёт из него</div>'; return; }
     const r = D.RELICS[id], own = !!s.relics[id], on = M.relicLoadout().includes(id);
     el.style.setProperty('--rc', rc(id));
-    el.innerHTML = '<div class="rd-ico">' + (own ? r.ico : '?') + '</div><div class="rd-txt"><small>' + rname(id) + (on ? ' · В ЗАБЕГЕ' : '') + '</small>' +
+    el.innerHTML = '<div class="rd-ico">' + (own ? rico(id) : '?') + '</div><div class="rd-txt"><small>' + rname(id) + (on ? ' · В ЗАБЕГЕ' : '') + '</small>' +
       '<b>' + (own ? r.name : 'НЕ НАЙДЕНА') + '</b><span>' + (own ? r.desc : 'Выпадает из сундуков') + '</span></div>';
   };
   RL.tap = function (id, fromSlot) {
@@ -91,7 +93,7 @@
     if (!el) return;
     const lo = M.relicLoadout(), slots = M.relicSlots();
     let h = '<small>РЕЛИКВИИ</small><div class="rr-slots">';
-    for (let i = 0; i < slots; i++) h += lo[i] ? '<span style="--rc:' + rc(lo[i]) + '">' + D.RELICS[lo[i]].ico + '</span>' : '<span class="e">+</span>';
+    for (let i = 0; i < slots; i++) h += lo[i] ? '<span style="--rc:' + rc(lo[i]) + '">' + rico(lo[i]) + '</span>' : '<span class="e">+</span>';
     h += '</div><em>' + (daily ? 'не в испытании' : M.relicCount() ? 'изменить ›' : 'найдите в сундуках ›') + '</em>';
     el.innerHTML = h;
     el.classList.toggle('off', daily);
@@ -184,7 +186,7 @@
     let coins = 0;
     const rows = res.map((r) => {
       coins += r.coins;
-      return '<div class="ca-row" style="--rc:' + rc(r.id) + '"><span class="ca-ico">' + D.RELICS[r.id].ico + '</span><div><b>' + D.RELICS[r.id].name + '</b><small>' + (r.dupe ? 'повтор → +' + r.coins + ' монет' : 'НОВАЯ · ' + rname(r.id)) + '</small></div></div>';
+      return '<div class="ca-row" style="--rc:' + rc(r.id) + '"><span class="ca-ico">' + rico(r.id) + '</span><div><b>' + D.RELICS[r.id].name + '</b><small>' + (r.dupe ? 'повтор → +' + r.coins + ' монет' : 'НОВАЯ · ' + rname(r.id)) + '</small></div></div>';
     }).join('');
     showCard('<div class="cc-cap">ОТКРЫТО СУНДУКОВ: ' + res.length + '</div><div class="ca-list">' + rows + '</div>' + (coins ? '<div class="cc-dupe">За повторы: +' + U.fmt(coins) + ' ' + ic('coin') + '</div>' : ''));
     left();
@@ -320,11 +322,18 @@
     g.addColorStop(0, '#2a3046'); g.addColorStop(1, '#0d1020');
     c.fillStyle = g; c.shadowColor = col; c.shadowBlur = 24; c.fill();
     c.shadowBlur = 0; c.lineWidth = Math.max(2, s * 0.06); c.strokeStyle = col; c.stroke();
-    // при градиентном fillStyle iOS (WebKit) рисует эмодзи как маску — выходит тёмный силуэт; сплошной цвет цветные эмодзи не трогает
-    c.fillStyle = '#fff';
-    c.font = Math.round(s * 0.62) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText(D.RELICS[id].ico, 0, s * 0.03);
+    const f = G.frame(id), im = f && G.src(f);
+    if (im) {
+      // нарисованный значок вписан в шестиугольник
+      const k = s * 0.78 / Math.max(f[2], f[3]);
+      c.drawImage(im, f[0], f[1], f[2], f[3], -f[2] * k / 2, -f[3] * k / 2, f[2] * k, f[3] * k);
+    } else {
+      // при градиентном fillStyle iOS (WebKit) рисует эмодзи как маску — выходит тёмный силуэт; сплошной цвет цветные эмодзи не трогает
+      c.fillStyle = '#fff';
+      c.font = Math.round(s * 0.62) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(D.RELICS[id].ico, 0, s * 0.03);
+    }
     c.restore();
   }
   function bounceOut(k) {

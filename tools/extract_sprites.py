@@ -25,7 +25,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы),
 # 12 — враги 3.1 (защиты от оружия и поддержка), 13 — разное 3.1 (торговец, энергоблоки, яйца улья, конвой,
 # медкорабль, лавовые астероиды), 14–15 — детали корабля 3.1 (модули забега на корабле)
-# 16 — значки улучшений забега (файл назван по номеру листа в docs/sprites-needed.md)
+# 16 — значки улучшений забега, 17 — реликвии, 18 — модули корабля (файлы названы по номерам листов
+# в docs/sprites-needed.md)
 SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet00_main.png',
     'sheet01_player_ships.png',
@@ -44,6 +45,8 @@ SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet14_parts_31.jpg',
     'sheet15_parts2_31.jpg',
     'sheet22_perks.png',
+    'sheet17_relics.png',
+    'sheet20_modules.jpg',
 )]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -341,6 +344,56 @@ SPRITES = {
     'pk_heavy':     ((940, 755, 1096, 919), 'solid', 16, {'max': 112}),
     'pk_heal':      ((1135, 752, 1294, 919), 'solid', 16, {'max': 112}),
     'pk_bomb':      ((1336, 755, 1487, 919), 'solid', 16, {'max': 112}),
+    # ── лист 17 (art/sheet17_relics.png): реликвии, по имени реликвии; №10 на листе — повтор песочных часов, у «Талисмана комбо» пока эмодзи ──
+    'r_lens':         ((28, 58, 166, 206), 'solid', 17, {'max': 112}),
+    'r_coolant':      ((190, 52, 303, 197), 'solid', 17, {'max': 112}),
+    'r_scope':        ((328, 58, 460, 199), 'solid', 17, {'max': 112}),
+    'r_kevlar':       ((474, 58, 621, 204), 'solid', 17, {'max': 112}),
+    'r_gravlov':      ((635, 54, 771, 205), 'solid', 17, {'max': 112}),
+    'r_purse':        ((782, 53, 916, 208), 'solid', 17, {'max': 112}),
+    'r_afterburner':  ((934, 53, 1068, 206), 'solid', 17, {'max': 112}),
+    'r_arsenal':      ((1087, 52, 1217, 204), 'solid', 17, {'max': 112}),
+    'r_neuro':        ((1227, 53, 1371, 203), 'solid', 17, {'max': 112}),
+    'r_hourglass':    ((35, 267, 152, 406), 'solid', 17, {'max': 112}),
+    'r_dice':         ((167, 267, 319, 417), 'solid', 17, {'max': 112}),
+    'r_trophy':       ((325, 278, 469, 409), 'solid', 17, {'max': 112}),
+    'r_hunteye':      ((484, 267, 617, 411), 'solid', 17, {'max': 112}),
+    'r_reflector':    ((634, 274, 759, 428), 'solid', 17, {'max': 112}),
+    'r_salvo':        ((780, 282, 917, 423), 'solid', 17, {'max': 112}),
+    'r_shieldburst':  ((931, 273, 1068, 424), 'solid', 17, {'max': 112}),
+    'r_sparker':      ((1078, 272, 1219, 421), 'solid', 17, {'max': 112}),
+    'r_frost':        ((1234, 272, 1361, 419), 'solid', 17, {'max': 112}),
+    'r_redstar':      ((1379, 275, 1509, 415), 'solid', 17, {'max': 112}),
+    'r_volatile':     ((34, 418, 152, 538), 'solid', 17, {'max': 112}),
+    'r_chart':        ((185, 420, 334, 539), 'solid', 17, {'max': 112}),
+    'r_bloodstone':   ((55, 584, 185, 738), 'solid', 17, {'max': 112}),
+    'r_feather':      ((222, 582, 378, 738), 'solid', 17, {'max': 112}),
+    'r_buddy':        ((404, 596, 552, 738), 'solid', 17, {'max': 112}),
+    'r_nano':         ((582, 594, 728, 736), 'solid', 17, {'max': 112}),
+    'r_shieldgen':    ((762, 594, 916, 738), 'solid', 17, {'max': 112}),
+    'r_starheart':    ((952, 593, 1108, 738), 'solid', 17, {'max': 112}),
+    'r_crown':        ((1139, 593, 1290, 732), 'solid', 17, {'max': 112}),
+    'r_chrono':       ((1335, 582, 1491, 738), 'solid', 17, {'max': 112}),
+    'r_twins':        ((82, 807, 238, 963), 'solid', 17, {'max': 112}),
+    'r_singularity':  ((322, 802, 478, 958), 'solid', 17, {'max': 112}),
+    'r_stormeye':     ((562, 802, 718, 958), 'solid', 17, {'max': 112}),
+    'r_cursedcoin':   ((907, 812, 1063, 968), 'solid', 17, {'max': 112}),
+    'r_glassblade':   ((1242, 807, 1398, 963), 'solid', 17, {'max': 112}),
+    # ── лист 18 (art/sheet20_modules.jpg): модули корабля, порядок как в D.MODULES ──
+    'md_power':       ((22, 54, 212, 261), 'solid', 18, {'max': 112}),
+    'md_cooling':     ((244, 58, 411, 261), 'solid', 18, {'max': 112}),
+    'md_plating':     ((443, 64, 618, 254), 'solid', 18, {'max': 112}),
+    'md_shieldcore':  ((642, 66, 804, 261), 'solid', 18, {'max': 112}),
+    'md_wings':       ((829, 83, 1033, 262), 'solid', 18, {'max': 112}),
+    'md_targeting':   ((1060, 63, 1255, 254), 'solid', 18, {'max': 112}),
+    'md_hunter':      ((18, 306, 210, 492), 'solid', 18, {'max': 112}),
+    'md_salvage':     ((242, 301, 406, 492), 'solid', 18, {'max': 112}),
+    'md_scanner':     ((445, 288, 618, 493), 'solid', 18, {'max': 112}),
+    'md_bombbay':     ((646, 310, 824, 497), 'solid', 18, {'max': 112}),
+    'md_gyro':        ((852, 300, 1041, 502), 'solid', 18, {'max': 112}),
+    'md_chrono':      ((1070, 307, 1259, 500), 'solid', 18, {'max': 112}),
+    'md_repair':      ((19, 550, 218, 753), 'solid', 18, {'max': 112}),
+    'md_emergency':   ((264, 524, 474, 744), 'solid', 18, {'max': 112}),
 }
 
 # поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
@@ -349,6 +402,8 @@ LATE = {n for n in SPRITES if n.startswith('b_') or n.startswith('fx_scr_')} | {
 # 3.1: лист 13 нужен не раньше 3-й волны (торговец, конвой, медкорабль) или дальних секторов (улей, красный гигант)
 LATE |= {n for n in SPRITES if len(SPRITES[n]) > 2 and SPRITES[n][2] == 13 and not n.startswith('en_')}
 LATE |= {n for n in SPRITES if n.startswith('asti_') or n.startswith('astp_')}
+# значки интерфейса (улучшения, реликвии, модули) нужны не на первом экране: до догрузки вместо них — эмодзи
+LATE |= {n for n in SPRITES if n.startswith('pk_') or n.startswith('r_') or n.startswith('md_')}
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
 NOZZLES = {
