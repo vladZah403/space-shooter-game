@@ -46,20 +46,6 @@
     if (SS.ui && SS.ui.measure) setTimeout(() => { SS.ui.measure(); if (SS.ui.measureMenuSlot) SS.ui.measureMenuSlot(); }, 60);
   };
 
-  // красная виньетка «последняя жизнь» (рисуется один раз)
-  main.vignetteRed = function () {
-    const G = SS.gfx;
-    if (main._vig && main._vig.width === Math.round(G.W / 2)) return main._vig;
-    const c = document.createElement('canvas');
-    c.width = Math.round(G.W / 2); c.height = Math.round(G.H / 2);
-    const x = c.getContext('2d');
-    const g = x.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.35, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.72);
-    g.addColorStop(0, 'rgba(255,0,40,0)'); g.addColorStop(1, 'rgba(255,0,40,.32)');
-    x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
-    main._vig = c;
-    return c;
-  };
-
   main.applyQuality = function () {
     const q = SS.store.s.settings.quality;
     main.autoQ = q === 'auto';

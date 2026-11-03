@@ -15,7 +15,7 @@
   const textPool = new SS.Pool(() => ({}));
 
   const fx = {
-    parts: [], expl: [], rings: [], texts: [], beams: [], sprites: [], scr: [], _vig: {},
+    parts: [], expl: [], rings: [], texts: [], beams: [], sprites: [], scr: [], arcs: [], _vig: {},
     trauma: 0, shakeX: 0, shakeY: 0,
     flashA: 0, flashColor: '#fff',
     maxParts: 500,
@@ -27,7 +27,7 @@
     clear() {
       for (const p of this.parts) partPool.put(p);
       for (const t of this.texts) textPool.put(t);
-      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0; this.sprites.length = 0; this.scr.length = 0;
+      this.parts.length = 0; this.expl.length = 0; this.rings.length = 0; this.texts.length = 0; this.beams.length = 0; this.sprites.length = 0; this.scr.length = 0; this.arcs.length = 0;
       this.trauma = 0; this.flashA = 0;
     },
 
@@ -207,6 +207,23 @@
       this._vig[key] = c;
       return c;
     },
+    // рамка по всем четырём краям одинаковой толщины (последняя жизнь): у vigCanvas на высоком экране светятся в основном углы
+    edgeCanvas(color) {
+      const W = G().W, H = G().H, key = 'edge' + color + W + 'x' + H;
+      if (this._vig[key]) return this._vig[key];
+      const c = document.createElement('canvas');
+      c.width = Math.max(2, Math.round(W / 3)); c.height = Math.max(2, Math.round(H / 3));
+      const x = c.getContext('2d'), w = c.width, h = c.height, d = Math.min(w, h) * 0.22;
+      const side = (x0, y0, x1, y1, rx, ry, rw, rh) => {
+        const g = x.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, G().hexA(color, 0.8)); g.addColorStop(0.4, G().hexA(color, 0.25)); g.addColorStop(1, G().hexA(color, 0));
+        x.fillStyle = g; x.fillRect(rx, ry, rw, rh);
+      };
+      side(0, 0, d, 0, 0, 0, d, h); side(w, 0, w - d, 0, w - d, 0, d, h);
+      side(0, 0, 0, d, 0, 0, w, d); side(0, h, 0, h - d, 0, h - d, w, d);
+      this._vig[key] = c;
+      return c;
+    },
     vignette(color, dur, alpha, pulse) {
       for (const s of this.scr) if (s.color === color) { s.life = 0; s.dur = dur; s.a = Math.max(s.a, alpha); s.pulse = !!pulse; return; }
       this.scr.push({ color, life: 0, dur, a: alpha, pulse: !!pulse });
@@ -218,6 +235,47 @@
         const k = s.life / s.dur;
         ctx.globalAlpha = s.a * (s.pulse ? 0.45 + 0.55 * Math.abs(Math.sin(s.life * 5)) : 1) * (k < 0.12 ? k / 0.12 : 1 - Math.max(0, k - 0.45) / 0.55);
         ctx.drawImage(this.vigCanvas(s.color), 0, 0, W, H);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    },
+    // дуга урона у края поля со стороны, откуда прилетело (px,py — корабль, sx,sy — источник; координаты поля)
+    dmgArc(px, py, sx, sy, color) {
+      const dx = sx - px, dy = sy - py;
+      if (dx * dx + dy * dy < 4) return;
+      if (this.arcs.length >= 4) this.arcs.shift();
+      this.arcs.push({ a: Math.atan2(dy, dx), px, py, color: color || '#ff2a48', life: 0, dur: 0.8 });
+    },
+    _arcGlow(color) {
+      const key = 'arc' + color;
+      if (this._vig[key]) return this._vig[key];
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, G().hexA(color, 0.95)); g.addColorStop(0.45, G().hexA(color, 0.45)); g.addColorStop(1, G().hexA(color, 0));
+      x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+      this._vig[key] = c;
+      return c;
+    },
+    drawArcs(ctx, x0, w, h) {
+      if (!this.arcs.length) return;
+      const S = G().S, L = Math.min(w, h) * 0.34, D = 30 * S;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const s of this.arcs) {
+        // луч от корабля к источнику — до первой стенки поля
+        const ox = x0 + s.px, oy = s.py, cx = Math.cos(s.a), cy = Math.sin(s.a);
+        const tx = cx > 1e-4 ? (x0 + w - ox) / cx : cx < -1e-4 ? (x0 - ox) / cx : Infinity;
+        const ty = cy > 1e-4 ? (h - oy) / cy : cy < -1e-4 ? -oy / cy : Infinity;
+        const t = Math.max(0, Math.min(tx, ty));
+        const k = s.life / s.dur;
+        ctx.globalAlpha = (k < 0.1 ? k / 0.1 : 1 - Math.max(0, k - 0.35) / 0.65) * 0.9;
+        ctx.save();
+        ctx.translate(ox + cx * t, oy + cy * t);
+        ctx.rotate(tx < ty ? Math.PI / 2 : 0);
+        const im = this._arcGlow(s.color);
+        ctx.drawImage(im, -L, -D, L * 2, D * 2);
+        ctx.drawImage(im, -L * 0.5, -D * 0.45, L, D * 0.9);
+        ctx.restore();
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
@@ -257,6 +315,7 @@
         s.rot += s.vr * dt; s.oy += s.vy * dt;
       }
       for (let i = this.scr.length - 1; i >= 0; i--) { const s = this.scr[i]; s.life += dt; if (s.life >= s.dur) this.scr.splice(i, 1); }
+      for (let i = this.arcs.length - 1; i >= 0; i--) { const s = this.arcs[i]; s.life += dt; if (s.life >= s.dur) this.arcs.splice(i, 1); }
       for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.life -= dt; if (r.life <= 0) this.rings.splice(i, 1); }
       for (let i = this.beams.length - 1; i >= 0; i--) { const b = this.beams[i]; b.life -= dt; if (b.life <= 0) this.beams.splice(i, 1); }
       for (let i = this.texts.length - 1; i >= 0; i--) {

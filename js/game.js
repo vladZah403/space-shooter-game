@@ -1137,6 +1137,7 @@
       FX.sprite('fx_sh_break', p.x, p.y, { w0: p.w * 1.3, w1: p.w * 2.3, dur: 0.45, hold: 0.3, rot: U.rand(-0.4, 0.4) });
       if (this.relic('r_shieldburst')) this.blast(p.x, p.y, 120 * G.S, 60 * this.dmgMul() * (1 + this.wave.n * 0.05), '#7fe7ff', 'shieldburst');
       FX.sparks(p.x, p.y, '#7fe7ff', 18, 320);
+      FX.dmgArc(p.x, p.y, sx, sy, '#7fe7ff');
       A.play('shieldHit');
       SS.tg.haptic('medium');
       this.clearBulletsAround(p.x, p.y, 90 * G.S);
@@ -1154,6 +1155,7 @@
     if (this.skill('sk_secondwind')) FX.ring(p.x, p.y, p.w * 0.5, 260 * G.S, '#bff4ff', 0.5, 4);
     FX.explode(p.x, p.y, 1.2, '#ff5c7a');
     FX.vignette('#ff2a48', 0.6, 0.85);
+    FX.dmgArc(p.x, p.y, sx, sy);
     FX.shake(0.55);
     A.play('playerHit');
     SS.tg.haptic('heavy');
@@ -1448,7 +1450,7 @@
     }
     // вертикальные лучи (дредноут, ионный, инквизитор) ранят один раз
     for (const bm of ov.beams) {
-      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(p.x, p.y, this.boss ? this.boss.bdef.name + ', луч' : 'Луч'); }
+      if (bm.t >= bm.warn && !bm.hitDone && p.alive && Math.abs(p.x - bm.x) < bm.w * 0.75 + p.r && p.y > bm.y0) { bm.hitDone = true; this.hitPlayer(bm.x, bm.y0, this.boss ? this.boss.bdef.name + ', луч' : 'Луч'); }
       // столпы света Цитадели бьют и по врагам
       if (bm.foes && bm.t >= bm.warn && !bm.foesDone) {
         bm.foesDone = true;
@@ -1473,7 +1475,7 @@
         const dx = Math.cos(L.ang), dy = Math.sin(L.ang);
         const tt = U.clamp((p.x - o.x) * dx + (p.y - o.y) * dy, 0, L.len);
         const qx = o.x + dx * tt, qy = o.y + dy * tt;
-        if (Math.hypot(p.x - qx, p.y - qy) < L.w * 0.45 + p.r) this.hitPlayer(p.x, p.y, (L.owner && L.owner.bdef ? L.owner.bdef.name + ', ' : '') + 'лазер');
+        if (Math.hypot(p.x - qx, p.y - qy) < L.w * 0.45 + p.r) this.hitPlayer(o.x, o.y, (L.owner && L.owner.bdef ? L.owner.bdef.name + ', ' : '') + 'лазер');
       }
     }
   };
@@ -1625,7 +1627,8 @@
         const rr = pr + b.r * 0.75;
         if (Math.abs(b.x - p.x) < rr + 30 && Math.abs(b.y - p.y) < rr + 40 && U.segDist2(p.x, p.y, b.px, b.py, b.x, b.y) < rr * rr) {
           b.dead = true;
-          this.hitPlayer(b.x, b.y, hitCause(b, this.boss));
+          // источник — точка на секунду назад по траектории: дуга урона со стороны выстрела
+          this.hitPlayer(b.x - b.vx, b.y - b.vy, hitCause(b, this.boss));
         }
       }
     }
@@ -2567,11 +2570,16 @@
       ctx.globalCompositeOperation = 'source-over';
     }
     if (this.player.alive && this.player.lives === 1) {
-      ctx.globalAlpha = 0.55 + 0.35 * Math.sin(this.t * 5);
-      ctx.drawImage(SS.main.vignetteRed(), 0, 0, W, H);
+      // последняя жизнь: виньетка по краям бьётся как сердце — два толчка и пауза
+      const ph = (this.t * 1.1) % 1, beat = Math.exp(-ph * 10) + (ph > 0.24 ? 0.65 * Math.exp(-(ph - 0.24) * 10) : 0);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(0.85, 0.25 + 0.55 * beat);
+      ctx.drawImage(FX.edgeCanvas('#ff2a48'), 0, 0, W, H);
       ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
     }
     FX.drawScreen(ctx, W, H);
+    FX.drawArcs(ctx, G.FX, G.FW, H);
     FX.drawFlash(ctx, W, H);
     // края поля на широких экранах
     if (G.FX > 1) {
