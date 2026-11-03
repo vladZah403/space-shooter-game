@@ -1035,7 +1035,7 @@
       if (!e.dmgSum || (e.alive && this.t - e.dmgT0 < DMG_NUM_T)) continue;
       const n = Math.round(e.dmgSum), crit = e.dmgCrit;
       e.dmgSum = 0; e.dmgCrit = false;
-      if (n > 0) FX.text(e.x + U.rand(-8, 8) * G.S, e.y - (e.ry || e.r) * 0.5, crit ? n + '!' : String(n), crit ? '#ffd23d' : '#ffffff', crit ? 15 : 11, crit ? 0.65 : 0.45, -70);
+      if (n > 0) FX.dmgNum(e.x + U.rand(-8, 8) * G.S, e.y - (e.ry || e.r) * 0.5, n, crit);
     }
   };
   game.nearestOther = function (e, range) {

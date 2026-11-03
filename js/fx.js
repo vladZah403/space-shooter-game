@@ -21,7 +21,7 @@
     maxParts: 500,
     quality: 2,
     shakeOn: true,
-    _tc: new Map(), _tcDpr: 0, _mx: null,
+    _tc: new Map(), _tcDpr: 0, _mx: null, _ga: {},
 
     setQuality(q) { this.quality = q; this.maxParts = q >= 2 ? 520 : q === 1 ? 280 : 110; },
     clear() {
@@ -146,8 +146,49 @@
       if (this.texts.length > 60) { textPool.put(this.texts.shift()); }
       const t = textPool.get();
       t.x = x; t.y = y; t.s = str; t.c = color || '#fff'; t.size = size || 13; t.life = dur || 0.7; t.max = t.life; t.vy = vy === undefined ? -55 : vy;
-      t.cv = null;
+      t.cv = null; t.ga = null;
       this.texts.push(t);
+    },
+    // 4.2.2: число урона собирается из атласа глифов — без нового холста на каждое значение
+    dmgNum(x, y, n, crit) {
+      const s = crit ? n + '!' : String(n), color = crit ? '#ffd23d' : '#ffffff', size = crit ? 15 : 11;
+      this.text(x, y, s, color, size, crit ? 0.65 : 0.45, -70);
+      if (/^[0-9]+!?$/.test(s)) this.texts[this.texts.length - 1].ga = this.glyphs(color, size);
+    },
+    // цифры и «!» рисуются один раз: верхний ряд — только обводка, нижний — только заливка
+    // (число рисуется в два прохода, как strokeText + fillText, и обводка соседа не ложится на цифру)
+    glyphs(color, size) {
+      const dpr = G().dpr, key = size + '|' + color + '|' + dpr;
+      let a = this._ga[key];
+      if (a) return a;
+      const CH = '0123456789!', pad = 3, font = '900 ' + size + 'px Orbitron, Rajdhani, sans-serif';
+      const m = this._mx || (this._mx = document.createElement('canvas').getContext('2d'));
+      m.font = font;
+      const th = Math.ceil(size * 1.5) + 6, map = {};
+      let w = 0;
+      for (const ch of CH) { const adv = m.measureText(ch).width, cw = Math.ceil(adv) + pad * 2; map[ch] = { x: w, adv, cw }; w += cw; }
+      const c = document.createElement('canvas');
+      c.width = Math.ceil(w * dpr); c.height = Math.ceil(th * 2 * dpr);
+      const x = c.getContext('2d');
+      x.scale(dpr, dpr);
+      x.font = font; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      x.lineWidth = 3.5; x.strokeStyle = 'rgba(0,0,10,.85)'; x.fillStyle = color;
+      for (const ch of CH) { const g = map[ch]; x.strokeText(ch, g.x + pad, th / 2); x.fillText(ch, g.x + pad, th * 1.5); }
+      a = this._ga[key] = { c, map, th, pad, dpr };
+      return a;
+    },
+    drawNum(ctx, t, pop) {
+      const a = t.ga, s = t.s, d = a.dpr, sh = a.th * d, h = a.th * pop, y = t.y - h / 2;
+      let w = 0;
+      for (let i = 0; i < s.length; i++) w += a.map[s[i]].adv;
+      for (let row = 0; row < 2; row++) {
+        let x = t.x - w * pop / 2;
+        for (let i = 0; i < s.length; i++) {
+          const g = a.map[s[i]];
+          ctx.drawImage(a.c, g.x * d, row * sh, g.cw * d, sh, x - a.pad * pop, y, g.cw * pop, h);
+          x += g.adv * pop;
+        }
+      }
     },
     // надпись рисуется в маленький холст один раз и дальше копируется: обводка и заливка текста на холсте —
     // одна из самых дорогих операций, а числа урона сильно повторяются
@@ -421,9 +462,10 @@
       for (const t of this.texts) {
         const k = t.life / t.max;
         const pop = k > 0.85 ? 1 + (k - 0.85) * 2.5 : 1;
+        ctx.globalAlpha = Math.min(1, k * 2.2);
+        if (t.ga) { this.drawNum(ctx, t, pop); continue; }
         const c = t.cv || (t.cv = this.textCanvas(t.s, t.c, t.size));
         const w = c.tw * pop, h = c.th * pop;
-        ctx.globalAlpha = Math.min(1, k * 2.2);
         ctx.drawImage(c, t.x - w / 2, t.y - h / 2, w, h);
       }
       ctx.globalAlpha = 1;
@@ -439,7 +481,7 @@
   };
 
   // шрифт догрузился — новые надписи рисуются им, а не запасным
-  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => fx._tc.clear());
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fx._tc.clear(); fx._ga = {}; });
 
   SS.fx = fx;
 })();
