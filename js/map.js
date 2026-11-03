@@ -148,7 +148,8 @@
       return false;
     }
     if (w.node === 'cache') {
-      const coins = Math.round((20 + w.n * 2.5) * game.st.coins / game.coinK);
+      // st.coins уже включает штраф за фарм лёгкой сложности (coinK) — тайник его не обходит
+      const coins = Math.round((20 + w.n * 2.5) * game.st.coins);
       run.coins += coins; M.addCoins(coins);
       FX.text(p.x, p.y - p.w, '📦 +' + coins, '#ffc83d', 16, 1.2);
       A.play('coin', { rate: 0.8 });
