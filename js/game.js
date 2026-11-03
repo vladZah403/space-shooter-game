@@ -212,8 +212,8 @@
     return {
       // бонусы урона складываются в один общий процент, а не перемножаются (иначе к концу прокачки
       // урон рос в 6–7 раз). Прокачка «Мощности» самого оружия добавляется к сумме в dmgMul(wid)
-      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + rl('r_lens') * 0.12 + rl('r_glassblade') * 0.4 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.noDrops() ? 0.3 : 0),
-      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05) * (1 + rl('r_coolant') * 0.12),
+      dmg: 1 + md('power') * 0.2 + (pl('vega') ? 0.1 : 0) + (ship.dmg || 0) + (pres.dmg - 1) + pk('dmg') * 0.15 + sk('sk_caliber') * 0.05 + rl('r_lens') * 0.12 + rl('r_glassblade') * 0.4 + (pk('glass') ? 0.5 : 0) - (pk('ricochet') ? 0.2 : 0) + (this.noDrops() ? 0.3 : 0) + pk('heavy') * 0.4,
+      rate: (1 + md('cooling') * 0.15) * (1 + (ship.rate || 0)) * (1 + pk('rate') * 0.12) * (1 + sk('sk_rapid') * 0.05) * (1 + rl('r_coolant') * 0.12) * (1 - pk('heavy') * 0.2),
       crit: 0.03 + md('targeting') * 0.12 + pk('crit') * 0.08 + (ship.crit || 0) + (pl('vega') ? 0.05 : 0) + sk('sk_precision') * 0.04 + rl('r_scope') * 0.06,
       critMul: 2 + (ship.critMul || 0) + pk('critdmg') * 0.5 + md('targeting') * 0.5 + rl('r_scope') * 0.5,
       pierce: pk('pierce'),
@@ -224,7 +224,7 @@
       coins: this.diff.coins / this.diff.count * (1 + md('salvage') * 0.4) * (pl('lira') ? 1.2 : 1) * (1 + pk('greed') * 0.3) * pres.coins * (1 + sk('sk_greed') * 0.1) * (1 + rl('r_purse') * 0.25) * (1 + rl('r_cursedcoin')) * SS.comp.coinMul() * this.coinK * D.ECON.coins * anK,
       luck: (1 + pk('luck') * 0.4) * (1 + sk('sk_lucky') * 0.25) * (1 + rl('r_dice') * 0.5),
       speed: (1 + (ship.speed || 0)) * (1 + md('gyro') * 0.15) * (1 + pk('speed') * 0.15) * (1 + rl('r_afterburner') * 0.12),
-      dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0)),
+      dodge: Math.min(0.45, sk('sk_ghost') * 0.07 + rl('r_afterburner') * 0.05 + pk('speed') * 0.05 + (ship.dodge || 0) + md('gyro') * 0.1 + (pl('nox') ? 0.12 : 0) + pk('nimble') * 0.08),
       cdMul: (1 - pk('cooldown') * 0.15) * (md('chrono') ? 0.7 : 1) * (1 - sk('sk_chrono') * 0.15) * (1 - rl('r_hourglass') * 0.25),
       bomb: 1 + md('bombbay') * 0.6 + (ship.bombdmg || 0) + (pl('rex') ? 0.5 : 0) + rl('r_arsenal') * 0.4,
       bombCd: pl('rex') ? 0.5 : 1,
@@ -373,6 +373,7 @@
     SS.map.updateEscort(dt);
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
+    this.updateBurn(dt);
     SS.foes.update(edt);
     SS.skills.update(dt);
     this.updateEBullets(edt);
@@ -452,12 +453,14 @@
     if (this.buffs.rapid > 0) r *= 1.6;
     if (this.run.skillFx.sk_overclock > 0) r *= 2.5;
     if (this.run.overload > 0) r *= 2;
+    if (this.perk('overclock') && this.run.combo >= 10) r *= 1 + this.perk('overclock') * 0.2;
     return r;
   };
   // wid — оружие: его прокачка урона входит в общую сумму бонусов. Временные состояния
   // (бонус «Усиление», берсерк) остаются множителями — они ситуативны, как криты
   game.dmgMul = function (wid) {
     let d = this.st.dmg + (wid ? wl(wid, 'dmg') * 0.12 : 0);
+    if (this.perk('investor')) d += Math.min(0.4, this.run.coins / 5000);
     if (this.buffs.power > 0) d *= 1.6;
     if (this.wave && this.wave.danger && this.skill('sk_daredevil')) d *= 1.25;
     // хладнокровие: +10% урона за каждые 4 с без попаданий, до +30%
@@ -964,8 +967,9 @@
     if (rk <= 0) return 0;
     dmg *= rk;
     let crit = false;
-    if (o.crit && Math.random() < this.st.crit) {
+    if (o.crit && (Math.random() < this.st.crit || this.run.nextCrit)) {
       dmg *= this.st.critMul; crit = true;
+      this.run.nextCrit = false;
       // реликвия «Искровой разрядник»: крит бьёт молнией в соседа
       if (this.relic('r_sparker') && Math.random() < 0.5) {
         const other = this.nearestOther(e, 150 * G.S);
@@ -981,6 +985,9 @@
     else if (e.elite) dmg *= this.st.eliteDmg;
     if (e.vuln > 0) dmg *= 1.5;
     if (this.skill('sk_executioner') && e.hp < e.maxHp * 0.25) dmg *= 2;
+    if (this.perk('finisher') && e.hp < e.maxHp * 0.35) dmg *= 1 + this.perk('finisher') * 0.25;
+    // снайпер: попадания оружием тем сильнее, чем дальше враг от корабля (полная надбавка — на высоту экрана)
+    if (o.crit && this.perk('sniper')) dmg *= 1 + this.perk('sniper') * 0.2 * U.clamp(Math.hypot(e.x - this.player.x, e.y - this.player.y) / (G.H * 0.8), 0, 1);
     if (e.frozen > 0) dmg *= 1.15;
     if (e.emp > 0) dmg *= 1.3;
     // щит щитоносца / дредноута
@@ -1014,6 +1021,7 @@
       }
     }
     if (o.cryo && this.st.cryo > 0 && !e.boss && Math.random() < this.st.cryo) e.frozen = 2;
+    if (o.crit && this.perk('burn')) this.ignite(e, dmg * 0.15 * this.perk('burn'));
     if (o.conductor && this.skill('sk_conductor') && Math.random() < 0.08) {
       const other = this.nearestOther(e, 140 * G.S);
       if (other) { FX.lightning(e.x, e.y, other.x, other.y, '#fff36b', 2 * G.S, 0.12); this.damageEnemy(other, dmg * 0.5, { src: 'lightning' }); }
@@ -1028,6 +1036,28 @@
     if (!e.boss && Math.random() < 0.25) A.play('hit');
     if (e.hp <= 0) SS.enemies.kill(e, o.src);
     return dmg;
+  };
+  // 4.3: поджог — урон горения копится (e.burn) и уходит за BURN_T с, наносится порциями раз в 0,25 с
+  const BURN_T = 3;
+  game.ignite = function (e, amount) {
+    if (!e.alive || amount <= 0) return;
+    e.burn = (e.burn || 0) + amount;
+    e.burnT = BURN_T;
+  };
+  game.updateBurn = function (dt) {
+    for (const e of this.enemies) {
+      if (!e.alive || !(e.burnT > 0)) continue;
+      const part = e.burn * Math.min(1, dt / e.burnT);
+      e.burn -= part; e.burnT -= dt;
+      e.burnAcc = (e.burnAcc || 0) + part;
+      if (FX.quality > 0 && Math.random() < dt * 10) FX.embers(e.x + U.rand(-0.4, 0.4) * (e.rx || e.r), e.y + U.rand(-0.3, 0.3) * (e.ry || e.r), Math.random() < 0.5 ? '#ff8a3d' : '#ffd23d', 1, 45);
+      if (this.t - (e.burnTick || 0) >= 0.25 || e.burnT <= 0) {
+        e.burnTick = this.t;
+        const d = e.burnAcc; e.burnAcc = 0;
+        if (d > 0) this.damageEnemy(e, d, { src: 'burn' });
+      }
+      if (e.burnT <= 0) e.burn = 0;
+    }
   };
   const DMG_NUM_T = 0.35;
   game.flushDmgNums = function () {
@@ -1068,6 +1098,11 @@
     run.comboT = this.relic('r_combo') ? 5.2 : 2.6;
     if (run.combo > run.maxCombo) run.maxCombo = run.combo;
     if (run.combo % 10 === 0) M.onCombo(run.combo);
+    if (this.perk('demo') && run.combo % 30 === 0 && this.player.bombs < 9) {
+      this.player.bombs++;
+      FX.text(this.player.x, this.player.y - this.player.w * 0.7, '🧨 +1 БОМБА', '#ff8a3d', 14, 1.0, -50);
+      this.hudDirty = true;
+    }
     if (run.combo >= 50 && !run.fever) this.setFever(true);
     if (run.combo === 10 || run.combo === 25) {
       const big = run.combo === 25, col = big ? '#ffc83d' : '#3de0ff';
@@ -1130,6 +1165,7 @@
     if (this.st.dodge > 0 && Math.random() < this.st.dodge) {
       p.inv = 0.35;
       FX.text(p.x, p.y - p.w * 0.6, 'УКЛОНЕНИЕ', '#7fe7ff', 13, 0.7);
+      if (this.perk('nimble')) this.run.nextCrit = true;
       FX.glowPuff(p.x, p.y, '#7fe7ff', 60 * G.S, 0.25);
       FX.sprite('fx_dash', 0, 0, { follow: p, w0: p.w * 0.9, w1: p.w * 1.3, dur: 0.35, hold: 0.3, hue: 190 });
       SS.tg.haptic('light');
