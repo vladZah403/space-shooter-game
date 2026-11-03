@@ -993,24 +993,25 @@
     $('#goTitle').classList.toggle('win', !!sum.isRecord);
     $('#goSub').textContent = D.DIFFS[sum.diff].name + ' • награды ×' + fmtMul(D.DIFFS[sum.diff].coins) + ' • Волна ' + sum.wave;
     $('#goCause').textContent = sum.cause ? 'Сбит: ' + sum.cause : '';
+    // плашка «новый рекорд» появляется со вспышкой, когда счёт досчитает (место под неё занято сразу — без скачка)
     $('#goRecord').hidden = !sum.isRecord;
+    $('#goRecord').classList.remove('on');
+    $('.go-score-card').classList.remove('rec-flash');
     $('#goBest').textContent = U.fmt(s.stats.bestScore);
-    $('#goStats').innerHTML = [
-      ['skull', 'Враги', U.fmt(sum.kills)], ['crown', 'Боссы', sum.bosses], ['bolt', 'Комбо', '×' + sum.maxCombo],
-      ['chart', 'Уровень', sum.level], ['target', 'Точность', sum.accuracy + '%'], ['retry', 'Время', U.fmtTime(sum.time)],
-    ].map((x) => '<div class="go-stat">' + ic(x[0]) + '<small>' + x[1] + '</small><b>' + x[2] + '</b></div>').join('');
+    const STATS = [
+      ['skull', 'Враги', sum.kills, U.fmt], ['crown', 'Боссы', sum.bosses, U.fmt], ['bolt', 'Комбо', sum.maxCombo, (n) => '×' + Math.floor(n)],
+      ['chart', 'Уровень', sum.level, U.fmt], ['target', 'Точность', sum.accuracy, (n) => Math.floor(n) + '%'], ['retry', 'Время', sum.time, U.fmtTime],
+    ];
+    $('#goStats').innerHTML = STATS.map((x) => '<div class="go-stat">' + ic(x[0]) + '<small>' + x[1] + '</small><b>0</b></div>').join('');
     $('#goBuild').innerHTML = buildHtml(game.run);
-    $('#goCoins').textContent = '+' + U.fmt(sum.coins + (sum.lvlCoins || 0));
-    $('#goXp').textContent = '+' + U.fmt(sum.xp);
-    // анимация счёта
-    const scoreEl = $('#goScore');
-    const target = sum.score, t0 = performance.now(), dur = Math.min(1600, 400 + Math.log10(target + 10) * 250);
-    const step = (now) => {
-      const k = Math.min(1, (now - t0) / dur);
-      scoreEl.textContent = U.fmt(target * U.easeOutCubic(k));
-      if (k < 1 && ui.cur === 'over') requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
+    // 4.2.2: числа набегают от нуля по очереди — счёт, статистика, награды (отсчёт с момента, когда экран виден)
+    const SHOW = 350, dur = Math.min(1600, 400 + Math.log10(sum.score + 10) * 250);
+    const plus = (n) => '+' + U.fmt(n);
+    const counts = [{ el: $('#goScore'), to: sum.score, f: U.fmt, at: SHOW, dur, done: sum.isRecord ? recordFlash : null }];
+    $$('#goStats b').forEach((el, i) => counts.push({ el, to: STATS[i][2], f: STATS[i][3], at: SHOW + 250 + i * 90, dur: 650 }));
+    counts.push({ el: $('#goCoins'), to: sum.coins + (sum.lvlCoins || 0), f: plus, at: SHOW + dur * 0.6, dur: 700 });
+    counts.push({ el: $('#goXp'), to: sum.xp, f: plus, at: SHOW + dur * 0.6 + 120, dur: 700 });
+    countUp(counts);
     // полоса опыта корабля
     const fill = $('#goXpFill');
     fill.style.transition = 'none';
@@ -1019,12 +1020,37 @@
     setTimeout(() => { fill.style.transition = ''; fill.style.width = Math.min(100, s.shipXP / D.shipXpNeed(s.shipLvl) * 100) + '%'; }, 250);
     // что открылось за забег: достижения, раскраски, задания
     const evs = ui.runEvents.slice(0, 8);
-    // 4.1: сундуки — открываются только здесь
-    SS.relicsUi.renderGo((sum.chests || []).length);
+    // 4.1: сундуки — открываются только здесь; 4.2.2: выезжают по одному, когда счёт досчитан
+    SS.relicsUi.renderGo((sum.chests || []).length, dur / 1000);
     $('#goAch').innerHTML = evs.map((a) => '<span class="chip">' + a.ico + ' ' + U.escape(a.text) + '</span>').join('');
     document.body.classList.add('toasts-bottom');
     setTimeout(() => ui.show('#scr-gameover'), 350);
   };
+
+  // несколько чисел набегают в одном кадре: { el, to, f — формат, at — задержка мс, dur, done — по окончании }
+  let countTok = 0;
+  function countUp(list) {
+    const tok = ++countTok, t0 = performance.now();
+    const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const step = (now) => {
+      if (tok !== countTok || ui.cur !== 'over') return;
+      let busy = false;
+      for (const c of list) {
+        const k = still ? 1 : U.clamp((now - t0 - c.at) / c.dur, 0, 1);
+        c.el.textContent = c.f(c.to * U.easeOutCubic(k));
+        if (k < 1) busy = true;
+        else if (c.done) { c.done(); c.done = null; }
+      }
+      if (busy) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  function recordFlash() {
+    $('#goRecord').classList.add('on');
+    $('.go-score-card').classList.add('rec-flash');
+    A.play('achievement');
+    T.haptic('success');
+  }
 
   ui.share = function () {
     const s = store.s;

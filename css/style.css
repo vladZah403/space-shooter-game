@@ -695,7 +695,13 @@ body.cinema .banner{visibility:hidden}
 .go-score-card{border-radius:20px;padding:16px;text-align:center;background:linear-gradient(180deg,rgba(26,38,90,.85),rgba(12,18,44,.85));border:1px solid var(--line2)}
 .go-score-lbl{font-family:var(--font-h);font-size:10px;letter-spacing:3px;color:var(--muted)}
 .go-score{font-family:var(--font-h);font-weight:900;font-size:44px;letter-spacing:1px;line-height:1.1;background:linear-gradient(180deg,#fff,#8fdcff);-webkit-background-clip:text;background-clip:text;color:transparent}
-.go-record{display:inline-block;margin:4px 0 2px;padding:3px 12px;border-radius:10px;font-family:var(--font-h);font-size:11px;font-weight:900;letter-spacing:2px;color:#2b1700;background:linear-gradient(135deg,#ffe07a,#ff9f1c);animation:readyPulse 1.2s infinite}
+.go-record{display:inline-block;margin:4px 0 2px;padding:3px 12px;border-radius:10px;font-family:var(--font-h);font-size:11px;font-weight:900;letter-spacing:2px;color:#2b1700;background:linear-gradient(135deg,#ffe07a,#ff9f1c);visibility:hidden}
+.go-record.on{visibility:visible;animation:recPop .5s cubic-bezier(.2,1.6,.4,1) both}
+/* новый рекорд: золотая вспышка карточки, когда счёт досчитал */
+.go-score-card.rec-flash{animation:recFlash 1s ease-out both}
+.go-score-card.rec-flash .go-score{background-image:linear-gradient(180deg,#fff7d1,#ffc83d)}
+@keyframes recFlash{0%{border-color:var(--line2);box-shadow:none}12%{border-color:#ffe07a;box-shadow:0 0 0 3px rgba(255,224,122,.9),0 0 48px rgba(255,200,61,.8);transform:scale(1.04)}100%{border-color:rgba(255,200,61,.55);box-shadow:0 0 20px rgba(255,200,61,.28);transform:none}}
+@keyframes recPop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
 .go-best{font-size:13px;color:var(--dim);margin-top:4px}
 .go-best b{color:var(--muted);font-family:var(--font-h);font-size:12px}
 .go-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -982,7 +988,8 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .go-chests{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:linear-gradient(135deg,rgba(255,200,61,.14),rgba(176,107,255,.12));border:1px solid rgba(255,200,61,.45);box-shadow:0 0 18px rgba(255,200,61,.18);animation:popIn .35s .3s both}
 .gc-row{display:flex;align-items:flex-end;gap:2px;flex-shrink:0}
 .gc-row b{font-family:var(--font-h);font-size:12px;color:var(--gold);margin-left:3px}
-.gc-ico{width:34px!important;animation:gcHop 1.6s ease-in-out infinite}
+.gc-ico{width:34px!important;animation:gcIn .45s cubic-bezier(.2,1.3,.4,1) both,gcHop 1.6s ease-in-out infinite}
+@keyframes gcIn{from{opacity:0;transform:translateX(60px) rotate(18deg) scale(.6)}to{opacity:1;transform:none}}
 @keyframes gcHop{0%,70%,100%{transform:none}78%{transform:translateY(-5px) rotate(-6deg)}86%{transform:translateY(0) rotate(4deg)}}
 .gc-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .gc-txt b{font-family:var(--font-h);font-size:11px;letter-spacing:1px;color:var(--gold)}
