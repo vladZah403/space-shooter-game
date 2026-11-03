@@ -149,7 +149,9 @@
       }
       // 4.2: аномалии сектора и эскорт
       if (data && data.patch >= 41 && !(data.patch >= 42) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v42')) this.s.notes.push({ type: 'v42' });
-      this.s.patch = 42;
+      // 4.3: новые улучшения, эволюции и реликвии — показывается вместо более старых заметок
+      if (data && !(data.patch >= 43) && data.stats && data.stats.games > 0 && !this.s.notes.some((n) => n.type === 'v43')) this.s.notes.push({ type: 'v43' });
+      this.s.patch = 43;
     },
     // облачное сохранение новее локального — принимаем его
     adoptCloud(json) {
