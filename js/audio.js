@@ -155,6 +155,8 @@
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.applyVolumes();
       this.renderSfx();
+      // iOS 16.4+: по умолчанию Safari глушит Web Audio переключателем «Без звука» — у игры звук как у плеера
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
       // разблокировка звука на iOS/Android — по первому касанию
       const unlock = () => this.unlock();
       ['pointerdown', 'touchend', 'click', 'keydown'].forEach((ev) => document.addEventListener(ev, unlock, { passive: true }));
@@ -162,7 +164,8 @@
 
     unlock() {
       if (!this.ac) return;
-      if (this.ac.state === 'suspended' && !document.hidden) this.ac.resume().catch(() => {});
+      // iOS после звонка, Siri или сворачивания оставляет контекст 'interrupted' — его тоже будим касанием
+      if (this.ac.state !== 'running' && this.ac.state !== 'closed' && !document.hidden) this.ac.resume().catch(() => {});
       if (!this.unlocked) {
         this.unlocked = true;
         try { const s = this.ac.createBufferSource(); s.buffer = this.ac.createBuffer(1, 1, 22050); s.connect(this.ac.destination); s.start(0); } catch (e) {}
@@ -231,7 +234,7 @@
     },
 
     suspend() { if (this.ac && this.ac.state === 'running') this.ac.suspend().catch(() => {}); },
-    resume() { if (this.ac && this.unlocked && this.ac.state === 'suspended') this.ac.resume().catch(() => {}); },
+    resume() { if (this.ac && this.unlocked && this.ac.state !== 'running' && this.ac.state !== 'closed') this.ac.resume().catch(() => {}); },
     // приглушение музыки на паузе
     muffle(on) {
       if (!this.ac) return;
