@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 MAX_LEADERBOARD_LIMIT = 50
 INIT_DATA_MAX_AGE = 24 * 3600          # initData старше суток не принимаем
 SCORE_COOLDOWN = 8                     # секунд между результатами одного игрока
+# потолок очков в секунду забега: бот-тестировщик на «Норме» к 19-й волне набирает ~1 300/с,
+# поздние волны на «Аде» — оценочно до ~10 000/с; было 150 000/с — подделку почти не ловило
+MAX_SCORE_PER_SEC = 30_000
 SUGGESTION_COOLDOWN = 60               # секунд между предложениями одного игрока
 DIFFICULTIES = {'zen', 'easy', 'normal', 'hard', 'nightmare', 'god', 'hell'}
 CATEGORIES = {
@@ -166,7 +169,7 @@ async def score_handler(request: web.Request) -> web.Response:
         accuracy = 0.0
     difficulty = data.get('difficulty') if data.get('difficulty') in DIFFICULTIES else 'normal'
     # грубая защита от явно подделанных результатов
-    if score > duration * 150_000 + 50_000:
+    if score > duration * MAX_SCORE_PER_SEC + 50_000:
         logger.warning(f'⚠️ Подозрительный результат: user={uid} score={score} dur={duration}')
         return _error(422, 'implausible score')
 

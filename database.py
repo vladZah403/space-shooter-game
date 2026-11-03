@@ -110,10 +110,13 @@ class Database:
                     total_playtime_seconds INTEGER DEFAULT 0,
                     total_enemies_killed INTEGER DEFAULT 0,
                     avg_accuracy REAL DEFAULT 0,
+                    zen_games INTEGER DEFAULT 0,
                     easy_games INTEGER DEFAULT 0,
                     normal_games INTEGER DEFAULT 0,
                     hard_games INTEGER DEFAULT 0,
                     nightmare_games INTEGER DEFAULT 0,
+                    god_games INTEGER DEFAULT 0,
+                    hell_games INTEGER DEFAULT 0,
                     win_streak INTEGER DEFAULT 0,
                     best_win_streak INTEGER DEFAULT 0,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -210,6 +213,9 @@ class Database:
             ("user_stats", "normal_games",           "ALTER TABLE user_stats ADD COLUMN normal_games INTEGER DEFAULT 0"),
             ("user_stats", "hard_games",             "ALTER TABLE user_stats ADD COLUMN hard_games INTEGER DEFAULT 0"),
             ("user_stats", "nightmare_games",        "ALTER TABLE user_stats ADD COLUMN nightmare_games INTEGER DEFAULT 0"),
+            ("user_stats", "zen_games",              "ALTER TABLE user_stats ADD COLUMN zen_games INTEGER DEFAULT 0"),
+            ("user_stats", "god_games",              "ALTER TABLE user_stats ADD COLUMN god_games INTEGER DEFAULT 0"),
+            ("user_stats", "hell_games",             "ALTER TABLE user_stats ADD COLUMN hell_games INTEGER DEFAULT 0"),
             ("user_stats", "win_streak",             "ALTER TABLE user_stats ADD COLUMN win_streak INTEGER DEFAULT 0"),
             ("user_stats", "best_win_streak",        "ALTER TABLE user_stats ADD COLUMN best_win_streak INTEGER DEFAULT 0"),
             ("user_stats", "max_level",              "ALTER TABLE user_stats ADD COLUMN max_level INTEGER DEFAULT 0"),
@@ -333,7 +339,7 @@ class Database:
                     win_streak = 0
 
                 # Обновляем статистику
-                valid_difficulties = {'easy', 'normal', 'hard', 'nightmare'}
+                valid_difficulties = {'zen', 'easy', 'normal', 'hard', 'nightmare', 'god', 'hell'}
                 if difficulty not in valid_difficulties:
                     difficulty = 'normal'
                 difficulty_column = f"{difficulty}_games"

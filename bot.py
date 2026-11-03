@@ -17,7 +17,7 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 from database import db, DatabaseError
-from api import DIFFICULTIES as GAME_DIFFICULTIES, _int, run_api_server
+from api import DIFFICULTIES as GAME_DIFFICULTIES, MAX_SCORE_PER_SEC, _int, run_api_server
 from config import (
     BOT_TOKEN, GAME_URL, DIFFICULTIES, ACHIEVEMENTS,
     Messages, BOT_COMMANDS, LEADERBOARD_SIZE, ADMIN_CHAT_ID,
@@ -142,7 +142,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not stats:
         stats = {
             'best_score': 0, 'games_played': 0, 'max_level': 0,
-            'easy_games': 0, 'normal_games': 0, 'hard_games': 0, 'nightmare_games': 0,
+            'zen_games': 0, 'easy_games': 0, 'normal_games': 0, 'hard_games': 0, 'nightmare_games': 0,
+            'god_games': 0, 'hell_games': 0,
             'total_score': 0, 'total_enemies_killed': 0, 'avg_accuracy': 0,
             'win_streak': 0, 'best_win_streak': 0
         }
@@ -175,10 +176,13 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 • Лучшая серия: <code>{stats['best_win_streak']}</code>
 
 <b>😊 По сложностям:</b>
+🧘 Зен: {stats.get('zen_games', 0)} игр
 {DIFFICULTIES['easy'].emoji} Легко: {stats['easy_games']} игр
 {DIFFICULTIES['normal'].emoji} Нормально: {stats['normal_games']} игр
 {DIFFICULTIES['hard'].emoji} Сложно: {stats['hard_games']} игр
 {DIFFICULTIES['nightmare'].emoji} Кошмар: {stats['nightmare_games']} игр
+⚔️ Бог войны: {stats.get('god_games', 0)} игр
+🔥 Ад: {stats.get('hell_games', 0)} игр
 """
 
     if recent_games:
@@ -527,7 +531,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         bosses_killed = _int(data.get('bosses_killed'), 0, 100_000)
         level_deltas = data.get('level_deltas')   # секунды между уровнями
         level_deltas = [x for x in level_deltas if isinstance(x, (int, float))][:500] if isinstance(level_deltas, list) else []
-        if score > duration * 150_000 + 50_000:
+        if score > duration * MAX_SCORE_PER_SEC + 50_000:
             logger.warning(f'⚠️ Подозрительный результат (sendData): user={user_id} score={score} dur={duration}')
             return
 
