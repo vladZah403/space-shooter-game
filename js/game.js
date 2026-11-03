@@ -143,7 +143,7 @@
     this.boss = null;
     this.timers = [];
     if (this.scene) { this.scene = null; SS.emit('cinema', false); }
-    this.ov = { rail: null, hole: null, beams: [], lasers: [] };
+    this.ov = { rail: null, hole: null, beams: [], lasers: [], fire: [] };
     SS.enemies.corpses.length = 0;
     SS.events.reset();
     SS.foes.reset();
@@ -374,6 +374,7 @@
     this.updateBullets(dt);
     SS.enemies.updateAll(edt, dt);
     this.updateBurn(dt);
+    this.updateFire(dt);
     SS.foes.update(edt);
     SS.skills.update(dt);
     this.updateEBullets(edt);
@@ -652,7 +653,7 @@
       for (let i = 0; i < n; i++) {
         const a = (i - (n - 1) / 2) * 0.42;
         shot({ x: p.x, y: nose, vx: Math.sin(a) * base.speed * S, vy: -Math.cos(a) * base.speed * S, dmg: base.dmg * dmgMul * mk, r: radius, kind: 'dark',
-          w: radius * 1.1, tickT: base.tick, pull, burst: base.burst * dmgMul * mk, burstR: radius * 1.25, wid, life: base.life });
+          w: radius * 1.1, tickT: base.tick, pull, burst: base.burst * dmgMul * mk * (this.evo('darkmatter') ? 2 : 1), burstR: radius * 1.25, wid, life: base.life });
       }
       A.play('dark');
     }
@@ -799,9 +800,23 @@
           if (d > 1 && d < b.r * 2.2) { const f = b.pull * (1 - d / (b.r * 2.2)) * dt; e.x += dx / d * f; e.y += dy / d * f; }
         }
         if (FX.quality > 0 && Math.random() < 0.5) { const a = Math.random() * U.TAU; FX.embers(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, '#b06bff', 1, 40); }
+        // эволюция «Горизонт событий»: вражеские пули рядом со сферой исчезают
+        if (this.evo('darkmatter')) {
+          const rr = b.r * b.r * 2.6;
+          for (const eb of this.ebullets) {
+            if (eb.dead) continue;
+            const dx = eb.x - b.x, dy = eb.y - b.y;
+            if (dx * dx + dy * dy < rr) { eb.dead = true; if (Math.random() < 0.3) FX.glowPuff(eb.x, eb.y, '#b06bff', 14 * S, 0.25); }
+          }
+        }
         if (b.life <= 0) { this.darkBurst(b); b.dead = true; continue; }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
+      // эволюция «Солнечная плазма»: шар оставляет горящий след (ov.fire, updateFire)
+      if (b.kind === 'plasma' && this.evo('plasma')) {
+        b.tick -= dt;
+        if (b.tick <= 0 && this.ov.fire.length < 120) { b.tick = 0.07; this.ov.fire.push({ x: b.x, y: b.y, t: 0, tick: 0, burn: b.dmg * 0.06 }); FX.glowPuff(b.x, b.y, '#ff8a3d', 34 * S, FIRE_DUR); }
+      }
       // купол Проектора: плазма лопается о его край
       if (b.kind === 'plasma' && SS.foes.inDome(b.x, b.y, b.r)) { SS.foes.domeHit(b.x, b.y); this.plasmaBlast(b, null); b.dead = true; continue; }
       if (ric && !b.bounced && (b.kind === 'laser' || b.kind === 'pellet' || b.kind === 'drone')) {
@@ -913,6 +928,12 @@
         let mul = 1, hitCol = b.kind === 'pellet' ? '#ffd23d' : '#7fe7ff';
         if (b.kind === 'pellet' && b.age < D.WEAPONS.shotgun.base.closeT) mul = D.WEAPONS.shotgun.base.closeMul;
         if (b.wid === 'laser') mul = this.laserFocus(e);
+        // эволюция «Каратель»: дробь в упор добивает ослабленных (кроме боссов и мини-боссов)
+        if (b.kind === 'pellet' && b.age < D.WEAPONS.shotgun.base.closeT && this.evo('shotgun') && !e.boss && !e.mini && e.hp < e.maxHp * 0.2) {
+          FX.sparks(e.x, e.y, '#ffd23d', 14, 320);
+          this.damageEnemy(e, e.hp + e.maxHp, { src: 'shotgun', heavy: true });
+          b.dead = true; break;
+        }
         if (mul >= 1.3) hitCol = '#ffffff';
         this.damageEnemy(e, b.dmg * mul, { crit: true, src: b.wid, cryo: true, conductor: true });
         FX.hit(b.x, b.y, hitCol);
@@ -1057,6 +1078,22 @@
         if (d > 0) this.damageEnemy(e, d, { src: 'burn' });
       }
       if (e.burnT <= 0) e.burn = 0;
+    }
+  };
+  // горящий след «Солнечной плазмы»: каждые 0,25 с поджигает врагов в радиусе
+  const FIRE_DUR = 1.4;
+  game.updateFire = function (dt) {
+    const f = this.ov.fire;
+    if (!f.length) return;
+    const R = 26 * G.S;
+    for (let i = f.length - 1; i >= 0; i--) {
+      const p = f[i];
+      p.t += dt;
+      if (p.t >= FIRE_DUR) { f[i] = f[f.length - 1]; f.pop(); continue; }
+      p.tick -= dt;
+      if (p.tick > 0) continue;
+      p.tick = 0.25;
+      for (const e of this.enemies) if (e.alive && e.hittable && this.inBlast(e, p.x, p.y, R)) this.ignite(e, p.burn);
     }
   };
   const DMG_NUM_T = 0.35;
