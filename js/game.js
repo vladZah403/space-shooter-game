@@ -2206,7 +2206,7 @@
     if (mods[0]) cards.push({ id: 'mod:' + mods[0].id, ico: mods[0].ico, name: mods[0].name, desc: 'Модуль корабля: ' + mods[0].desc, rar: mods[0].rar, price: Math.round((250 + n * 20) * cut / 10) * 10 });
     const perks = D.PERKS.filter((pk) => !pk.filler && pk.rar !== 'common' && this.perk(pk.id) < pk.max && !(pk.id === 'glass'));
     const pk = perks.length ? U.pick(perks) : null;
-    if (pk) cards.push({ id: 'perk:' + pk.id, ico: pk.ico, name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) * cut / 10) * 10 });
+    if (pk) cards.push({ id: 'perk:' + pk.id, ico: G.icon('pk_' + pk.id, pk.ico), name: pk.name, desc: 'Улучшение: ' + pk.desc, rar: pk.rar, price: Math.round((150 + n * 12) * cut / 10) * 10 });
     const epic = D.PERKS.filter((x) => x.rar === 'epic' && this.perk(x.id) < x.max && x.id !== 'glass' && x.id !== 'maxhp' && (!pk || x.id !== pk.id));
     const ep = epic.length && p.lives >= 2 ? U.pick(epic) : null;
     if (ep) cards.push({ id: 'deal:' + ep.id, ico: '🩸', name: 'СДЕЛКА: ' + ep.name, desc: '−1 жизнь, взамен: ' + ep.desc, rar: 'legendary' });

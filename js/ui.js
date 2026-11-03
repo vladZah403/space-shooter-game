@@ -719,7 +719,7 @@
     const pil = D.PILOTS[run.pilot] || D.PILOTS.kai;
     const chip = (ico, n, title, cls) => '<span class="rb-chip ' + cls + '" title="' + U.escape(title) + '">' + ico + (n > 1 ? '<b>' + n + '</b>' : '') + '</span>';
     const mods = D.MODULES.filter((m) => run.mods[m.id]).map((m) => chip(m.ico, run.mods[m.id], m.name, 'mod')).join('');
-    const perks = D.PERKS.filter((p) => run.perks[p.id] && !p.filler).map((p) => chip(p.ico, run.perks[p.id], p.name, 'perk')).join('');
+    const perks = D.PERKS.filter((p) => run.perks[p.id] && !p.filler).map((p) => chip(G.icon('pk_' + p.id, p.ico), run.perks[p.id], p.name, 'perk')).join('');
     const relics = Object.keys(run.relics || {}).filter((id) => D.RELICS[id]).map((id) => chip(D.RELICS[id].ico, 1, D.RELICS[id].name + ': ' + D.RELICS[id].desc, 'relic')).join('');
     return '<div class="rb-head"><span class="rb-pilot" style="color:' + pil.color + '">' + pil.ico + ' ' + pil.name + '</span><small>СБОРКА ЗАБЕГА</small></div>' +
       (mods ? '<div class="rb-row"><small>Модули</small>' + mods + '</div>' : '') +
@@ -892,7 +892,7 @@
       if (pk.max > 1 && pk.max < 99) { for (let i = 0; i < pk.max; i++) pips += '<i class="' + (i < lv ? 'on' : i === lv ? 'new' : '') + '"></i>'; }
       const ev = game.evoStep(pk.id);
       const evo = ev ? '<div class="perk-evo">🧬 ' + (lv + 1 >= ev.lvl ? 'ЭВОЛЮЦИЯ СЕЙЧАС: ' : 'К эволюции ' + (lv + 1) + '/' + ev.lvl + ': ') + ev.name + '</div>' : '';
-      b.innerHTML = '<div class="perk-ico">' + pk.ico + '</div><div class="perk-info"><div class="perk-name">' + pk.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + pk.desc + '</div>' + evo + (pips ? '<div class="perk-lv">' + pips + '</div>' : '') + '</div><div class="perk-rar">' + rar.name + '</div>';
+      b.innerHTML = '<div class="perk-ico">' + G.icon('pk_' + pk.id, pk.ico) + '</div><div class="perk-info"><div class="perk-name">' + pk.name + (lv ? ' ' + (lv + 1) : '') + '</div><div class="perk-desc">' + pk.desc + '</div>' + evo + (pips ? '<div class="perk-lv">' + pips + '</div>' : '') + '</div><div class="perk-rar">' + rar.name + '</div>';
       b.addEventListener('click', () => {
         if (b.classList.contains('wait')) return;
         ui.hide('#scr-perk');

@@ -418,6 +418,19 @@
     return this._proc[key] || (this._proc[key] = this.chest(tier).icon.toDataURL());
   };
   gfx.chestImg = function (tier, cls) { return '<img class="px-ico' + (cls ? ' ' + cls : '') + '" src="' + this.chestURL(tier) + '" alt="">'; };
+  // 4.3: нарисованный значок из атласа для HTML (<img>): кадр копируется в свой холст один раз, дальше — data URL
+  // из кэша. Кадра нет (значок ещё не нарисован, атлас не загрузился) — остаётся запасное эмодзи
+  gfx.iconURL = function (name) {
+    const key = 'iconURL_' + name;
+    if (this._proc[key]) return this._proc[key];
+    const f = this.frames[name], img = f && this.src(f);
+    if (!img || !img.width) return null;
+    const c = document.createElement('canvas');
+    c.width = f[2]; c.height = f[3];
+    c.getContext('2d').drawImage(img, f[0], f[1], f[2], f[3], 0, 0, f[2], f[3]);
+    try { return (this._proc[key] = c.toDataURL()); } catch (e) { return null; }
+  };
+  gfx.icon = function (name, emoji) { const url = this.iconURL(name); return url ? '<img class="sp-ico" src="' + url + '" alt="">' : emoji; };
   // сундук на холсте: центр (x, y), ширина w; open 0..1 — створки раскрываются, shake — дрожь крышки
   // возвращает { mouth } — y щели между крышкой и корпусом (оттуда бьёт свет)
   gfx.drawChest = function (ctx, tier, x, y, w, open, shake) {

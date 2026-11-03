@@ -986,6 +986,11 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
    ═══════════════════════════════════════════════════════════════ */
 .px-ico{image-rendering:pixelated;image-rendering:crisp-edges;width:100%;height:auto;display:block}
 .perk-ico .px-ico{width:44px}
+/* 4.3: нарисованные значки из атласа (улучшения забега) — плавное масштабирование, в отличие от пиксельных сундуков */
+.sp-ico{display:block;width:100%;height:auto}
+.perk-ico .sp-ico{width:46px}
+.perk-cards.dense .perk-ico .sp-ico{width:40px}
+.rb-chip .sp-ico{width:24px}
 .hud-right{gap:6px;align-items:center}
 .hud-chests{display:flex;align-items:center;gap:4px;height:32px;padding:0 9px 0 6px;border-radius:16px;background:rgba(8,12,30,.6);border:1px solid rgba(224,150,90,.4);font-family:var(--font-h);font-size:13px;font-weight:700;color:#ffd29a}
 .hud-chests svg{font-size:18px}
