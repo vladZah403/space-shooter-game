@@ -352,6 +352,13 @@
         p.x += kx / n * sp; p.y += ky / n * sp; p.vxs += kx / n * sp;
         this.clampPlayer();
       }
+      // 4.3.2: отброс от астероида (bumpAsteroid) гаснет за ~0,3 с
+      if (p.bumpT > 0) {
+        p.bumpT -= dt;
+        p.x += p.kbx * dt; p.y += p.kby * dt; p.vxs += p.kbx * dt;
+        p.kbx = U.damp(p.kbx, 0, 9, dt); p.kby = U.damp(p.kby, 0, 9, dt);
+        this.clampPlayer();
+      }
     }
     // крен корабля по горизонтальной скорости
     p.tilt = U.damp(p.tilt, U.clamp(p.vxs * 0.035, -0.32, 0.32), 10, rdt);
@@ -971,11 +978,34 @@
         if (!e.alive || !e.hittable || e.boss && e.entering) continue;
         const rr = e.r * 0.8 + p.r * 1.6;
         if (e.rx ? SS.enemies.hitTest(e, p.x, p.y, p.r * 1.6, 0.8) : U.dist2(e.x, e.y, p.x, p.y) < rr * rr) {
+          // обычный астероид Пояса — не таран, а толчок: жизнь цела (лавовый горячий — бьёт как враг)
+          if (e.type === 'asteroid') { this.bumpAsteroid(e); continue; }
           if (!e.boss && !e.mini) { this.damageEnemy(e, 999999, { src: 'ram', noText: true }); }
           this.hitPlayer(e.x, e.y, 'Столкновение: ' + (e.boss ? e.bdef.name : e.def.name || 'враг'));
         }
       }
     }
+  };
+
+  // 4.3.2: корабль задел астероид Пояса — его отбрасывает, жизнь цела. Мелкий камень разлетается
+  // (с добычей, как от тарана), крупный трескается (−50% прочности) и отлетает в сторону
+  game.bumpAsteroid = function (e) {
+    const p = this.player, S = G.S;
+    if (p.bumpT > 0) return;
+    let nx = p.x - e.x, ny = p.y - e.y;
+    const d = Math.hypot(nx, ny) || 1;
+    nx /= d; ny /= d;
+    const push = 520 * S;
+    p.kbx = nx * push; p.kby = ny * push; p.bumpT = 0.35;
+    const cx = e.x + nx * e.w * 0.4, cy = e.y + ny * e.w * 0.4;
+    FX.sparks(cx, cy, '#d8b48a', 14, 280);
+    FX.ring(cx, cy, 6 * S, 34 * S, '#ffe2b8', 0.25, 3);
+    FX.shake(0.25);
+    A.play('hitArmor', { rate: 0.6 });
+    SS.tg.haptic('medium');
+    if (e.w < D.ENEMIES.asteroid.w * S) { this.damageEnemy(e, 999999, { src: 'ram', noText: true }); return; }
+    this.damageEnemy(e, e.maxHp * 0.5, { src: 'ram', noText: true });
+    e.vx -= nx * 70 * S;
   };
 
   // фокус лазера: попадания подряд по одной цели (без пауз дольше focusT) усиливают урон
