@@ -119,6 +119,11 @@ svg{width:1em;height:1em;flex-shrink:0}
 .tip-sec.use b{color:var(--tc)}
 .tip-sec p{margin:0;font-size:14.5px;line-height:1.35;color:var(--text,#e8eeff)}
 .tip-ok{width:100%;margin-top:14px;min-height:46px}
+.ad-demo.tip-demo{height:140px;margin:10px 0 0;border-color:color-mix(in srgb,var(--tc) 40%,transparent)}
+.tip-modal.has-demo .tip-ico{font-size:34px;margin:6px 0 2px}
+.tip-modal.has-demo .tip-ico .sp-ico{width:52px}
+.tip-modal.has-demo .tip-sec{margin-top:8px;padding:8px 11px}
+.tip-modal.has-demo .tip-sec p{font-size:14px}
 
 /* ── Подэкраны (общая шапка) ── */
 .screen.sub{background:radial-gradient(ellipse at 50% -10%,rgba(40,70,170,.35),transparent 60%),rgba(5,6,15,.94)}

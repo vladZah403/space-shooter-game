@@ -1093,8 +1093,14 @@
     $('#tipHow').textContent = t.how || '';
     $('#tipUse').textContent = t.use || '';
     $('#tipOk').onclick = () => { A.play('click'); game.closeTip(); };
+    // живая сцена (js/demo.js): эволюция — оружие в усиленном виде, событие или аномалия — своя сцена
+    const cv = $('#tipDemo'), key = t.key || '', evo = key.startsWith('evo_') && key.slice(4);
+    const demo = evo ? () => SS.demo.start(cv, evo, { evo: true }) : SS.demo.hasScene(key) ? () => SS.demo.scene(cv, key) : null;
+    cv.hidden = !demo;
+    box.classList.toggle('has-demo', !!demo);
     A.play('perk', { vol: 0.6 });
     ui.show('#scr-tip');
+    if (demo) requestAnimationFrame(demo);
     T.back(() => game.closeTip());
   };
 
