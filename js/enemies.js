@@ -1066,7 +1066,11 @@
     // прочность растёт вместе с прочностью обычных врагов; первые два босса — разминка
     const ramp = num === 1 ? 0.92 : num === 2 ? 1.6 : 2 + (num - 3) * 0.2;
     // в босс-раше улучшений за мелочь почти нет — боссы там слабее
-    const hp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3) * (num === 1 ? D.BOSS_HP_FIRST : D.BOSS_HP) * (game.mode === 'rush' ? 0.55 : 1);
+    const baseHp = 1000 * bdef.hp * E.hpScale() * ramp * (1 + cycle * 0.3) * (num === 1 ? D.BOSS_HP_FIRST : D.BOSS_HP) * (game.mode === 'rush' ? 0.55 : 1);
+    // 4.3.2: у сильной сборки — не меньше, чем нужно на минимальный бой при её уроне по прошлому боссу (adapt);
+    // до первого босса урона ещё не знаем — запас по «Боевой мощи» (run.bossK). У новичка всё как раньше
+    const run = game.run;
+    const hp = Math.min(baseHp * D.BOSS_ADAPT.max, Math.max(baseHp * (run.bossDps ? 1 : run.bossK || 1), (run.bossDps || 0) * phaseMin(num) * 3));
     const w = Math.min(G.FW * bdef.wf, bdef.wmax * S);
     const asp = G.aspect(sprite);
     const h = w * asp;
@@ -1074,7 +1078,7 @@
       uid: uid++, type: 'boss', def: { coins: 0, xp: 0, score: 0 }, bdef, sprite, fallback, boss: true, mini: false,
       alive: true, hittable: true, entering: true,
       x: G.FW / 2, y: -h * 0.6, w, h, r: w * 0.37, rx: 0, ry: 0,
-      hp, maxHp: hp, phase: 1, age: 0, mt: 0, flash: 0, frozen: 0, alpha: 1, bank: 0, face: -1, lastX: G.FW / 2,
+      hp, maxHp: hp, baseHp, phase: 1, vt: 0, age: 0, mt: 0, flash: 0, frozen: 0, alpha: 1, bank: 0, face: -1, lastX: G.FW / 2,
       shield: bdef.shield ? hp * bdef.shield * 0.4 : 0, shieldMax: bdef.shield ? hp * bdef.shield * 0.4 : 0, shieldHitT: 0, shieldRegenWait: 0, fx: 1,
       cv: hue !== undefined && hue !== null ? G.tinted(sprite, { hue }) : null,
       // корпус целиком ниже полосы босса, но не ниже середины экрана
@@ -1436,6 +1440,24 @@
     const floor = b.phase < 3 ? b.maxHp * PHASE_HP[b.phase - 1] : 0;
     return floor > 0 ? Math.min(dmg, Math.max(0, b.hp - floor)) : dmg;
   };
+  // 4.3.2: подстройка под огневую мощь (D.BOSS_ADAPT). b.vt — сколько секунд босс был уязвим в этой фазе,
+  // part — какую долю прочности за это время сняли. Средний урон в секунду за весь бой (run.bossDps) решает,
+  // с какой прочностью выйдет следующий босс (spawnBoss). Фазу снесли быстрее минимума — с rescale крепнет
+  // и этот босс (прочность и максимум растут вместе — полоса не прыгает)
+  function phaseMin(num) { const MIN = D.BOSS_PHASE_MIN; return MIN[U.clamp(num, 1, MIN.length) - 1]; }
+  function adapt(b, rescale, part) {
+    const run = game.run, min = phaseMin(b.num), t = Math.max(0.2, b.vt);
+    b.vt = 0;
+    b.drained = (b.drained || 0) + b.maxHp * part;
+    b.vtAll = (b.vtAll || 0) + t;
+    if (!run) return;
+    run.bossDps = b.drained / b.vtAll;
+    if (!rescale || t >= min) return;
+    const f = Math.min(D.BOSS_ADAPT.step, min / t, D.BOSS_ADAPT.max * b.baseHp / b.maxHp);
+    if (f <= 1.01) return;
+    b.hp *= f; b.maxHp *= f;
+    b.shield *= f; b.shieldMax *= f;
+  }
   function phaseEnd(b, n) {
     b.phase = n;
     b.trans = PHASE_T;
@@ -1492,7 +1514,8 @@
       return;
     }
     const want = ratio <= PHASE_HP[1] + 1e-6 ? 3 : ratio <= PHASE_HP[0] + 1e-6 ? 2 : 1;
-    if (want > b.phase) { phaseEnd(b, want); return; }
+    if (want > b.phase) { adapt(b, true, 1 / 3); phaseEnd(b, want); return; }
+    b.vt += dt;
     // «Кошмар» и «Бог войны»: ярость на последних 15% прочности — все атаки чаще
     if (b.phase === 3 && !b.rage && ratio <= 0.15 && game.diff.bossRage) {
       b.rage = true;
@@ -1556,6 +1579,8 @@
   }
 
   function bossDeath(b) {
+    // Феникс возрождается с 30% прочности: первая смерть — конец 3-й фазы, вторая — конец возрождения
+    adapt(b, b.bdef.id === 'phoenix' && !b.reborn, b.reborn ? 0.3 : 1 / 3);
     if (b.bdef.id === 'phoenix' && !b.reborn) {
       b.reborn = true;
       b.hp = b.maxHp * 0.3;

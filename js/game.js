@@ -87,6 +87,9 @@
       mods: {}, repairT: 0, emergT: 0, pilot: D.PILOTS[s.pilot] && M.pilotUnlocked(s.pilot) ? s.pilot : 'kai',
       challenge: ch || null, noDrops: !!(ch && ch.mods.includes('nodrops')),
       anomaly: null, lastAnomaly: '', anomalies: 0,
+      // 4.3.2: боссы под огневую мощь (enemies.js adapt). bossDps — урон в секунду по прошлому боссу;
+      // bossK — запас прочности первого босса, если «Боевая мощь» вдвое и больше выше рекомендуемой
+      bossDps: 0, bossK: U.clamp(Math.sqrt(M.power() / Math.max(100, this.diff.power || 0) / 2), 1, D.BOSS_ADAPT.start),
     };
     // рогалик: порядок секторов и боссов свой в каждом забеге; первыми всегда Орбита Земли и Страж
     const rnd = ch ? U.seeded(U.hashStr('order:' + ch.date)) : Math.random;
