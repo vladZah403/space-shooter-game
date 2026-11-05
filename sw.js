@@ -1,13 +1,13 @@
 // Space Shooter 2.0 — сервис-воркер
 // Стратегия: сеть в приоритете (всегда свежая версия), кэш — для офлайна и медленной сети.
 // При каждом релизе меняйте VERSION (и ?v= в index.html).
-const VERSION = 'ss-4.3.3';
+const VERSION = 'ss-4.3.4';
 const CORE = [
-  './', './index.html', './manifest.json', './css/style.css?v=4.3.3',
-  './js/config.js?v=4.3.3', './js/atlas.js?v=4.3.3', './js/core.js?v=4.3.3', './js/data.js?v=4.3.3',
-  './js/store.js?v=4.3.3', './js/tg.js?v=4.3.3', './js/audio.js?v=4.3.3', './js/gfx.js?v=4.3.3',
-  './js/fx.js?v=4.3.3', './js/game.js?v=4.3.3', './js/enemies.js?v=4.3.3', './js/events.js?v=4.3.3', './js/foes.js?v=4.3.3', './js/skills.js?v=4.3.3', './js/sectors.js?v=4.3.3', './js/map.js?v=4.3.3', './js/galaxy.js?v=4.3.3', './js/scenes.js?v=4.3.3', './js/companion.js?v=4.3.3', './js/intro.js?v=4.3.3', './js/demo.js?v=4.3.3', './js/ui.js?v=4.3.3', './js/relics.js?v=4.3.3', './js/main.js?v=4.3.3',
-  './assets/sprites.webp?v=4.3.3', './assets/sprites2.webp?v=4.3.3', './assets/ship_cutaway.webp?v=4.3.3', './icon-192.png', './icon-512.png',
+  './', './index.html', './manifest.json', './css/style.css?v=4.3.4',
+  './js/config.js?v=4.3.4', './js/atlas.js?v=4.3.4', './js/core.js?v=4.3.4', './js/data.js?v=4.3.4',
+  './js/store.js?v=4.3.4', './js/tg.js?v=4.3.4', './js/audio.js?v=4.3.4', './js/gfx.js?v=4.3.4',
+  './js/fx.js?v=4.3.4', './js/game.js?v=4.3.4', './js/enemies.js?v=4.3.4', './js/events.js?v=4.3.4', './js/foes.js?v=4.3.4', './js/skills.js?v=4.3.4', './js/sectors.js?v=4.3.4', './js/map.js?v=4.3.4', './js/galaxy.js?v=4.3.4', './js/scenes.js?v=4.3.4', './js/companion.js?v=4.3.4', './js/intro.js?v=4.3.4', './js/demo.js?v=4.3.4', './js/ui.js?v=4.3.4', './js/relics.js?v=4.3.4', './js/main.js?v=4.3.4',
+  './assets/sprites.webp?v=4.3.4', './assets/sprites2.webp?v=4.3.4', './assets/ship_cutaway.webp?v=4.3.4', './icon-192.png', './icon-512.png',
 ];
 
 self.addEventListener('install', (e) => {
