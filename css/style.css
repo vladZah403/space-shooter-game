@@ -124,6 +124,23 @@ svg{width:1em;height:1em;flex-shrink:0}
 .tip-modal.has-demo .tip-ico .sp-ico{width:52px}
 .tip-modal.has-demo .tip-sec{margin-top:8px;padding:8px 11px}
 .tip-modal.has-demo .tip-sec p{font-size:14px}
+/* кнопка всегда видна внизу окна, даже если текст пришлось листать */
+.tip-ok{position:sticky;bottom:0;box-shadow:0 -10px 18px rgba(10,15,38,.95)}
+/* невысокие экраны (iPhone SE, Telegram с шапкой): сцена ниже, значок прячется — его заменяет сцена */
+@media (max-height:700px){
+  .tip-modal{padding:16px 14px}
+  .ad-demo.tip-demo{height:104px;margin-top:8px}
+  .tip-modal.has-demo .tip-ico{display:none}
+  .tip-title{font-size:17px}
+  .tip-note{font-size:12.5px;margin-top:4px}
+  .tip-modal .tip-sec{margin-top:7px;padding:7px 10px}
+  .tip-modal .tip-sec p{font-size:13.5px;line-height:1.28}
+  .tip-ok{margin-top:10px;min-height:44px}
+}
+@media (max-height:600px){
+  .ad-demo.tip-demo{height:88px}
+  .tip-modal .tip-sec p{font-size:13px}
+}
 
 /* ── Подэкраны (общая шапка) ── */
 .screen.sub{background:radial-gradient(ellipse at 50% -10%,rgba(40,70,170,.35),transparent 60%),rgba(5,6,15,.94)}

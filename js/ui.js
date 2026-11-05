@@ -704,15 +704,23 @@
     pumpToasts();
   };
   function pumpToasts() {
+    // 4.3.2: пока открыто окно-подсказка, плашки ждут в очереди — иначе они закрывают его верх
+    if (ui.isShown('#scr-tip')) return;
     const box = $('#toasts');
     while (ui._toastQ.length && box.querySelectorAll('.toast:not(.out)').length < 2) {
       const t = ui._toastQ.shift();
       const el = document.createElement('div');
       el.className = 'toast' + (t.info ? ' info' : '') + (t.hint ? ' hint' : '');
       el.innerHTML = '<div class="t-ico">' + (t.img || (t.ico && t.ico.length > 3 ? ic(t.ico) : U.escape(t.ico || '🏆'))) + '</div><div><div class="t-title">' + U.escape(t.title || '') + '</div><div class="t-text">' + U.escape(t.text || '') + '</div></div>' + (t.rew ? '<div class="t-rew">' + U.escape(t.rew) + ' ' + ic('coin') + '</div>' : '');
+      el._t = t;
       box.appendChild(el);
-      setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 320); }, t.dur || 2400);
+      el._timer = setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 320); }, t.dur || 2400);
     }
+  }
+  // открылось окно-подсказка: плашки, что уже на экране, возвращаются в начало очереди и покажутся после него
+  function holdToasts() {
+    const shown = Array.from($('#toasts').querySelectorAll('.toast:not(.out)'));
+    for (let i = shown.length - 1; i >= 0; i--) { const el = shown[i]; clearTimeout(el._timer); if (el._t) ui._toastQ.unshift(el._t); el.remove(); }
   }
 
   // ════════════════════════════════════════════════════════════
@@ -1082,7 +1090,7 @@
   // 4.3.2: окно-подсказка (game.tipOnce): t = { kind, ico (эмодзи или <img> из атласа), title, color, note, how, use };
   // null — закрыть. Игра стоит, пока окно открыто; «Понятно», «Назад» Telegram и Esc продолжают бой
   ui.showTip = function (t) {
-    if (!t) { ui.hide('#scr-tip'); if (ui.cur === 'game') T.back(null); return; }
+    if (!t) { ui.hide('#scr-tip'); if (ui.cur === 'game') T.back(null); pumpToasts(); return; }
     const box = $('#scr-tip .tip-modal');
     box.style.setProperty('--tc', t.color || '#3de0ff');
     $('#tipKind').textContent = t.kind || '';
@@ -1099,6 +1107,7 @@
     cv.hidden = !demo;
     box.classList.toggle('has-demo', !!demo);
     A.play('perk', { vol: 0.6 });
+    holdToasts();
     ui.show('#scr-tip');
     if (demo) requestAnimationFrame(demo);
     T.back(() => game.closeTip());
