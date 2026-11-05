@@ -991,6 +991,15 @@ body.toasts-bottom #toasts{top:auto;bottom:calc(var(--sab) + 14px);flex-directio
 .perk-ico .sp-ico{width:46px}
 .perk-cards.dense .perk-ico .sp-ico{width:40px}
 .rb-chip .sp-ico{width:24px}
+/* 4.3.2: значки навыков (лист 19) и аномалий (лист 20) */
+.sk-tico .sp-ico{width:46px}
+.sk-slot .sp-ico{width:36px}
+.skd-ico .sp-ico{width:42px}
+.skbtn .sp-ico{width:1.7em}
+.buff i .sp-ico{width:24px}
+.pfx i .sp-ico{width:26px}
+.toast .t-ico .sp-ico{width:34px}
+body.in-game .toast .t-ico .sp-ico{width:28px}
 .hud-right{gap:6px;align-items:center}
 .hud-chests{display:flex;align-items:center;gap:4px;height:32px;padding:0 9px 0 6px;border-radius:16px;background:rgba(8,12,30,.6);border:1px solid rgba(224,150,90,.4);font-family:var(--font-h);font-size:13px;font-weight:700;color:#ffd29a}
 .hud-chests svg{font-size:18px}

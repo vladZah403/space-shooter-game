@@ -5,6 +5,9 @@
 
 (function () {
   const U = SS.util, D = SS.data, $ = U.$, $$ = U.$$, ic = U.icon;
+  // 4.3.2: нарисованный значок навыка (лист 19, поздний атлас); пока атлас не догрузился — эмодзи
+  const skIco = (id) => SS.gfx.icon(id, D.SKILLS[id].ico);
+  const anIco = (id) => SS.gfx.icon('an_' + id, D.ANOMALIES[id].ico);
   const NL = String.fromCharCode(10);
   let G, A, M, T, game, store;
 
@@ -531,7 +534,7 @@
       const b = document.createElement('button');
       b.className = 'skbtn ready';
       b.dataset.sk = id;
-      b.innerHTML = '<svg class="ring" viewBox="0 0 66 66"><circle class="rbg" cx="33" cy="33" r="30"/><circle class="rfg" cx="33" cy="33" r="30" stroke-dasharray="188.5" stroke-dashoffset="0"/></svg><span class="sk-emoji">' + sk.ico + '</span><span class="sk-cd"></span>';
+      b.innerHTML = '<svg class="ring" viewBox="0 0 66 66"><circle class="rbg" cx="33" cy="33" r="30"/><circle class="rfg" cx="33" cy="33" r="30" stroke-dasharray="188.5" stroke-dashoffset="0"/></svg><span class="sk-emoji">' + skIco(id) + '</span><span class="sk-cd"></span>';
       bindPress(b, () => game.useSkill(i));
       b._id = id; b._rfg = b.querySelector('.rfg'); b._cd = b.querySelector('.sk-cd');
       box.appendChild(b);
@@ -620,11 +623,11 @@
     if (c.buffs !== buffKey) {
       c.buffs = buffKey;
       const ad = an && D.ANOMALIES[an];
-      let h = ad ? buffChip(ad.color, ad.ico, 20, '+' + Math.round(ad.bonus * 100) + '%') : '';
+      let h = ad ? buffChip(ad.color, anIco(an), 20, '+' + Math.round(ad.bonus * 100) + '%') : '';
       if (wev) h += buffChip(wev.color, wev.ico, 20);
       if (perfect) h += buffChip('#3dffa2', ic('star'), 20, '×2');
       for (const k of Object.keys(g.buffs)) h += buffChip(D.POWERUPS[k].color, ic(BUFF_ICONS[k] || 'star'), ring(g.buffs[k], D.POWERUPS[k].dur));
-      for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) h += buffChip('#3de0ff', D.SKILLS[id].ico, ring(run.skillFx[id], D.SKILLS[id].dur));
+      for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) h += buffChip('#3de0ff', skIco(id), ring(run.skillFx[id], D.SKILLS[id].dur));
       if (run.overload > 0) h += buffChip('#ffc83d', ic('bolt'), 20);
       el.buffs.innerHTML = h;
     }
@@ -704,7 +707,7 @@
       const t = ui._toastQ.shift();
       const el = document.createElement('div');
       el.className = 'toast' + (t.info ? ' info' : '') + (t.hint ? ' hint' : '');
-      el.innerHTML = '<div class="t-ico">' + (t.ico && t.ico.length > 3 ? ic(t.ico) : U.escape(t.ico || '🏆')) + '</div><div><div class="t-title">' + U.escape(t.title || '') + '</div><div class="t-text">' + U.escape(t.text || '') + '</div></div>' + (t.rew ? '<div class="t-rew">' + U.escape(t.rew) + ' ' + ic('coin') + '</div>' : '');
+      el.innerHTML = '<div class="t-ico">' + (t.img || (t.ico && t.ico.length > 3 ? ic(t.ico) : U.escape(t.ico || '🏆'))) + '</div><div><div class="t-title">' + U.escape(t.title || '') + '</div><div class="t-text">' + U.escape(t.text || '') + '</div></div>' + (t.rew ? '<div class="t-rew">' + U.escape(t.rew) + ' ' + ic('coin') + '</div>' : '');
       box.appendChild(el);
       setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 320); }, t.dur || 2400);
     }
@@ -737,11 +740,11 @@
       '<div class="pi-cell"><small>Монеты</small><b>' + U.fmt(run.coins) + '</b></div>';
     // 4.2: что сейчас действует — подробности к значкам из HUD
     const fx = [], an = g.anomaly(), wev = SS.events.active();
-    if (an) { const d = D.ANOMALIES[an]; fx.push([d.color, d.ico, 'Аномалия: ' + d.name, d.desc + ' · награды +' + Math.round(d.bonus * 100) + '%']); }
+    if (an) { const d = D.ANOMALIES[an]; fx.push([d.color, anIco(an), 'Аномалия: ' + d.name, d.desc + ' · награды +' + Math.round(d.bonus * 100) + '%']); }
     if (wev) fx.push([wev.color, wev.ico, wev.name, wev.desc]);
     if (run.waveDamage === 0 && g.wave && !g.wave.cleared) fx.push(['#3dffa2', ic('star'), 'Без урона', 'волна без попаданий — бонус ×2']);
     for (const k of Object.keys(g.buffs)) fx.push([D.POWERUPS[k].color, ic(BUFF_ICONS[k] || 'star'), D.POWERUPS[k].name, 'ещё ' + Math.ceil(g.buffs[k]) + ' с']);
-    for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) fx.push(['#3de0ff', D.SKILLS[id].ico, D.SKILLS[id].name, 'ещё ' + Math.ceil(run.skillFx[id]) + ' с']);
+    for (const id in run.skillFx) if (run.skillFx[id] > 0 && D.SKILLS[id]) fx.push(['#3de0ff', skIco(id), D.SKILLS[id].name, 'ещё ' + Math.ceil(run.skillFx[id]) + ' с']);
     $('#pauseFx').innerHTML = fx.map((f) => '<div class="pfx" style="--bc:' + f[0] + '"><i>' + f[1] + '</i><div><b>' + U.escape(f[2]) + '</b><small>' + U.escape(f[3]) + '</small></div></div>').join('');
     $('#pauseBuild').innerHTML = buildHtml(run);
     syncPauseToggles();
@@ -1389,7 +1392,7 @@
     // слоты активных навыков и счётчик пассивных
     const act = Object.keys(s.skills).filter((id) => D.SKILLS[id].type === 'active');
     let h = '';
-    for (let i = 0; i < D.MAX_ACTIVE; i++) { const sk = D.SKILLS[act[i]]; h += '<div class="sk-slot act' + (sk ? ' filled' : '') + '">' + (sk ? sk.ico : '⚡') + '<small>АКТИВ ' + (i + 1) + '</small></div>'; }
+    for (let i = 0; i < D.MAX_ACTIVE; i++) { const sk = D.SKILLS[act[i]]; h += '<div class="sk-slot act' + (sk ? ' filled' : '') + '">' + (sk ? skIco(act[i]) : '⚡') + '<small>АКТИВ ' + (i + 1) + '</small></div>'; }
     h += '<div class="sk-slot filled sum"><b>' + M.skillCount('passive') + '</b><small>ПАССИВНЫХ</small></div>';
     $('#skillSlots').innerHTML = h;
     const ids = Object.keys(D.SKILLS).filter((id) => D.SKILLS[id].branch === br.id);
@@ -1404,7 +1407,7 @@
         const cls = (st.learned ? ' learned' : st.locked ? ' locked' : st.canLearn ? ' available' : '') + (st.maxed ? ' maxed' : '') + (sk.type === 'active' ? ' act' : '') + (id === ui._skSel ? ' sel' : '');
         let pips = '';
         if (st.max > 1) { pips = '<div class="sk-pips">'; for (let i = 0; i < st.max; i++) pips += '<i' + (i < st.rank ? ' class="on"' : '') + '></i>'; pips += '</div>'; }
-        t += '<button class="sk-tnode' + cls + '" data-id="' + id + '"><div class="sk-tico">' + sk.ico + (sk.type === 'active' ? '<span class="sk-act">⚡</span>' : '') + '</div>' + pips +
+        t += '<button class="sk-tnode' + cls + '" data-id="' + id + '"><div class="sk-tico">' + skIco(id) + (sk.type === 'active' ? '<span class="sk-act">⚡</span>' : '') + '</div>' + pips +
           '<div class="sk-tname">' + sk.name + '</div><div class="sk-tcost">' + (st.maxed ? ic('check') : ic('atom') + sk.cost) + '</div></button>';
       }
       t += '</div>';
@@ -1449,13 +1452,13 @@
       else if (st.slotsFull) why = 'Уже два активных навыка — снимите один';
       else if (!st.afford) why = 'Нужно ' + sk.cost + ' ' + U.plural(sk.cost, 'очко', 'очка', 'очков') + ', есть ' + M.skillPoints();
     }
-    box.innerHTML = '<div class="skd-head"><div class="skd-ico">' + sk.ico + '</div><div><div class="skd-name">' + sk.name + '</div><div class="skd-meta">' + meta.join(' · ') + '</div></div></div>' +
+    box.innerHTML = '<div class="skd-head"><div class="skd-ico">' + skIco(id) + '</div><div><div class="skd-name">' + sk.name + '</div><div class="skd-meta">' + meta.join(' · ') + '</div></div></div>' +
       '<div class="skd-desc">' + sk.desc + '</div>' + (why ? '<div class="skd-why">' + why + '</div>' : '') +
       '<div class="skd-btns">' + (st.maxed ? '' : '<button class="btn primary" id="skdLearn"' + (st.canLearn || SS.DEV && !st.locked && !st.slotsFull ? '' : ' disabled') + '>' + (st.learned ? 'РАНГ ' + (st.rank + 1) : 'ИЗУЧИТЬ') + ' · ' + ic('atom') + sk.cost + '</button>') +
       (st.learned ? '<button class="btn ghost" id="skdForget">СНЯТЬ</button>' : '') + '</div>';
     const learn = $('#skdLearn');
     if (learn) learn.addEventListener('click', () => {
-      if (M.learnSkill(id)) { A.play('levelup'); T.haptic('success'); ui.toast({ ico: sk.ico, title: st.learned ? 'РАНГ ' + (st.rank + 1) : 'НАВЫК ИЗУЧЕН', text: sk.name, info: true }); }
+      if (M.learnSkill(id)) { A.play('levelup'); T.haptic('success'); ui.toast({ ico: sk.ico, img: skIco(id), title: st.learned ? 'РАНГ ' + (st.rank + 1) : 'НАВЫК ИЗУЧЕН', text: sk.name, info: true }); }
       else A.play('error');
       ui.renderSkills(br.id);
     });

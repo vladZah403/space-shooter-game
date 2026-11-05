@@ -25,8 +25,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 11 — астероиды (3.0: обычные, кристальные, с ресурсами; остальные ряды — на будущие секторы),
 # 12 — враги 3.1 (защиты от оружия и поддержка), 13 — разное 3.1 (торговец, энергоблоки, яйца улья, конвой,
 # медкорабль, лавовые астероиды), 14–15 — детали корабля 3.1 (модули забега на корабле)
-# 16 — значки улучшений забега, 17 — реликвии, 18 — модули корабля (файлы названы по номерам листов
-# в docs/sprites-needed.md)
+# 16 — значки улучшений забега, 17 — реликвии, 18 — модули корабля, 19 — навыки, 20 — аномалии сектора
+# (файлы названы по номерам листов в docs/sprites-needed.md)
 SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet00_main.png',
     'sheet01_player_ships.png',
@@ -47,6 +47,8 @@ SHEET_FILES = [os.path.join('art', f) for f in (
     'sheet22_perks.png',
     'sheet17_relics.png',
     'sheet20_modules.jpg',
+    'sheet21_skills.png',
+    'sheet26_anomalies.png',
 )]
 OUT_PNG = os.path.join(ROOT, 'assets', 'sprites.png')
 OUT_JS = os.path.join(ROOT, 'js', 'atlas.js')
@@ -394,6 +396,45 @@ SPRITES = {
     'md_chrono':      ((1070, 307, 1259, 500), 'solid', 18, {'max': 112}),
     'md_repair':      ((19, 550, 218, 753), 'solid', 18, {'max': 112}),
     'md_emergency':   ((264, 524, 474, 744), 'solid', 18, {'max': 112}),
+    # ── лист 19 (art/sheet21_skills.png): навыки, порядок как в D.SKILLS (4 ветки по 8); имя спрайта = id навыка ──
+    'sk_caliber':       ((20, 28, 209, 215), 'solid', 19, {'max': 112}),
+    'sk_rapid':         ((241, 30, 434, 213), 'solid', 19, {'max': 112}),
+    'sk_precision':     ((456, 23, 657, 216), 'solid', 19, {'max': 112}),
+    'sk_rail':          ((667, 33, 873, 218), 'solid', 19, {'max': 112}),
+    'sk_executioner':   ((896, 23, 1092, 210), 'solid', 19, {'max': 112}),
+    'sk_berserker':     ((1118, 22, 1316, 211), 'solid', 19, {'max': 112}),
+    'sk_orbital':       ((1337, 21, 1551, 220), 'solid', 19, {'max': 112}),
+    'sk_coolhead':      ((1563, 23, 1757, 220), 'solid', 19, {'max': 112}),
+    'sk_armor':         ((14, 241, 208, 428), 'solid', 19, {'max': 112}),
+    'sk_regen':         ((238, 242, 432, 428), 'solid', 19, {'max': 112}),
+    'sk_ghost':         ((452, 242, 660, 431), 'solid', 19, {'max': 112}),
+    'sk_barrier':       ((666, 236, 886, 442), 'solid', 19, {'max': 112}),
+    'sk_capacitor':     ((896, 240, 1093, 428), 'solid', 19, {'max': 112}),
+    'sk_phoenix':       ((1109, 236, 1324, 431), 'solid', 19, {'max': 112}),
+    'sk_timewarp':      ((1339, 247, 1537, 436), 'solid', 19, {'max': 112}),
+    'sk_secondwind':    ((1564, 241, 1759, 429), 'solid', 19, {'max': 112}),
+    'sk_detonator':     ((11, 449, 214, 647), 'solid', 19, {'max': 112}),
+    'sk_magnet':        ((242, 456, 432, 637), 'solid', 19, {'max': 112}),
+    'sk_ricochet':      ((455, 466, 657, 642), 'solid', 19, {'max': 112}),
+    'sk_turret':        ((675, 455, 875, 643), 'solid', 19, {'max': 112}),
+    'sk_conductor':     ((892, 450, 1102, 655), 'solid', 19, {'max': 112}),
+    'sk_overload':      ((1117, 447, 1325, 647), 'solid', 19, {'max': 112}),
+    'sk_blackhole':     ((1337, 456, 1544, 643), 'solid', 19, {'max': 112}),
+    'sk_chrono':        ((1552, 453, 1759, 643), 'solid', 19, {'max': 112}),
+    'sk_greed':         ((17, 665, 214, 856), 'solid', 19, {'max': 112}),
+    'sk_scavenger':     ((237, 673, 434, 868), 'solid', 19, {'max': 112}),
+    'sk_lucky':         ((455, 669, 654, 854), 'solid', 19, {'max': 112}),
+    'sk_emp':           ((676, 665, 876, 854), 'solid', 19, {'max': 112}),
+    'sk_daredevil':     ((896, 672, 1100, 852), 'solid', 19, {'max': 112}),
+    'sk_vamp':          ((1118, 671, 1317, 859), 'solid', 19, {'max': 112}),
+    'sk_clone':         ((1336, 671, 1541, 857), 'solid', 19, {'max': 112}),
+    'sk_jackpot':       ((1563, 665, 1763, 856), 'solid', 19, {'max': 112}),
+    # ── лист 20 (art/sheet26_anomalies.png): аномалии сектора, порядок как в D.ANOMALIES; имя — an_<id аномалии> ──
+    'an_ionwind':       ((27, 155, 433, 576), 'solid', 20, {'max': 112}),
+    'an_flagship':      ((461, 130, 855, 579), 'solid', 20, {'max': 112}),
+    'an_silence':       ((870, 165, 1274, 573), 'solid', 20, {'max': 112}),
+    'an_unstable':      ((1303, 152, 1702, 583), 'solid', 20, {'max': 112}),
+    'an_swarm':         ((1737, 150, 2155, 578), 'solid', 20, {'max': 112}),
 }
 
 # поздний атлас: свои спрайты боссов и большие мини-боссы. Он качается в фоне уже после появления меню
@@ -402,8 +443,8 @@ LATE = {n for n in SPRITES if n.startswith('b_') or n.startswith('fx_scr_')} | {
 # 3.1: лист 13 нужен не раньше 3-й волны (торговец, конвой, медкорабль) или дальних секторов (улей, красный гигант)
 LATE |= {n for n in SPRITES if len(SPRITES[n]) > 2 and SPRITES[n][2] == 13 and not n.startswith('en_')}
 LATE |= {n for n in SPRITES if n.startswith('asti_') or n.startswith('astp_')}
-# значки интерфейса (улучшения, реликвии, модули) нужны не на первом экране: до догрузки вместо них — эмодзи
-LATE |= {n for n in SPRITES if n.startswith('pk_') or n.startswith('r_') or n.startswith('md_')}
+# значки интерфейса (улучшения, реликвии, модули, навыки, аномалии) нужны не на первом экране: до догрузки вместо них — эмодзи
+LATE |= {n for n in SPRITES if n.startswith('pk_') or n.startswith('r_') or n.startswith('md_') or n.startswith('sk_') or n.startswith('an_')}
 
 # сопла двигателей (координаты листа): x, y, относительный размер пламени
 NOZZLES = {

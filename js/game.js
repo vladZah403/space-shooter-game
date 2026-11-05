@@ -2102,7 +2102,7 @@
         // после баннера волны, чтобы не налезать на него
         this.after(this.wave.intro + 0.6, () => {
           if (this.run !== run || D.ANOMALIES[run.anomaly] !== def) return;
-          SS.emit('toast', { ico: def.ico, title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
+          SS.emit('toast', { ico: def.ico, img: G.icon('an_' + run.anomaly, def.ico), title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
           A.play('skill', { rate: 0.7 });
           this.hintOnce('anomaly', 'ПОДСКАЗКА', 'Аномалия меняет правила сектора до босса: сложнее, зато монет и опыта больше. Подробности — на паузе');
         });
