@@ -1474,9 +1474,13 @@
       else if (!st.afford) why = 'Нужно ' + sk.cost + ' ' + U.plural(sk.cost, 'очко', 'очка', 'очков') + ', есть ' + M.skillPoints();
     }
     box.innerHTML = '<div class="skd-head"><div class="skd-ico">' + skIco(id) + '</div><div><div class="skd-name">' + sk.name + '</div><div class="skd-meta">' + meta.join(' · ') + '</div></div></div>' +
-      '<div class="skd-desc">' + sk.desc + '</div>' + (why ? '<div class="skd-why">' + why + '</div>' : '') +
+      '<div class="skd-desc">' + sk.desc + '</div>' +
+      // 4.3.2: у активного навыка — живой предпросмотр, как у оружия в арсенале (js/demo.js)
+      (sk.type === 'active' ? '<canvas class="ad-demo skd-demo" id="skillDemo"></canvas>' : '') +
+      (why ? '<div class="skd-why">' + why + '</div>' : '') +
       '<div class="skd-btns">' + (st.maxed ? '' : '<button class="btn primary" id="skdLearn"' + (st.canLearn || SS.DEV && !st.locked && !st.slotsFull ? '' : ' disabled') + '>' + (st.learned ? 'РАНГ ' + (st.rank + 1) : 'ИЗУЧИТЬ') + ' · ' + ic('atom') + sk.cost + '</button>') +
       (st.learned ? '<button class="btn ghost" id="skdForget">СНЯТЬ</button>' : '') + '</div>';
+    if (sk.type === 'active') requestAnimationFrame(() => SS.demo.skill($('#skillDemo'), id));
     const learn = $('#skdLearn');
     if (learn) learn.addEventListener('click', () => {
       if (M.learnSkill(id)) { A.play('levelup'); T.haptic('success'); ui.toast({ ico: sk.ico, img: skIco(id), title: st.learned ? 'РАНГ ' + (st.rank + 1) : 'НАВЫК ИЗУЧЕН', text: sk.name, info: true }); }
