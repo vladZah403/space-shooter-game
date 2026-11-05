@@ -192,6 +192,21 @@
     SS.store.soon();
     SS.emit('toast', { ico: 'info', title, text, info: true, hint: true, dur: 6500 });
   };
+  // 4.3.2: первая встреча с аномалией, событием волны или эволюцией — пауза и окно «как работает / как
+  // использовать» (тексты — D.TIPS). Окно ждёт в очереди, пока идёт бой без сцен и выбора (game.frame).
+  // true — окно будет (тогда обычную плашку не показываем); дальше — только плашка, подробности на паузе
+  game.tipOnce = function (key, tip) {
+    const seen = M.s.tips || (M.s.tips = {}), q = this.run && (this.run.tipQ || (this.run.tipQ = []));
+    if (!q || seen[key] || !D.TIPS[key]) return false;
+    if (!q.some((t) => t.key === key)) q.push(Object.assign({ key, how: D.TIPS[key].how, use: D.TIPS[key].use }, tip));
+    return true;
+  };
+  game.closeTip = function () {
+    if (this.state !== 'tip') return;
+    this.state = 'play';
+    this.player.inv = Math.max(this.player.inv, 0.6);
+    SS.emit('tip', null);
+  };
   // 4.2: аномалия сектора: без id — какая действует (или null), с id — действует ли эта
   game.anomaly = function (id) { const a = this.run && this.run.anomaly; return id ? a === id : a || null; };
   // нет бонусов: испытание «Без бонусов» или аномалия «Радиотишина»
@@ -313,6 +328,17 @@
   // ГЛАВНЫЙ ЦИКЛ
   // ════════════════════════════════════════════════════════════
   game.frame = function (rdt) {
+    if (this.state === 'play' && this.run.tipQ && this.run.tipQ.length && this.player.alive) {
+      const tip = this.run.tipQ.shift();
+      // «показано» отмечаем, только когда окно открылось (забег мог кончиться раньше)
+      (M.s.tips || (M.s.tips = {}))[tip.key] = 1;
+      SS.store.soon();
+      this.state = 'tip';
+      this.pointer.id = null;
+      SS.tg.haptic('medium');
+      SS.emit('tip', tip);
+      return;
+    }
     if (this.state === 'play' || this.state === 'dying' || this.state === 'cutscene') {
       // хитстоп: мир замирает на пару кадров (кадр при этом рисуется)
       if (this.stopT > 0) { this.stopT -= rdt; return; }
@@ -1990,7 +2016,8 @@
       FX.sprite('fx_beam', 0, 0, { follow: p, oy: -p.w * 0.95, w0: p.w * 1.3, w1: p.w * 1.5, dur: 1.2, hold: 0.5, fadeIn: 0.1, hue: 300 });
       FX.flash('#ff9ff3', 0.3);
       A.play('levelup', { rate: 1.2 });
-      SS.emit('toast', { ico: '🧬', title: 'ЭВОЛЮЦИЯ ОРУЖИЯ', text: ev.name + ': ' + ev.desc, info: true, dur: 3200 });
+      if (!this.tipOnce('evo_' + ev.weapon, { kind: 'ЭВОЛЮЦИЯ ОРУЖИЯ', ico: '🧬', title: ev.name, color: D.WEAPONS[ev.weapon].color, note: 'Оружие: ' + D.WEAPONS[ev.weapon].name + '. Действует до конца забега.' }))
+        SS.emit('toast', { ico: '🧬', title: 'ЭВОЛЮЦИЯ ОРУЖИЯ', text: ev.name + ': ' + ev.desc, info: true, dur: 3200 });
       if (p.weapon !== ev.weapon) this.setWeapon(ev.weapon);
     }
   };
@@ -2102,8 +2129,11 @@
         // после баннера волны, чтобы не налезать на него
         this.after(this.wave.intro + 0.6, () => {
           if (this.run !== run || D.ANOMALIES[run.anomaly] !== def) return;
-          SS.emit('toast', { ico: def.ico, img: G.icon('an_' + run.anomaly, def.ico), title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
           A.play('skill', { rate: 0.7 });
+          const pct = Math.round(def.bonus * 100);
+          if (this.tipOnce(run.anomaly, { kind: 'АНОМАЛИЯ СЕКТОРА', ico: G.icon('an_' + run.anomaly, def.ico), title: def.name, color: def.color,
+            note: 'Действует до босса сектора. Монет и опыта +' + pct + '%.' })) return;
+          SS.emit('toast', { ico: def.ico, img: G.icon('an_' + run.anomaly, def.ico), title: 'АНОМАЛИЯ: ' + def.name, text: def.desc + ' · награды +' + Math.round(def.bonus * 100) + '%', dur: 3800 });
           this.hintOnce('anomaly', 'ПОДСКАЗКА', 'Аномалия меняет правила сектора до босса: сложнее, зато монет и опыта больше. Подробности — на паузе');
         });
       }

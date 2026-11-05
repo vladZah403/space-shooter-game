@@ -81,6 +81,8 @@
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      // 4.3.2: окно-подсказка закрывается Esc / Enter / пробелом
+      if (g.state === 'tip' && (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); g.closeTip(); return; }
       if ((e.code === 'Escape' || e.code === 'KeyP') && (g.inRun() || g.state === 'pause')) { g.state === 'pause' ? g.resume() : g.pause(); return; }
       if (e.code === 'Escape' && SS.ui) { SS.ui.back(); return; }
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && g.inRun()) e.preventDefault();
@@ -126,7 +128,7 @@
       ctx.imageSmoothingEnabled = true;
       g.draw(ctx);
     }
-    if (g.state === 'play' || g.state === 'perk' || g.state === 'pause' || g.state === 'dying' || g.state === 'revive') SS.ui.updateHud();
+    if (g.state === 'play' || g.state === 'perk' || g.state === 'pause' || g.state === 'tip' || g.state === 'dying' || g.state === 'revive') SS.ui.updateHud();
     measure(rdt);
   }
 

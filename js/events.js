@@ -72,6 +72,7 @@
       if (!c.announced) {
         c.announced = true;
         SS.emit('waveEvent', c.def);
+        game.tipOnce(c.def.id, { kind: 'СОБЫТИЕ ВОЛНЫ', ico: c.def.ico, title: c.def.name, color: c.def.color });
         A.play('skill', { rate: 0.8 });
         game.hudDirty = true;
         c.cd = 1.4;

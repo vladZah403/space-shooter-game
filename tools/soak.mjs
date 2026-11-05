@@ -99,6 +99,7 @@ const BOT = `(() => {
       if (g.state === 'idle' || g.state === 'over') return;
       if (g.player) g.player.inv = Math.max(g.player.inv, 5);
       if ((g.scene || g.state === 'cutscene') && g.skipScene) g.skipScene();
+      if (g.state === 'tip') { g.closeTip(); return; }
       if (g.state === 'perk') {
         if (g.offerKind === 'map') {
           const run = g.run, step = (run.mapStep - 1) % 5, ch = SS.map.choices(run.map, step);

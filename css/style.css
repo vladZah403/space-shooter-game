@@ -106,6 +106,19 @@ svg{width:1em;height:1em;flex-shrink:0}
 .dialog-ico svg{font-size:44px}
 .dialog-btns{display:flex;gap:10px;margin-top:6px}
 .dialog-btns .btn{flex:1}
+/* 4.3.2: окно-подсказка (аномалия, событие волны, эволюция) */
+.tip-modal{--tc:#3de0ff;border-color:color-mix(in srgb,var(--tc) 55%,transparent);box-shadow:0 0 28px color-mix(in srgb,var(--tc) 25%,transparent);text-align:center;max-height:calc(100dvh - 40px);overflow-y:auto}
+.tip-kind{font-family:var(--font-h);font-size:11px;letter-spacing:2px;color:var(--tc);opacity:.9}
+.tip-ico{font-size:52px;line-height:1;margin:10px 0 6px}
+.tip-ico .sp-ico{width:84px}
+.tip-title{color:var(--tc);font-size:19px;letter-spacing:2px}
+.tip-note{font-size:13px;color:var(--gold);margin-top:6px}
+.tip-sec{text-align:left;margin-top:12px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
+.tip-sec b{display:block;font-family:var(--font-h);font-size:11px;letter-spacing:1.5px;color:var(--dim);margin-bottom:4px}
+.tip-sec.use{border-color:color-mix(in srgb,var(--tc) 35%,transparent)}
+.tip-sec.use b{color:var(--tc)}
+.tip-sec p{margin:0;font-size:14.5px;line-height:1.35;color:var(--text,#e8eeff)}
+.tip-ok{width:100%;margin-top:14px;min-height:46px}
 
 /* ── Подэкраны (общая шапка) ── */
 .screen.sub{background:radial-gradient(ellipse at 50% -10%,rgba(40,70,170,.35),transparent 60%),rgba(5,6,15,.94)}

@@ -138,6 +138,7 @@
     SS.on('reviveOffer', (cost) => ui.showRevive(cost));
     SS.on('runEnd', (sum) => { if (sum) ui.showGameOver(sum); });
     SS.on('paused', (on) => { if (on) ui.showPause(); else ui.hide('#scr-pause'); });
+    SS.on('tip', (t) => ui.showTip(t));
     SS.on('playerHit', () => { const f = $('#dmgFlash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 90); ui.hudCache.lives = -1; });
     SS.on('revived', () => { ui.hide('#scr-revive'); });
 
@@ -251,6 +252,7 @@
 
   ui.back = function () {
     if (ui.isShown('#scr-dialog')) { ui.hide('#scr-dialog'); return; }
+    if (ui.isShown('#scr-tip')) { game.closeTip(); return; }
     if (ui.isShown('#scr-chest')) { SS.relicsUi.chestClose(); return; }
     if (ui.isShown('#scr-relics')) { SS.relicsUi.close(); return; }
     if (ui.isShown('#scr-diff')) { A.play('back'); ui.hide('#scr-diff'); if (ui.cur === 'menu') T.back(null); return; }
@@ -1077,6 +1079,25 @@
   // ════════════════════════════════════════════════════════════
   // ДИАЛОГ
   // ════════════════════════════════════════════════════════════
+  // 4.3.2: окно-подсказка (game.tipOnce): t = { kind, ico (эмодзи или <img> из атласа), title, color, note, how, use };
+  // null — закрыть. Игра стоит, пока окно открыто; «Понятно», «Назад» Telegram и Esc продолжают бой
+  ui.showTip = function (t) {
+    if (!t) { ui.hide('#scr-tip'); if (ui.cur === 'game') T.back(null); return; }
+    const box = $('#scr-tip .tip-modal');
+    box.style.setProperty('--tc', t.color || '#3de0ff');
+    $('#tipKind').textContent = t.kind || '';
+    $('#tipIco').innerHTML = t.ico || '';
+    $('#tipTitle').textContent = t.title || '';
+    $('#tipNote').textContent = t.note || '';
+    $('#tipNote').hidden = !t.note;
+    $('#tipHow').textContent = t.how || '';
+    $('#tipUse').textContent = t.use || '';
+    $('#tipOk').onclick = () => { A.play('click'); game.closeTip(); };
+    A.play('perk', { vol: 0.6 });
+    ui.show('#scr-tip');
+    T.back(() => game.closeTip());
+  };
+
   ui.dialog = function (o) {
     $('#dlgIco').innerHTML = o.ico ? (o.ico.length > 3 ? ic(o.ico) : U.escape(o.ico)) : '';
     $('#dlgTitle').textContent = o.title || '';
